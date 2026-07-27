@@ -454,6 +454,8 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   <div class="mi" onclick="fecharMenu();openAdegasManager()">✏️ Gerenciar adegas</div>
   <div class="mi" onclick="fecharMenu();abrirConfigIA()">🔑 IA de visão (scanner)</div>
   <div class="mi" onclick="fecharMenu();carregarDemo()">🎬 Carregar demonstração</div>
+  <div class="mi" onclick="fecharMenu();abrirFeedback()">💬 Enviar feedback</div>
+  <div class="mi hidden" id="mi-fundador" onclick="fecharMenu();abrirFeedbacksFundador()">📥 Feedbacks (fundador)</div>
   <div class="mi" onclick="fecharMenu();abrirAjuda()">❓ Ajuda e suporte</div>
   <div class="mi" onclick="fecharMenu();abrirSobre()">ℹ️ Sobre o Apotheca</div>
   <div class="mi sair" onclick="fecharMenu();sairSessao()">🚪 Sair da sessão</div>
@@ -504,7 +506,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.30"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.31"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
@@ -1119,6 +1121,8 @@ function status(v){
 
 /* ================== MENU POP-UP ================== */
 function renderMenu(){
+  const mf=$("#mi-fundador");
+  if(mf)mf.classList.toggle("hidden",!(perfil&&perfil.user==="Jorge.Queiroz"));
   const tot=id=>vinhos.filter(v=>id==="todas"||v.adega===id).reduce((s,v)=>s+v.qtd,0);
   $("#menu-adegas").innerHTML=
     `<div class="mtit">MINHAS ADEGAS</div>`+
@@ -1218,6 +1222,48 @@ async function testarIA(){
 /* ===== SESSÃO E CADASTRO (nome único e definitivo) ===== */
 let provPendente=null;
 const normUser=s=>(s||"").trim().replace(/\s+/g,".").replace(/[^a-zA-Z0-9._-]/g,"");
+function abrirFeedback(){
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">💬 Sua opinião constrói o Apotheca</h3>
+    <div class="sub">Elogios, críticas, ideias, problemas — tudo chega direto ao fundador.</div>
+    <div class="field" style="margin-bottom:10px"><label>Tipo</label>
+      <select id="fb-tipo" style="width:100%">
+        <option value="elogio">💚 Elogio</option>
+        <option value="sugestao" selected>💡 Sugestão</option>
+        <option value="problema">🐞 Problema / erro</option>
+        <option value="critica">😤 Crítica</option>
+      </select></div>
+    <div class="field" style="margin-bottom:14px"><label>Sua mensagem</label>
+      <textarea id="fb-texto" rows="4" style="width:100%" placeholder="Conte com sinceridade — é assim que o app melhora."></textarea></div>
+    <button class="btn btn-primary" style="width:100%" onclick="enviarFeedback()">Enviar ao fundador</button>`;
+  $("#modal-detail").classList.add("open");
+}
+async function enviarFeedback(){
+  const texto=($("#fb-texto").value||"").trim();
+  if(!texto){toast("Escreva a mensagem primeiro. 💬");return}
+  try{
+    await sb("/feedback",{method:"POST",body:JSON.stringify({usuario:perfil?perfil.user:"anônimo",tipo:$("#fb-tipo").value,texto})});
+    closeModal("modal-detail");
+    toast("💌 Recebido! Obrigado por construir o Apotheca junto.");
+  }catch(e){toast("Sem conexão agora — tente de novo com internet. 📡")}
+}
+async function abrirFeedbacksFundador(){
+  $("#modal-detail-body").innerHTML=`<button class="close" onclick="closeModal('modal-detail')">✕</button><h3 class="serif">📥 Feedbacks recebidos</h3><div class="sub">⏳ Buscando na nuvem…</div>`;
+  $("#modal-detail").classList.add("open");
+  try{
+    const fbs=await sb("/feedback?select=*&order=id.desc&limit=100");
+    const EMO={elogio:"💚",sugestao:"💡",problema:"🐞",critica:"😤"};
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="closeModal('modal-detail')">✕</button>
+      <h3 class="serif">📥 Feedbacks recebidos (${fbs.length})</h3>
+      <div class="sub">Direto do banco, em tempo real — só você vê isto.</div>
+      ${fbs.map(f=>`<div style="background:var(--cream);border-radius:10px;padding:11px 13px;margin-bottom:8px">
+        <div style="font-size:12px;color:var(--ink-2);margin-bottom:4px">${EMO[f.tipo]||"💬"} <b>${f.tipo}</b> · @${f.usuario} · ${new Date(f.criado).toLocaleString("pt-BR")}</div>
+        <div style="font-size:13.5px;line-height:1.5">${f.texto}</div>
+      </div>`).join("")||'<div class="empty">Nenhum feedback ainda — compartilhe o link! 📣</div>'}`;
+  }catch(e){$("#modal-detail-body").innerHTML=`<button class="close" onclick="closeModal('modal-detail')">✕</button><div class="empty">Sem conexão com a nuvem agora. 📡</div>`}
+}
 function carregarDemo(){
   const d=JSON.parse(JSON.stringify(DEMO_SEED));
   vinhos=d.vinhos;historico=d.historico;eventos=d.eventos;amigos=d.amigos;ADEGAS=d.ADEGAS;
