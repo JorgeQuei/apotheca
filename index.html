@@ -1,0 +1,1720 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apotheca — Sua adega, inteligente</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#5c1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Apotheca">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root{
+  --wine:#5c1a2e; --wine-2:#7d2a40; --wine-3:#9c3a50;
+  --gold:#c9a227; --gold-soft:#e8d9a8;
+  --cream:#f7f1e5; --page:#f3ecdd; --card:#fffdf8;
+  --ink:#2b2026; --ink-2:#6b5c62; --ink-3:#998a90;
+  --line:#e6dccb; --ok:#3e7d3e; --warn:#b07a10; --danger:#b03636;
+  --c-tinto:#9c3a50; --c-branco:#d9a441; --c-rose:#e87ba4; --c-espumante:#6da7ec; --c-fortificado:#9d5b13;
+  --shadow:0 2px 10px rgba(60,30,40,.08), 0 1px 3px rgba(60,30,40,.06);
+  --radius:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--page);color:var(--ink);min-height:100vh}
+.serif{font-family:Georgia,"Times New Roman",serif}
+
+/* ===== Shell ===== */
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.sidebar{background:linear-gradient(175deg,var(--wine) 0%,#471323 100%);color:#f4e8da;padding:26px 18px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:11px;margin-bottom:26px;padding:0 6px}
+.brand-icon{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.1);border:1px solid rgba(201,162,39,.55);display:flex;align-items:center;justify-content:center;font-size:22px}
+.brand h1{font-size:23px;letter-spacing:.5px;font-weight:600}
+.brand small{display:block;font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--gold-soft);font-family:system-ui,sans-serif}
+.nav-btn{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:10px;border:none;background:transparent;color:#e9d8c8;font-size:14.5px;cursor:pointer;text-align:left;width:100%;transition:background .15s}
+.nav-btn:hover{background:rgba(255,255,255,.08)}
+.nav-btn.active{background:rgba(201,162,39,.18);color:#fff;font-weight:600;box-shadow:inset 0 0 0 1px rgba(201,162,39,.4)}
+.nav-btn .ico{font-size:18px;width:22px;text-align:center}
+.sidebar .foot{margin-top:auto;font-size:11px;color:rgba(244,232,218,.55);padding:0 6px;line-height:1.5}
+
+.main{padding:28px 34px 90px;max-width:1120px;width:100%;margin:0 auto}
+.topbar{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+.topbar h2{font-size:26px;font-weight:650}
+.topbar p{color:var(--ink-2);font-size:14px;margin-top:3px}
+
+/* Bottom nav (mobile) */
+.bottomnav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--wine);z-index:60;padding:6px 4px calc(6px + env(safe-area-inset-bottom));justify-content:space-around;box-shadow:0 -3px 12px rgba(0,0,0,.2)}
+.bottomnav button{background:none;border:none;color:#dcc6b4;font-size:10.5px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:4px 2px;border-radius:8px;flex:1 1 0;min-width:0}
+.bottomnav button .ico{font-size:20px}
+.bottomnav button.active{color:var(--gold-soft);font-weight:700}
+.bottomnav .fab{width:58px;height:58px;border-radius:50%;background:var(--gold);color:#3a2b06;font-size:32px;font-weight:700;line-height:1;margin-top:-26px;box-shadow:0 4px 14px rgba(0,0,0,.35),0 0 0 5px var(--page);flex:none;display:flex;align-items:center;justify-content:center;padding:0}
+.bottomnav .fab.active{background:var(--gold-soft);color:#3a2b06}
+
+/* ===== Chat do encontro ===== */
+.chat-box{background:var(--cream);border-radius:12px;padding:12px;margin-top:10px}
+.chat-msgs{max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:4px}
+.msg{max-width:82%;padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.45;box-shadow:0 1px 2px rgba(60,30,40,.08)}
+.msg.deles{background:#fff;border-bottom-left-radius:4px;align-self:flex-start}
+.msg.minha{background:var(--wine);color:#fdf3e7;border-bottom-right-radius:4px;align-self:flex-end}
+.msg .quem{font-size:11px;font-weight:700;color:var(--wine-3);margin-bottom:2px}
+.msg.minha .quem{color:var(--gold-soft)}
+.msg .hora{font-size:10px;opacity:.6;text-align:right;margin-top:3px}
+.chat-envio{display:flex;gap:7px;margin-top:10px}
+.chat-envio input{flex:1;min-width:0;font-size:13px;padding:9px 12px}
+
+/* ===== Sugestões da base mundial no cadastro ===== */
+.sug-wrap{position:relative}
+.sug-box{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--gold);border-radius:0 0 12px 12px;box-shadow:0 10px 26px rgba(40,15,25,.18);z-index:70;max-height:260px;overflow:auto}
+.sug-item{padding:10px 13px;cursor:pointer;border-bottom:1px solid var(--cream);font-size:13px;display:flex;gap:8px;align-items:center}
+.sug-item:hover{background:var(--cream)}
+.sug-item .inf{flex:1;min-width:0}
+.sug-item .inf small{display:block;color:var(--ink-2);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sug-head{padding:7px 13px;font-size:10.5px;font-weight:700;letter-spacing:1px;color:var(--ink-3);background:var(--cream)}
+
+/* ===== Menu pop-up ===== */
+.menu-btn{background:var(--card);border:1px solid var(--line);border-radius:12px;width:42px;height:42px;font-size:19px;cursor:pointer;box-shadow:var(--shadow);color:var(--wine);flex:none}
+.menu-bg{position:fixed;inset:0;z-index:85;display:none}
+.menu-bg.open{display:block}
+.menu-pop{position:fixed;top:70px;right:18px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(40,15,25,.28);z-index:90;min-width:236px;overflow:hidden;display:none}
+.menu-pop.open{display:block}
+.menu-pop .mi{display:flex;gap:11px;align-items:center;padding:13px 17px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--cream);user-select:none}
+.menu-pop .mi:hover{background:var(--cream)}
+.menu-pop .mi.sair{border-bottom:none;color:var(--danger)}
+.menu-pop .mi.ativo{background:var(--cream);font-weight:700}
+.menu-pop .mi .cont{margin-left:auto;font-size:11px;background:var(--cream);padding:2px 8px;border-radius:99px;color:var(--ink-2)}
+.menu-pop .mtit{padding:10px 17px 5px;font-size:10.5px;font-weight:700;letter-spacing:1.2px;color:var(--ink-3)}
+.login-screen{position:fixed;inset:0;background:linear-gradient(170deg,var(--wine),#471323);z-index:200;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:#f4e8da;text-align:center;padding:24px}
+.login-screen.open{display:flex}
+
+/* ===== Seletor de adegas ===== */
+.adega-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center}
+.adega-chip{display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:all .15s}
+.adega-chip:hover{border-color:var(--gold)}
+.adega-chip.sel{background:var(--wine);color:#fdf3e7;border-color:var(--wine)}
+.adega-chip .n{font-size:11px;background:rgba(0,0,0,.08);padding:1px 7px;border-radius:99px}
+.adega-chip.sel .n{background:rgba(255,255,255,.18)}
+.adega-loc{font-size:11.5px;color:var(--ink-2);background:var(--cream);padding:3px 8px;border-radius:6px}
+
+/* ===== Cards & KPIs ===== */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:14px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:118px}
+.kpi .lbl{font-size:12px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.kpi .val{font-size:30px;font-weight:700;line-height:1.05}
+.kpi .sub{font-size:12px;color:var(--ink-2);margin-top:5px}
+.kpi.hero{background:linear-gradient(150deg,var(--wine) 0%,var(--wine-2) 100%);color:#fdf6ec;border-color:transparent}
+.kpi.hero .lbl{color:var(--gold-soft)}
+.kpi.hero .sub{color:#e5cdb8}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.panel h3{font-size:15px;font-weight:650;margin-bottom:14px}
+.panel h3 small{font-weight:400;color:var(--ink-2);font-size:12px}
+
+/* Stacked bar (tipos) */
+.stack{display:flex;height:34px;border-radius:8px;overflow:hidden;gap:2px;background:var(--card)}
+.stack div{transition:flex .3s}
+.stack-legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:12px}
+.stack-legend span{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink)}
+.dot{width:10px;height:10px;border-radius:3px;flex:none}
+
+/* Horizontal bars (países) */
+.hbars{display:flex;flex-direction:column;gap:9px}
+.hbar{display:grid;grid-template-columns:96px 1fr 34px;align-items:center;gap:10px;font-size:12.5px}
+.hbar .name{color:var(--ink);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbar .track{background:transparent;height:16px;position:relative}
+.hbar .fill{height:16px;border-radius:0 4px 4px 0;background:var(--wine-3);min-width:3px}
+.hbar .num{color:var(--ink-2);font-variant-numeric:tabular-nums}
+
+/* Alerts */
+.alert-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--cream);margin-bottom:8px;font-size:13px;cursor:pointer;border:1px solid transparent}
+.alert-row:hover{border-color:var(--gold)}
+.alert-row .tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;flex:none}
+.tag.auge{background:#e3f0e3;color:var(--ok)} .tag.logo{background:#faeed2;color:var(--warn)} .tag.passando{background:#f7dede;color:var(--danger)} .tag.guardar{background:#e8e4f5;color:#5b4a9e}
+
+/* ===== Coleção ===== */
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.filters input[type=search]{flex:1;min-width:200px}
+input,select,textarea{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(201,162,39,.5);border-color:var(--gold)}
+.wine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(295px,1fr));gap:14px}
+.wcard{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--c-tinto);border-radius:var(--radius);padding:15px 16px;box-shadow:var(--shadow);cursor:pointer;transition:transform .12s, box-shadow .12s;position:relative}
+.wcard:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(60,30,40,.14)}
+.wcard .top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.wcard h4{font-size:15.5px;font-weight:650;line-height:1.25}
+.wcard .vin{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:99px;color:#fff;flex:none;letter-spacing:.3px}
+.wcard .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--ink-2)}
+.wcard .meta span{background:var(--cream);padding:3px 8px;border-radius:6px}
+.wcard .bottom{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.wcard .qty{font-size:13px;font-weight:700}
+.wcard .qty small{font-weight:400;color:var(--ink-2)}
+.count-note{color:var(--ink-2);font-size:13px;margin-bottom:12px}
+
+/* ===== Botões ===== */
+.btn{border:none;border-radius:10px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;transition:filter .15s}
+.btn:hover{filter:brightness(1.08)}
+.btn-primary{background:var(--wine);color:#fdf3e7}
+.btn-gold{background:var(--gold);color:#3a2b06}
+.btn-ghost{background:transparent;color:var(--wine);border:1.5px solid var(--wine)}
+.btn-sm{padding:7px 12px;font-size:12.5px;border-radius:8px}
+
+/* ===== Add ===== */
+.add-modes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+.mode-card{background:var(--card);border:2px solid var(--line);border-radius:var(--radius);padding:22px;text-align:center;cursor:pointer;transition:border .15s}
+.mode-card:hover,.mode-card.sel{border-color:var(--gold)}
+.mode-card .big{font-size:34px;margin-bottom:8px}
+.mode-card h4{font-size:15px;margin-bottom:5px}
+.mode-card p{font-size:12.5px;color:var(--ink-2);line-height:1.45}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:13px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.field input,.field select{width:100%}
+.field.wide{grid-column:1/-1}
+.slider-val{font-weight:700;color:var(--wine);margin-left:6px}
+input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
+
+/* Scanner */
+.scan-overlay{position:fixed;inset:0;background:rgba(20,8,14,.93);z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;gap:22px;color:#f0e2d0}
+.scan-overlay.open{display:flex}
+.scan-frame{width:min(320px,80vw);height:400px;border:2px solid rgba(201,162,39,.8);border-radius:18px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.04)}
+.scan-frame .bottle{font-size:120px;opacity:.9;filter:drop-shadow(0 6px 20px rgba(0,0,0,.5))}
+.scan-line{position:absolute;left:8px;right:8px;height:3px;background:linear-gradient(90deg,transparent,#ffd76e,transparent);animation:scan 1.6s ease-in-out infinite;border-radius:3px;box-shadow:0 0 14px #ffd76e}
+@keyframes scan{0%,100%{top:8%}50%{top:90%}}
+.scan-status{font-size:15px;letter-spacing:.3px;text-align:center;max-width:320px;line-height:1.5}
+.scan-ok{color:#8fd08f;font-weight:700}
+
+/* ===== Harmonizar ===== */
+.dish-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:12px}
+.dish{background:var(--card);border:2px solid var(--line);border-radius:var(--radius);padding:16px 12px;text-align:center;cursor:pointer;transition:all .15s}
+.dish:hover{border-color:var(--gold);transform:translateY(-2px)}
+.dish.sel{border-color:var(--wine);background:#fbf3ea;box-shadow:var(--shadow)}
+.dish .em{font-size:30px;margin-bottom:7px}
+.dish h4{font-size:13.5px;line-height:1.25}
+.dish small{font-size:11px;color:var(--ink-2)}
+.freeform{display:flex;gap:10px;margin:16px 0 6px}
+.freeform input{flex:1}
+.pair-results{margin-top:22px}
+.pair-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);margin-bottom:14px;display:flex;gap:16px;align-items:flex-start}
+.pair-card.first{border:2px solid var(--gold);background:linear-gradient(160deg,#fffdf8,#fdf6e6)}
+.medal{font-size:30px;flex:none;width:44px;text-align:center}
+.pair-card h4{font-size:16.5px}
+.pair-card .vin{color:var(--ink-2);font-size:13px;margin:2px 0 8px}
+.match{font-size:12px;font-weight:800;color:var(--wine);background:var(--gold-soft);padding:3px 10px;border-radius:99px;white-space:nowrap}
+.why{margin-top:8px;font-size:13.5px;line-height:1.55;color:var(--ink)}
+.why li{margin-left:18px;margin-bottom:4px}
+.pair-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+.explain-box{background:var(--cream);border-radius:10px;padding:13px 15px;font-size:13px;color:var(--ink-2);line-height:1.55;margin-top:14px}
+
+/* ===== Histórico ===== */
+.hist-row{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin-bottom:10px}
+.hist-row .em{font-size:24px}
+.hist-row .info{flex:1}
+.hist-row h4{font-size:14.5px}
+.hist-row p{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.stars{color:var(--gold);font-size:15px;letter-spacing:1px;white-space:nowrap}
+
+/* ===== Modal ===== */
+.modal-bg{position:fixed;inset:0;background:rgba(30,12,20,.55);z-index:80;display:none;align-items:center;justify-content:center;padding:18px}
+.modal-bg.open{display:flex}
+.modal{background:var(--card);border-radius:18px;max-width:560px;width:100%;max-height:88vh;overflow:auto;padding:26px;box-shadow:0 18px 60px rgba(0,0,0,.35);position:relative}
+.modal .close{position:absolute;top:14px;right:16px;background:var(--cream);border:none;border-radius:99px;width:32px;height:32px;font-size:16px;cursor:pointer;color:var(--ink-2)}
+.modal h3{font-size:20px;margin-bottom:2px;padding-right:36px}
+.modal .sub{color:var(--ink-2);font-size:13.5px;margin-bottom:16px}
+.spec-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px 18px;margin:14px 0;font-size:13.5px}
+.spec-grid b{display:block;font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.meter{display:flex;gap:3px;margin-top:3px}
+.meter i{width:16px;height:7px;border-radius:3px;background:var(--line)}
+.meter i.on{background:var(--wine-3)}
+.notes{background:var(--cream);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.55;font-style:italic;color:var(--ink-2);margin:10px 0 16px}
+.modal-actions{display:flex;gap:10px;flex-wrap:wrap}
+.rate-stars{display:flex;gap:6px;font-size:30px;cursor:pointer;user-select:none;margin:10px 0 18px}
+.rate-stars span{color:#d8cfc0;transition:color .1s}
+.rate-stars span.on{color:var(--gold)}
+
+.toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--wine);color:#fdf3e7;padding:13px 22px;border-radius:12px;font-size:14px;z-index:120;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .3s,transform .3s,visibility .3s;box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible}
+.hidden{display:none!important}
+.empty{color:var(--ink-2);text-align:center;padding:40px 20px;font-size:14px;line-height:1.6}
+.empty .big{font-size:40px;margin-bottom:10px}
+
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .bottomnav{display:flex}
+  .main{padding:20px 16px 110px}
+  .grid2{grid-template-columns:1fr}
+  .add-modes{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">🍷</div>
+      <div><h1 class="serif">Apotheca</h1><small>Sua adega, inteligente</small></div>
+    </div>
+    <button class="nav-btn active" data-view="dashboard"><span class="ico">🏛️</span> Minha Adega</button>
+    <button class="nav-btn" data-view="colecao"><span class="ico">🍾</span> Coleção</button>
+    <button class="nav-btn" data-view="add"><span class="ico">➕</span> Adicionar vinho</button>
+    <button class="nav-btn" data-view="harmonizar"><span class="ico">🍽️</span> Harmonizar</button>
+    <button class="nav-btn" data-view="encontros"><span class="ico">🥂</span> Encontros</button>
+    <button class="nav-btn" data-view="historico"><span class="ico">📜</span> Histórico</button>
+    <div class="foot">Protótipo <span id="ver-badge"></span> · <span id="persist-badge"></span><br>Adega de <b>Jorge</b><br>
+      <a href="#" onclick="resetDemo();return false" style="color:var(--gold-soft);font-size:11px">↺ Restaurar dados de demonstração</a></div>
+  </aside>
+
+  <main class="main">
+
+    <div class="adega-bar" id="adega-bar" style="display:none"></div>
+
+    <!-- ===== DASHBOARD ===== -->
+    <section id="view-dashboard">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:-6px 0 16px">
+        <div class="serif" style="font-size:20px;color:var(--wine);font-weight:700;letter-spacing:.4px">🍷 Apotheca</div>
+        <button class="menu-btn" onclick="toggleMenu(event)" title="Menu" aria-label="Menu">☰</button>
+      </div>
+      <div class="topbar"><div><h2>Minha Adega</h2><p>Visão geral da sua coleção — atualizada em tempo real.</p></div></div>
+      <div class="kpis">
+        <div class="kpi hero"><div class="lbl">Garrafas na adega</div><div class="val" id="kpi-garrafas">—</div><div class="sub" id="kpi-rotulos">—</div></div>
+        <div class="kpi"><div class="lbl">Valor estimado</div><div class="val" id="kpi-valor">—</div><div class="sub">soma dos preços de aquisição</div></div>
+        <div class="kpi"><div class="lbl">No auge para beber</div><div class="val" id="kpi-auge">—</div><div class="sub">dentro da janela ideal de consumo</div></div>
+        <div class="kpi" onclick="go('historico')" style="cursor:pointer" title="Ver histórico de consumo"><div class="lbl">Consumidas em 2026 📜</div><div class="val" id="kpi-consumidas">—</div><div class="sub" id="kpi-media">—</div><div class="sub" style="color:var(--wine);font-weight:600">toque para ver o histórico →</div></div>
+      </div>
+      <div class="grid2">
+        <div class="panel">
+          <h3>Composição por tipo <small>· garrafas</small></h3>
+          <div class="stack" id="chart-tipos" role="img" aria-label="Distribuição de garrafas por tipo de vinho"></div>
+          <div class="stack-legend" id="legend-tipos"></div>
+        </div>
+        <div class="panel">
+          <h3>Garrafas por país <small>· origem</small></h3>
+          <div class="hbars" id="chart-paises"></div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <h3>⏳ Janela de consumo — atenção</h3>
+        <div id="alerts"></div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <h3>📜 Histórico de consumo <small>· suas últimas garrafas abertas</small></h3>
+        <div id="dash-hist"></div>
+      </div>
+    </section>
+
+    <!-- ===== COLEÇÃO ===== -->
+    <section id="view-colecao" class="hidden">
+      <div class="topbar"><div><h2>Coleção</h2><p>Todos os rótulos cadastrados na sua Apotheca.</p></div>
+        <button class="btn btn-primary btn-sm" onclick="go('add')">＋ Adicionar vinho</button></div>
+      <div class="filters">
+        <input type="search" id="f-busca" placeholder="🔍 Buscar por nome, vinícola, uva ou região…">
+        <select id="f-tipo"><option value="">Todos os tipos</option></select>
+        <select id="f-pais"><option value="">Todos os países</option></select>
+        <select id="f-ordem">
+          <option value="nome">Ordenar: Nome</option>
+          <option value="safra">Ordenar: Safra</option>
+          <option value="preco">Ordenar: Preço ↓</option>
+          <option value="qtd">Ordenar: Quantidade ↓</option>
+        </select>
+      </div>
+      <div class="count-note" id="colecao-count"></div>
+      <div class="wine-grid" id="wine-grid"></div>
+    </section>
+
+    <!-- ===== ADICIONAR ===== -->
+    <section id="view-add" class="hidden">
+      <div class="topbar"><div><h2>Adicionar vinho</h2><p>Cadastre pelo scanner do rótulo ou manualmente.</p></div></div>
+      <div class="add-modes">
+        <div class="mode-card sel" onclick="document.getElementById('form-panel').scrollIntoView({behavior:'smooth'});setTimeout(()=>document.getElementById('a-nome').focus(),400)">
+          <div class="big">🌍</div><h4>Buscar na base mundial</h4>
+          <p><b>O caminho mais rápido:</b> digite 3+ letras do nome no campo abaixo e escolha entre 100 mil vinhos — a ficha completa se preenche sozinha.</p>
+        </div>
+        <div class="mode-card" onclick="openScanner()">
+          <div class="big">📷</div><h4>Fotografar o rótulo</h4>
+          <p>A câmera lê o rótulo e sugere candidatos da base. Rótulos artísticos podem vencer o leitor local — nesse caso, use a busca digitada.</p>
+        </div>
+      </div>
+      <div class="panel" id="form-panel">
+        <h3 id="form-title">Ficha do vinho</h3>
+        <div class="formgrid">
+          <div class="field wide sug-wrap"><label>Nome do vinho * <span style="font-weight:400;text-transform:none;letter-spacing:0">· digite e busque na base mundial de 100 mil vinhos</span></label><input id="a-nome" placeholder="Ex.: Catena, Esporão, Miolo…" autocomplete="off"><div class="sug-box hidden" id="nome-sug"></div></div>
+          <div class="field"><label>Vinícola / Produtor</label><input id="a-vinicola" placeholder="Ex.: Vinícola Miolo"></div>
+          <div class="field"><label>País</label><select id="a-pais"></select></div>
+          <div class="field"><label>Região</label><input id="a-regiao" placeholder="Ex.: Vale dos Vinhedos"></div>
+          <div class="field"><label>Safra</label><input id="a-safra" type="number" min="1900" max="2026" placeholder="2020"></div>
+          <div class="field"><label>Tipo</label><select id="a-tipo"></select></div>
+          <div class="field"><label>Uvas (separe por vírgula)</label><input id="a-uvas" placeholder="Merlot, Cabernet Sauvignon"></div>
+          <div class="field"><label>Guardar em qual adega?</label><select id="a-adega" onchange="document.getElementById('nova-adega-wrap').classList.toggle('hidden',this.value!=='__nova')"></select></div>
+          <div class="field hidden" id="nova-adega-wrap"><label>Nome da nova adega</label><input id="a-nova-adega" placeholder="Ex.: Casa de Campo"></div>
+          <div class="field"><label>Quantidade de garrafas</label><input id="a-qtd" type="number" min="1" value="1"></div>
+          <div class="field"><label>Preço pago (R$/garrafa)</label><input id="a-preco" type="number" min="0" placeholder="120"></div>
+          <div class="field"><label>Corpo <span class="slider-val" id="v-corpo">3</span></label><input type="range" id="a-corpo" min="1" max="5" value="3" oninput="v_corpo.textContent=this.value"></div>
+          <div class="field"><label>Acidez <span class="slider-val" id="v-acidez">3</span></label><input type="range" id="a-acidez" min="1" max="5" value="3" oninput="v_acidez.textContent=this.value"></div>
+          <div class="field"><label>Taninos <span class="slider-val" id="v-tanino">3</span></label><input type="range" id="a-tanino" min="1" max="5" value="3" oninput="v_tanino.textContent=this.value"></div>
+          <div class="field"><label>Beber entre (início)</label><input id="a-jan1" type="number" placeholder="2024"></div>
+          <div class="field"><label>Beber até (fim)</label><input id="a-jan2" type="number" placeholder="2030"></div>
+          <div class="field wide"><label>Notas de degustação</label><textarea id="a-notas" rows="2" style="width:100%" placeholder="Aromas, sabores, impressões…"></textarea></div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="saveWine()">Salvar na adega</button>
+          <button class="btn btn-ghost" onclick="clearForm()">Limpar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== HARMONIZAR ===== -->
+    <section id="view-harmonizar" class="hidden">
+      <div class="topbar"><div><h2>O que vai à mesa hoje?</h2><p>Escolha o prato e o Apotheca aponta, <b>entre as suas garrafas</b>, qual deveria ser aberta — e por quê.</p></div></div>
+      <div class="dish-grid" id="dish-grid"></div>
+      <div class="freeform">
+        <input id="free-dish" placeholder="Ou descreva o prato: ex. 'peixe grelhado com legumes'…">
+        <button class="btn btn-gold" onclick="freeSearch()">Harmonizar</button>
+      </div>
+      <div class="pair-results" id="pair-results"></div>
+    </section>
+
+    <!-- ===== ENCONTROS ===== -->
+    <section id="view-encontros" class="hidden">
+      <div class="topbar"><div><h2>Encontros & Confrarias</h2><p>Crie o evento, convide os amigos e veja as garrafas que cada um vai levar — com a ordem certa de serviço.</p></div></div>
+      <div class="panel" style="margin-bottom:16px">
+        <h3>👥 Minha Confraria <small>· sua rede de apreciadores — cada amigo pode entrar em uns encontros e não em outros</small></h3>
+        <div id="confraria-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="c-amigo-nome" placeholder="Nome do amigo" style="flex:1;min-width:140px">
+          <input id="c-amigo-cidade" placeholder="Cidade (opcional)" style="flex:1;min-width:120px">
+          <button class="btn btn-gold btn-sm" onclick="addAmigo()">＋ Adicionar amigo</button>
+        </div>
+      </div>
+      <div id="eventos-list"></div>
+      <div class="panel" style="margin-top:16px">
+        <h3>➕ Criar novo encontro</h3>
+        <div class="formgrid">
+          <div class="field"><label>Nome do encontro</label><input id="e-nome" placeholder="Ex.: Almoço no Fasano"></div>
+          <div class="field"><label>Data</label><input id="e-data" placeholder="Ex.: 08/08/2026"></div>
+          <div class="field"><label>Local</label><input id="e-local" placeholder="Ex.: Fasano, Recife"></div>
+        </div>
+        <div style="margin-top:12px">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px">Quem participa deste encontro?</label>
+          <div id="e-amigos" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn btn-primary" onclick="createEvento()">Criar encontro</button></div>
+      </div>
+    </section>
+
+    <!-- ===== HISTÓRICO ===== -->
+    <section id="view-historico" class="hidden">
+      <div class="topbar"><div><h2>Histórico de consumo</h2><p>As garrafas que você já abriu, com suas avaliações.</p></div></div>
+      <div id="hist-list"></div>
+      <div style="margin-top:22px;text-align:center"><button class="btn btn-ghost btn-sm" onclick="resetDemo()">↺ Restaurar dados de demonstração</button>
+      <div style="font-size:11.5px;color:var(--ink-2);margin-top:8px" id="persist-note"></div></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Bottom nav mobile -->
+<nav class="bottomnav">
+  <button class="active" data-view="dashboard"><span class="ico">🏛️</span>Adega</button>
+  <button data-view="colecao"><span class="ico">🍾</span>Coleção</button>
+  <button class="fab" data-view="add" aria-label="Adicionar vinho">＋</button>
+  <button data-view="harmonizar"><span class="ico">🍽️</span>Harmonizar</button>
+  <button data-view="encontros"><span class="ico">🥂</span>Encontros</button>
+</nav>
+
+<!-- Menu pop-up -->
+<div class="menu-bg" id="menu-bg" onclick="fecharMenu()"></div>
+<div class="menu-pop" id="menu-pop">
+  <div id="menu-adegas"></div>
+  <div class="mi" onclick="fecharMenu();go('historico')">📜 Histórico</div>
+  <div class="mi" onclick="fecharMenu();openAdegasManager()">✏️ Gerenciar adegas</div>
+  <div class="mi" onclick="fecharMenu();abrirConfigIA()">🔑 IA de visão (scanner)</div>
+  <div class="mi" onclick="fecharMenu();abrirAjuda()">❓ Ajuda e suporte</div>
+  <div class="mi" onclick="fecharMenu();abrirSobre()">ℹ️ Sobre o Apotheca</div>
+  <div class="mi sair" onclick="fecharMenu();sairSessao()">🚪 Sair da sessão</div>
+</div>
+
+<!-- Tela de login (simulada) -->
+<div class="login-screen" id="login-screen">
+  <div style="font-size:60px">🍷</div>
+  <h1 class="serif" style="font-size:36px;letter-spacing:1px">Apotheca</h1>
+  <p style="color:var(--gold-soft);margin-top:-8px">Sua adega, inteligente</p>
+  <p style="font-size:13px;max-width:290px;opacity:.85;line-height:1.5">Sessão encerrada com segurança.<br>No aplicativo final, aqui estará o login com e-mail, Google ou Apple.</p>
+  <button class="btn btn-gold" onclick="entrarSessao()">Entrar como Jorge</button>
+</div>
+
+<!-- Scanner overlay -->
+<div class="scan-overlay" id="scanner">
+  <div class="scan-frame">
+    <div class="bottle">🍾</div>
+    <video id="scan-video" playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:16px"></video>
+    <div class="scan-line" id="scan-line"></div>
+  </div>
+  <div class="scan-status" id="scan-status">Iniciando câmera…</div>
+  <button id="btn-capturar" class="btn btn-primary" onclick="capturarRotulo()">📸 Fotografar rótulo</button>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+    <button class="btn btn-ghost" style="color:#f0e2d0;border-color:#f0e2d0" onclick="closeScanner();document.getElementById('a-nome').focus();toast('Digite 3+ letras do nome — a base mundial completa o resto. 🌍')">⌨️ Prefiro digitar</button>
+    <button class="btn btn-ghost" style="color:#f0e2d0;border-color:#f0e2d0" onclick="scanDemo()">🎬 Demo</button>
+    <button class="btn btn-ghost" style="color:#f0e2d0;border-color:#f0e2d0" onclick="closeScanner()">Cancelar</button>
+  </div>
+</div>
+
+<!-- Modal detalhe -->
+<div class="modal-bg" id="modal-detail"><div class="modal" id="modal-detail-body"></div></div>
+<!-- Modal consumo -->
+<div class="modal-bg" id="modal-consume"><div class="modal" id="modal-consume-body"></div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================== DADOS ================== */
+const APP_VERSION = "0.23"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const IA_KEY_STORE="apotheca_ia_key";
+function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
+const ANO = 2026;
+const TIPOS = ["Tinto","Branco","Rosé","Espumante","Fortificado"];
+const CORES = {Tinto:"var(--c-tinto)",Branco:"var(--c-branco)","Rosé":"var(--c-rose)",Espumante:"var(--c-espumante)",Fortificado:"var(--c-fortificado)"};
+const PAISES = ["Brasil","Argentina","Chile","Uruguai","Portugal","Espanha","França","Itália","Alemanha","Nova Zelândia","África do Sul","Estados Unidos","Outro"];
+/* Adega de demonstração — cada vinho tem perfil sensorial (1–5) usado pelo motor de harmonização */
+let NEXT_ID = 100;
+let vinhos = [
+ {id:1,nome:"Lote 43",vinicola:"Miolo",pais:"Brasil",regiao:"Vale dos Vinhedos",safra:2020,tipo:"Tinto",uvas:["Merlot","Cabernet Sauvignon"],corpo:4,acidez:3,tanino:3,doc:1,qtd:6,preco:135,jan:[2023,2030],notas:"Frutas negras maduras, baunilha e especiarias; taninos redondos."},
+ {id:2,nome:"Terroir Exclusivo Merlot",vinicola:"Casa Valduga",pais:"Brasil",regiao:"Vale dos Vinhedos",safra:2019,tipo:"Tinto",uvas:["Merlot"],corpo:4,acidez:3,tanino:3,doc:1,qtd:4,preco:160,jan:[2022,2029],notas:"Ameixa, cacau e tabaco; final longo e elegante."},
+ {id:3,nome:"Catena Malbec",vinicola:"Catena Zapata",pais:"Argentina",regiao:"Mendoza",safra:2021,tipo:"Tinto",uvas:["Malbec"],corpo:4,acidez:3,tanino:4,doc:1,qtd:12,preco:180,jan:[2023,2031],notas:"Violetas, amora e pimenta; clássico de altitude mendocino."},
+ {id:4,nome:"Rutini Cabernet-Malbec",vinicola:"Rutini Wines",pais:"Argentina",regiao:"Mendoza",safra:2020,tipo:"Tinto",uvas:["Cabernet Sauvignon","Malbec"],corpo:5,acidez:3,tanino:4,doc:1,qtd:6,preco:165,jan:[2023,2032],notas:"Estruturado, notas de cassis, cedro e chocolate amargo."},
+ {id:5,nome:"Montes Alpha Cabernet Sauvignon",vinicola:"Montes",pais:"Chile",regiao:"Valle de Colchagua",safra:2020,tipo:"Tinto",uvas:["Cabernet Sauvignon"],corpo:4,acidez:3,tanino:4,doc:1,qtd:8,preco:170,jan:[2023,2031],notas:"Cassis, eucalipto e barrica bem integrada."},
+ {id:6,nome:"Marqués de Casa Concha Carmenère",vinicola:"Concha y Toro",pais:"Chile",regiao:"Peumo",safra:2021,tipo:"Tinto",uvas:["Carmenère"],corpo:4,acidez:3,tanino:3,doc:1,qtd:10,preco:130,jan:[2023,2030],notas:"Pimentão vermelho assado, frutas negras e toque defumado."},
+ {id:7,nome:"Esporão Reserva Tinto",vinicola:"Herdade do Esporão",pais:"Portugal",regiao:"Alentejo",safra:2020,tipo:"Tinto",uvas:["Aragonez","Trincadeira","Alicante Bouschet"],corpo:4,acidez:3,tanino:3,doc:1,qtd:6,preco:190,jan:[2023,2030],notas:"Fruta madura, alecrim e taninos aveludados; alentejano clássico."},
+ {id:8,nome:"Crasto Reserva Vinhas Velhas",vinicola:"Quinta do Crasto",pais:"Portugal",regiao:"Douro",safra:2019,tipo:"Tinto",uvas:["Touriga Nacional","Touriga Franca","Tinta Roriz"],corpo:5,acidez:4,tanino:4,doc:1,qtd:3,preco:320,jan:[2024,2034],notas:"Concentrado e mineral; amoras, esteva e xisto do Douro."},
+ {id:9,nome:"Marqués de Riscal Reserva",vinicola:"Marqués de Riscal",pais:"Espanha",regiao:"Rioja",safra:2019,tipo:"Tinto",uvas:["Tempranillo"],corpo:4,acidez:4,tanino:3,doc:1,qtd:5,preco:210,jan:[2023,2031],notas:"Cereja madura, coco e baunilha do carvalho americano."},
+ {id:10,nome:"Barolo",vinicola:"Fontanafredda",pais:"Itália",regiao:"Piemonte",safra:2018,tipo:"Tinto",uvas:["Nebbiolo"],corpo:5,acidez:4,tanino:5,doc:1,qtd:4,preco:450,jan:[2024,2036],notas:"Rosas secas, alcatrão e cereja; o rei dos vinhos italianos."},
+ {id:11,nome:"Chianti Classico",vinicola:"San Felice",pais:"Itália",regiao:"Toscana",safra:2021,tipo:"Tinto",uvas:["Sangiovese"],corpo:3,acidez:4,tanino:3,doc:1,qtd:8,preco:220,jan:[2023,2029],notas:"Cereja ácida, violeta e ervas; acidez vibrante típica do Sangiovese."},
+ {id:12,nome:"Brunello di Montalcino",vinicola:"Banfi",pais:"Itália",regiao:"Toscana",safra:2017,tipo:"Tinto",uvas:["Sangiovese Grosso"],corpo:5,acidez:4,tanino:4,doc:1,qtd:2,preco:650,jan:[2024,2035],notas:"Complexo: couro, tabaco, cereja em compota e longa persistência."},
+ {id:13,nome:"Château Larose-Trintaudon",vinicola:"Larose-Trintaudon",pais:"França",regiao:"Haut-Médoc, Bordeaux",safra:2018,tipo:"Tinto",uvas:["Cabernet Sauvignon","Merlot"],corpo:4,acidez:3,tanino:4,doc:1,qtd:4,preco:280,jan:[2023,2030],notas:"Grafite, groselha e cedro; bordalês de excelente custo."},
+ {id:14,nome:"Châteauneuf-du-Pape La Bernardine",vinicola:"M. Chapoutier",pais:"França",regiao:"Vale do Rhône",safra:2019,tipo:"Tinto",uvas:["Grenache","Syrah"],corpo:5,acidez:3,tanino:4,doc:1,qtd:2,preco:520,jan:[2024,2033],notas:"Garrigue, framboesa madura e pimenta preta; potente e solar."},
+ {id:15,nome:"Bourgogne Pinot Noir",vinicola:"Louis Latour",pais:"França",regiao:"Borgonha",safra:2020,tipo:"Tinto",uvas:["Pinot Noir"],corpo:2,acidez:4,tanino:2,doc:1,qtd:6,preco:260,jan:[2023,2028],notas:"Cereja fresca, sutil terroso; leve, sedoso e gastronômico."},
+ {id:16,nome:"Beaujolais-Villages",vinicola:"Georges Duboeuf",pais:"França",regiao:"Beaujolais",safra:2022,tipo:"Tinto",uvas:["Gamay"],corpo:2,acidez:4,tanino:1,doc:1,qtd:5,preco:140,jan:[2023,2026],notas:"Frutado, floral, para beber jovem e até levemente refrescado."},
+ {id:17,nome:"Primitivo di Manduria",vinicola:"San Marzano",pais:"Itália",regiao:"Puglia",safra:2021,tipo:"Tinto",uvas:["Primitivo"],corpo:4,acidez:3,tanino:3,doc:2,qtd:6,preco:110,jan:[2023,2028],notas:"Geleia de amora, alcaçuz e calor mediterrâneo; macio e generoso."},
+ {id:18,nome:"Chablis",vinicola:"William Fèvre",pais:"França",regiao:"Borgonha (Chablis)",safra:2021,tipo:"Branco",uvas:["Chardonnay"],corpo:3,acidez:5,tanino:1,doc:1,qtd:4,preco:310,jan:[2023,2028],notas:"Mineralidade cortante, maçã verde e notas salinas de ostra."},
+ {id:19,nome:"Sauvignon Blanc",vinicola:"Cloudy Bay",pais:"Nova Zelândia",regiao:"Marlborough",safra:2023,tipo:"Branco",uvas:["Sauvignon Blanc"],corpo:2,acidez:5,tanino:1,doc:1,qtd:3,preco:330,jan:[2024,2027],notas:"Maracujá, capim-limão e explosão aromática inconfundível."},
+ {id:20,nome:"Vinho Verde",vinicola:"Casal Garcia",pais:"Portugal",regiao:"Minho",safra:2023,tipo:"Branco",uvas:["Loureiro","Trajadura","Arinto"],corpo:1,acidez:5,tanino:1,doc:2,qtd:8,preco:60,jan:[2024,2026],notas:"Leve, cítrico e levemente frisante; refrescância pura."},
+ {id:21,nome:"Albariño",vinicola:"Pazo de Señorans",pais:"Espanha",regiao:"Rías Baixas",safra:2022,tipo:"Branco",uvas:["Albariño"],corpo:2,acidez:5,tanino:1,doc:1,qtd:3,preco:240,jan:[2023,2027],notas:"Pêssego branco, casca de limão e salinidade atlântica."},
+ {id:22,nome:"Riesling Kabinett",vinicola:"Dr. Loosen",pais:"Alemanha",regiao:"Mosel",safra:2022,tipo:"Branco",uvas:["Riesling"],corpo:1,acidez:5,tanino:1,doc:3,qtd:4,preco:190,jan:[2024,2032],notas:"Damasco, petróleo sutil e doçura equilibrada por acidez elétrica."},
+ {id:23,nome:"Catena Chardonnay",vinicola:"Catena Zapata",pais:"Argentina",regiao:"Mendoza",safra:2022,tipo:"Branco",uvas:["Chardonnay"],corpo:4,acidez:4,tanino:1,doc:1,qtd:5,preco:140,jan:[2023,2027],notas:"Abacaxi grelhado, manteiga e barrica elegante; untuoso."},
+ {id:24,nome:"Gewürztraminer",vinicola:"Trimbach",pais:"França",regiao:"Alsácia",safra:2021,tipo:"Branco",uvas:["Gewürztraminer"],corpo:3,acidez:3,tanino:1,doc:2,qtd:2,preco:280,jan:[2023,2028],notas:"Lichia, rosas e gengibre; exuberante e aromático."},
+ {id:25,nome:"Whispering Angel",vinicola:"Château d'Esclans",pais:"França",regiao:"Provence",safra:2023,tipo:"Rosé",uvas:["Grenache","Cinsault"],corpo:2,acidez:4,tanino:1,doc:1,qtd:3,preco:350,jan:[2024,2026],notas:"Pálido provençal: morango sutil, pêssego e final seco."},
+ {id:26,nome:"Rosé Perini",vinicola:"Casa Perini",pais:"Brasil",regiao:"Vale Trentino",safra:2023,tipo:"Rosé",uvas:["Merlot"],corpo:2,acidez:4,tanino:1,doc:2,qtd:4,preco:55,jan:[2024,2026],notas:"Frutas vermelhas frescas, leve e descomplicado."},
+ {id:27,nome:"Chandon Brut",vinicola:"Chandon",pais:"Brasil",regiao:"Serra Gaúcha",safra:0,tipo:"Espumante",uvas:["Chardonnay","Pinot Noir"],corpo:2,acidez:4,tanino:1,doc:2,qtd:6,preco:110,jan:[2024,2027],notas:"Maçã, brioche leve e perlage fina; versátil."},
+ {id:28,nome:"Cave Geisse Brut",vinicola:"Cave Geisse",pais:"Brasil",regiao:"Pinto Bandeira",safra:2020,tipo:"Espumante",uvas:["Chardonnay","Pinot Noir"],corpo:3,acidez:5,tanino:1,doc:1,qtd:4,preco:150,jan:[2023,2028],notas:"Método tradicional brasileiro de nível mundial; cítrico e cremoso."},
+ {id:29,nome:"Prosecco DOC",vinicola:"Mionetto",pais:"Itália",regiao:"Vêneto",safra:0,tipo:"Espumante",uvas:["Glera"],corpo:1,acidez:4,tanino:1,doc:2,qtd:6,preco:120,jan:[2024,2026],notas:"Pera, flores brancas e bolha alegre; aperitivo perfeito."},
+ {id:30,nome:"Veuve Clicquot Brut",vinicola:"Veuve Clicquot",pais:"França",regiao:"Champagne",safra:0,tipo:"Espumante",uvas:["Pinot Noir","Chardonnay","Meunier"],corpo:3,acidez:5,tanino:1,doc:1,qtd:2,preco:450,jan:[2024,2029],notas:"Brioche, avelã e maçã assada; o clássico amarelo."},
+ {id:31,nome:"Porto Tawny 10 Anos",vinicola:"Graham's",pais:"Portugal",regiao:"Douro",safra:0,tipo:"Fortificado",uvas:["Touriga Nacional","Tinta Barroca"],corpo:4,acidez:3,tanino:2,doc:5,qtd:2,preco:280,jan:[2020,2040],notas:"Caramelo, nozes e figo seco; doçura envolvente."}
+];
+
+/* ===== MÚLTIPLAS ADEGAS ===== */
+let ADEGAS=[
+ {id:"casa",nome:"Casa Principal",icone:"🏠"},
+ {id:"praia",nome:"Casa da Praia",icone:"🏖️"},
+ {id:"campo",nome:"Casa de Campo",icone:"🌄"}
+];
+let adegaAtiva="todas";
+/* Distribuição inicial: leves/frescos na praia, rústicos no campo, o restante em casa */
+const DIST={praia:[19,20,25,26,27,29],campo:[11,16,17,6]};
+vinhos.forEach(v=>{v.adega=DIST.praia.includes(v.id)?"praia":DIST.campo.includes(v.id)?"campo":"casa"});
+const adegaDe=id=>ADEGAS.find(a=>a.id===id)||{nome:"—",icone:"🍷"};
+const vinhosAtivos=()=>vinhos.filter(v=>adegaAtiva==="todas"||v.adega===adegaAtiva);
+
+/* Histórico inicial de demonstração */
+let historico = [
+ {nome:"Catena Malbec 2021",prato:"Churrasco de domingo",data:"12/07/2026",estrelas:5},
+ {nome:"Chablis 2021 · William Fèvre",prato:"Ostras frescas",data:"28/06/2026",estrelas:4},
+ {nome:"Chianti Classico 2021 · San Felice",prato:"Massa ao ragù",data:"14/06/2026",estrelas:4}
+];
+
+/* Base "mundial" simulada do scanner */
+const BASE_SCANNER = [
+ {nome:"Gran Reserva Tannat",vinicola:"Bodega Garzón",pais:"Uruguai",regiao:"Garzón, Maldonado",safra:2020,tipo:"Tinto",uvas:["Tannat"],corpo:5,acidez:3,tanino:5,doc:1,preco:220,jan:[2024,2032],notas:"Tannat uruguaio icônico: potente, frutas negras e taninos firmes."},
+ {nome:"Pouilly-Fumé",vinicola:"Domaine Didier Dagueneau",pais:"França",regiao:"Vale do Loire",safra:2021,tipo:"Branco",uvas:["Sauvignon Blanc"],corpo:3,acidez:5,tanino:1,doc:1,preco:890,jan:[2023,2030],notas:"Sílex, defumado e precisão cirúrgica do Loire."},
+ {nome:"Amarone della Valpolicella",vinicola:"Tommasi",pais:"Itália",regiao:"Vêneto",safra:2018,tipo:"Tinto",uvas:["Corvina","Rondinella"],corpo:5,acidez:3,tanino:4,doc:2,preco:580,jan:[2024,2034],notas:"Uvas passificadas: cereja em licor, chocolate e potência."},
+ {nome:"Erral Single Vineyard Pinot Noir",vinicola:"Ventisquero",pais:"Chile",regiao:"Casablanca",safra:2021,tipo:"Tinto",uvas:["Pinot Noir"],corpo:2,acidez:4,tanino:2,doc:1,preco:190,jan:[2023,2028],notas:"Frutas vermelhas frescas e toque terroso costeiro."}
+];
+
+const BASE_MUNDIAL=[["Origem Merlot","Tinto","Merlot","Brasil","Vale dos Vinhedos","Casa Valduga",4,3],["Reserva Chardonnay","Branco","Chardonnay","Brasil","Serra Gaúcha","Aurora",3,3],["Dona Antonia Porto Reserva Tawny","Fortificado","Touriga Nacional, Touriga Franca, Tinta Barroca, Tinta Amarela","Portugal","Porto","Porto Ferreira",5,5],["Fine Ruby Port","Fortificado","Tinta Amarela, Tinta Barroca, Touriga Franca, Tinta Roriz","Portugal","Porto","Sandeman",5,3],["Maré Alta","Branco","Loureiro, Alvarinho, Arinto","Portugal","Vinho Verde","Fonte Pequena",1,5],["Terras de Felgueiras Espumante de Vinho Verde Seco Branco","Espumante","Loureiro, Arinto, Trajadura, Azal Branco","Portugal","Vinho Verde","Cooperativa Agricola de Felgueiras",3,3],["Pátria Alentejo Selection Reserva","Tinto","Alicante Bouschet, Aragonez, Trincadeira","Portugal","Alentejo","Carmim",4,3],["Além do Rio Branco","Branco","Malvasia, Seara Nova, Arinto, Fernão Pires","Portugal","Lisboa","Azueira",3,5],["Calda Bordaleza Tinto","Tinto","Cabernet Sauvignon, Merlot, Petit Verdot","Portugal","Bairrada","Campolargo",4,3],["Regional Tinto","Tinto","Aragonez, Syrah/Shiraz","Portugal","Lisboa","Mundus",4,3],["Lacrau Colheita Field Blend","Tinto","Touriga Franca, Touriga Nacional, Tinta Roriz, Tinta Barroca","Portugal","Douro","Secret Spot Wines",4,3],["Maria Izabel Rosé","Rosé","Tinta Roriz, Tinta Francisca, Touriga Nacional","Portugal","Douro","Quinta Maria Izabel",3,5],["Terras de Basto Tinto","Tinto","Azal Tinto, Vinhão, Padeiro","Portugal","Vinho Verde","Quinta de Soutelos",4,3],["Primata Touriga Nacional","Tinto","Tinta Amarela, Touriga Franca, Tinta Roriz, Tinto Cão","Portugal","Douro","Niepoort",4,3],["Porto Colheita","Fortificado","Touriga Nacional, Touriga Franca, Tinta Roriz","Portugal","Porto","Quinta do Portal",5,3],["White Reserve Porto","Fortificado","Rabigato, Viosinho, Malvasia Fina, Côdega de Larinho","Portugal","Douro","Bulas",5,3],["Black Label Nik Weis Saar Riesling","Branco","Riesling","Alemanha","Mosel","Weingut Nik Weis-St. Urbans-Hof",3,5],["Felix Lemberger Trocken","Tinto","Lemberger","Alemanha","Württemberg","Wachtstetter",3,5],["Merlot Reserve Trocken","Tinto","Merlot","Alemanha","Württemberg","Aldinger",3,3],["Sauternes (Premier Grand Cru Classé)","Fortificado","Sémillon, Sauvignon Blanc","França","Sauternes","Château Suduiraut",4,5],["Vieille Vigne Gevrey-Chambertin","Tinto","Pinot Noir","França","Gevrey-Chambertin","Domaine Fourrier",3,3],["Pommard Premier Cru 'Grand Clos des Épenots'","Tinto","Pinot Noir","França","Pommard","Domaine de Courcel",3,3],["Coteaux d'Aix-en-Provence Rosé","Rosé","Syrah/Shiraz, Cinsault, Grenache","França","Provence","Moonlight & Roses",2,3],["Sancerre Les Baronnes Rosé","Rosé","Pinot Noir","França","Sancerre","Henri Bourgeois",3,3],["Pessac-Léognan","Tinto","Merlot, Cabernet Sauvignon, Petit Verdot","França","Pessac-Léognan","Château Pontet-Caillou",4,5],["Château Chemin Royal Moulis-en-Médoc","Tinto","Merlot, Cabernet Sauvignon","França","Moulis-en-Médoc","Château Fonréaud",4,5],["Santenay Rouge","Tinto","Pinot Noir","França","Santenay","Louis Latour",2,5],["Fleurie La Madone","Tinto","Gamay Noir","França","Fleurie","Albert Bichot",2,5],["Nuits-St-Georges Les Plateaux","Tinto","Pinot Noir","França","Nuits-Saint-Georges","Mongeard-Mugneret",3,5],["Cinsault-Grenache Rosé","Rosé","Grenache, Cinsault","França","Vin de France","La Francette",3,5],["Les Dessous des Dentelles","Tinto","Grenache, Mourvedre, Syrah/Shiraz","França","Gigondas","Château La Croix des Pins",4,3],["Les Fuées Chambolle-Musigny 1er Cru","Tinto","Pinot Noir","França","Chambolle-Musigny","Domaine Faiveley",4,5],["Lou Mansengou","Fortificado","Petit Manseng","França","Jurançon","Domaine Larroudé",3,5],["Cabardès Rosé","Rosé","Cabernet Franc, Grenache, Cinsault, Syrah/Shiraz","França","Cabardès","Château Jouclary",3,5],["Marc d'Alsace Riesling","Fortificado","Riesling","França","Alsace","Gerard Schueller",3,3],["Chablis 1er Cru 'Montmains'","Branco","Chardonnay","França","Chablis 1er Cru 'Montmains'","J. Moreau & Fils",3,5],["Bandol Cuvée Spéciale La Louffe","Tinto","Mourvedre, Grenache, Cinsault","França","Bandol","Domaine Tempier",4,3],["Meursault 1er Cru 'La Pièce Sous Le Bois'","Branco","Chardonnay","França","Meursault 1er Cru 'La pièce sous le Bois'","Demessey",4,3],["Rosato","Rosé","Barbera, Dolcetto","Itália","Piemonte","Enzo Bartoli",2,3],["Ricarico Prestige Cuvée","Tinto","Primitivo, Negroamaro","Itália","Puglia","Giordano",4,3],["Nicolon Barbera d'Alba","Tinto","Barbera","Itália","Barbera d'Alba","Angelo Negro",3,5],["Langhe Nebbiolo","Tinto","Nebbiolo","Itália","Langhe","Cascina Ballarin",4,5],["Al Poggio Chardonnay di Toscana","Branco","Chardonnay","Itália","Toscana","Castello di Ama",3,5],["Gabbiano Pinot Grigio","Branco","Pinot Grigio, Chardonnay","Itália","Delle Venezie","Cavaliere d'Oro",3,3],["Zinfandel","Tinto","Zinfandel","Itália","Puglia","Masseria Trajone",4,3],["La Primavera in Rosa Rosé Italia","Rosé","Negroamaro, Merlot, Refosco","Itália","Vino d'Italia","Grande Alberone",3,3],["Müller Thurgau Alto Adige","Branco","Müller-Thurgau","Itália","Südtirol-Alto Adige","Kettmeir",3,3],["Riserva Prêt-A-Porter","Tinto","Corvina, Corvinone, Rondinella, Molinara","Itália","Amarone della Valpolicella","Bottega",5,3],["Brachetto d'Acqui","Espumante","Brachetto","Itália","Brachetto d'Acqui","Il Falchetto",3,5],["Torgaio Toscana","Tinto","Sangiovese, Merlot, Alicante Bouschet, Petit Verdot","Itália","Toscana","Ruffino",3,3],["Dulcis Moscato d'Asti","Fortificado","Muscat/Moscato","Itália","Moscato d'Asti","San Silvestro",2,3],["Narin Barbaresco","Tinto","Nebbiolo","Itália","Barbaresco","Carlo Giacosa",4,5],["Solatio Moscato d'Asti","Branco","Muscat/Moscato","Itália","Asti","Roberto Sarotto",2,3],["Barbera d'Alba","Tinto","Barbera","Itália","Barbera d'Alba","Filippo Gallino",3,3],["Belcaro Vin Santo del Chianti Classico","Fortificado","Trebbiano, Malvasia","Itália","Vin Santo del Chianti Classico","San Felice",3,5],["Bardolino Classico","Tinto","Corvina, Rondinella, Molinara","Itália","Bardolino Classico","Carlo Zenegaglia",4,3],["Langhe Chardonnay","Branco","Chardonnay","Itália","Langhe","Mustela",3,3],["Barolo Riserva","Tinto","Nebbiolo","Itália","Barolo","Cascina Ghercina",4,5],["Barolo","Tinto","Nebbiolo","Itália","Barolo","Francesco Scanavino",4,5],["Cerequio Barolo","Tinto","Nebbiolo","Itália","Barolo","Saglietti Flavio",4,5],["Fiano del Salento","Branco","Fiano","Itália","Salento","Mottura",3,5],["Manzoni Moscato Spumante","Espumante","Raboso Piave, Muscat of Hamburg","Itália","Veneto","Bonotto delle Tezze",2,5],["Fior di Vigna Dolce Rosso","Fortificado","Brachetto","Itália","Langhe","Vallebelbo",4,2],["Rare Cream Sherry Superior (Solera Reserva)","Fortificado","Palomino, Pedro Ximenez","Espanha","Cream Sherry","Lustau",4,5],["Fino Eléctrico 3 Fases","Fortificado","Pedro Ximenez","Espanha","Montilla-Moriles","Toro Albalá",4,3],["La Tinaja de Aranzazu","Branco","Albariño","Espanha","Rías Baixas","Nanclares y Prieto",3,3],["Coyam","Tinto","Syrah/Shiraz, Petit Verdot, Carmenère, Garnacha","Chile","Colchagua Valley","Emiliana",4,5],["Las Mulas Reserva Sauvignon Blanc","Branco","Sauvignon Blanc","Chile","Central Valley (CL)","Miguel Torres Chile",3,5],["El Espiritu de Cachapoal Brut","Espumante","Chardonnay","Chile","Cachapoal Valley","Château Los Boldos",2,5],["Cabernet Franc","Tinto","Cabernet Franc","Chile","Maule Valley","Erasmo",3,3],["Reserva Cabernet Franc","Tinto","Cabernet Franc","Uruguai","Maldonado","Bodega Garzón",3,3],["Los Cardos Malbec","Tinto","Malbec","Argentina","Mendoza","Doña Paula",4,5],["Gran Malbec","Tinto","Malbec","Argentina","Lujan de Cuyo","De Angeles Viña 1924",5,3],["Extra Brut Cuvée Spéciale Baron B","Espumante","Chardonnay, Pinot Noir","Argentina","Mendoza","CHANDON Argentina",3,3],["Unwooded Chardonnay","Branco","Chardonnay","África do Sul","Western Cape","Boplaas",3,3],["Cabernet Sauvignon-Shiraz","Tinto","Cabernet Sauvignon, Syrah/Shiraz","Austrália","South Australia","Oxford Landing",5,3],["The Visionary Cabernet Sauvignon","Tinto","Cabernet Sauvignon","Austrália","Clare Valley","Taylors/Wakefield",4,3],["Rocky Gully Cabernets","Tinto","Cabernet Sauvignon, Cabernet Franc, Merlot","Austrália","Frankland River","Frankland Estate",4,5],["Haven Pinot Noir","Tinto","Pinot Noir","Austrália","Mornington Peninsula","Kooyong",3,3],["Pinot Noir","Tinto","Pinot Noir","Estados Unidos","Willamette Valley","King Estate",3,5],["Estate Pinot Noir","Tinto","Pinot Noir","Estados Unidos","Willamette Valley","Illahe",3,3],["Old Vine Zinfandel","Tinto","Zinfandel","Estados Unidos","Lodi","Maggio Family Vineyards",5,3],["Old Vine Zinfandel","Tinto","Zinfandel, Petite Sirah, Mourvedre, Merlot","Estados Unidos","Napa Valley","Big Smooth",5,3],["Dry Creek Valley Zinfandel","Fortificado","Zinfandel","Estados Unidos","Dry Creek Valley","Dashe",5,3],["Lauréne Pinot Noir","Tinto","Pinot Noir","Estados Unidos","Dundee Hills","Domaine Drouhin",3,5],["Coyote Canyon Reserve Syrah","Tinto","Syrah/Shiraz","Estados Unidos","Horse Heaven Hills","Columbia Crest",4,3],["Rosé of Pinot Noir","Rosé","Pinot Noir","Estados Unidos","Willamette Valley","Anne Amie Vineyards",3,5],["Pinot Noir","Tinto","Pinot Noir","Estados Unidos","Lodi","Van Ruiten",3,3],["Cabernet Sauvignon","Tinto","Cabernet Sauvignon","Estados Unidos","Mount Veeder","Yates Family Vineyard",5,3],["Barrel Select Fumé Blanc","Branco","Sauvignon Blanc","Estados Unidos","New Mexico","Aridus",3,5],["Pedroni Vineyard Cabernet Franc","Tinto","Cabernet Franc","Estados Unidos","Sonoma County","Amphora",3,3],["Premiere Napa Valley Cabernet Sauvignon","Tinto","Cabernet Sauvignon, Malbec, Petit Verdot","Estados Unidos","Mount Veeder","The Hess Collection",5,5],["Private Reserve Riesling","Branco","Riesling","Canadá","Niagara Peninsula","Peller Estates",2,5],["Pinot Noir","Tinto","Pinot Noir","Nova Zelândia","Marlborough","Matua",3,3],["Zweigelt","Tinto","Zweigelt","Áustria","Niederösterreich","Schloss Gobelsburg",3,5],["Cuvée Alexander Rose de Pinot Extra Brut","Espumante","Pinot Noir, Cabernet Sauvignon","Russia","Taman Peninsula (Таманский полуостров)","Aristov",3,5],["Kormilitsa Red","Tinto","Cabernet Sauvignon, Limnio","Grécia","Chalkidiki","Tsantali",4,3],["Select Rosé Brut","Espumante","Pinot Blanc, Bianca, Muscat/Moscato, Saperavi","Russia","Taman Peninsula (Таманский полуостров)","Château Tamagne",3,5],["Kallisto","Branco","Assyrtiko, Robola","Grécia","Ilia","Mercouri Estate",4,5],["The Falcon Pinot Gris","Branco","Pinot Gris","Nova Zelândia","Marlborough","Lake Chalice",3,5]];
+/* Base mundial offline (amostra oficial X-Wines, licença CC BY-NC-SA — 100 vinhos; a versão completa tem 100 mil).
+   Uma base externa 'vinhos-db.json' (colocada junto ao app) substitui/expande esta automaticamente. */
+let baseMundialPronta=BASE_MUNDIAL.slice();
+(function carregarBaseExterna(){
+  try{
+    const x=new XMLHttpRequest();
+    x.open("GET","vinhos-db.json",true);
+    x.onload=function(){try{const j=JSON.parse(x.responseText);if(Array.isArray(j)&&j.length){baseMundialPronta=j;baseIdx=null}}catch(e){}};
+    x.onerror=function(){};
+    x.send();
+  }catch(e){}
+})();
+const normBM=s=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+/* Palavras gen\u00e9ricas que n\u00e3o identificam um vinho \u2014 ignoradas dos dois lados da compara\u00e7\u00e3o */
+const STOP_BM=new Set(["reserva","reserve","riserva","gran","grand","grande","vinho","vino","wine","wines","vineyard","vineyards","estate","seleccion","selecao","selection","cuvee","edition","edicao","especial","special","premium","classic","classico","clasico","tinto","branco","blanc","bianco","rosso","rouge","white","red","blend","old","vines","vina","vinha","vinhas","dos","das","del","dela","the","and","brut","seco","dry"]);
+let baseIdx=null;
+function buildBaseIdx(){
+  baseIdx=[];
+  for(const w of baseMundialPronta){
+    const toks=[...new Set(normBM(w[0]+" "+(w[5]||"")+" "+(w[4]||"")).split(" ").filter(t=>t.length>=3&&!STOP_BM.has(t)))];
+    if(toks.length)baseIdx.push({w,toks});
+  }
+}
+function matchBaseMundialTop(texto,k){
+  if(!baseIdx)buildBaseIdx();
+  const tokens=new Set(normBM(texto).split(" ").filter(t=>t.length>=3&&!STOP_BM.has(t)));
+  if(!tokens.size)return [];
+  const res=[];
+  for(const e of baseIdx){
+    let hits=0;
+    for(const t of e.toks)if(tokens.has(t))hits++;
+    if(hits<2&&!(hits===1&&e.toks.length===1))continue;
+    const score=hits/e.toks.length+(hits>=2?0.3:0);
+    if(score>=0.55)res.push({w:e.w,score,hits});
+  }
+  res.sort((a,b)=>b.score-a.score||b.hits-a.hits);
+  return res.slice(0,k||3);
+}
+/* Aceite autom\u00e1tico DURANTE a leitura: s\u00f3 com certeza alta (3+ palavras coincidentes ou nome exato) */
+function matchBaseMundial(texto){
+  const top=matchBaseMundialTop(texto,1);
+  return top.length&&(top[0].hits>=3||top[0].score>=1)?top[0].w:null;
+}
+function nomeExibicao(w){
+  const generico=w[0].length<=14&&w[5]&&!normBM(w[0]).includes(normBM(w[5]).split(" ")[0]);
+  return generico?w[5]+" "+w[0]:w[0];
+}
+function preencherDaBase(w){
+  $("#a-nome").value=nomeExibicao(w);
+  $("#a-vinicola").value=w[5]||"";
+  $("#a-uvas").value=w[2]||"";
+  if(PAISES.includes(w[3]))$("#a-pais").value=w[3];
+  $("#a-regiao").value=w[4]||"";
+  $("#a-tipo").value=w[1]||"Tinto";
+  $("#a-corpo").value=w[6]||3;$("#v-corpo").textContent=w[6]||3;
+  $("#a-acidez").value=w[7]||3;$("#v-acidez").textContent=w[7]||3;
+  $("#nome-sug").classList.add("hidden");
+}
+/* Autocomplete do cadastro manual: mostra a base mundial em a\u00e7\u00e3o enquanto voc\u00ea digita */
+let sugTimer=null;
+function buscarSugestoes(){
+  const q=$("#a-nome").value.trim();
+  const box=$("#nome-sug");
+  if(q.length<3){box.classList.add("hidden");return}
+  if(!baseIdx)buildBaseIdx();
+  const nq=normBM(q),toksQ=nq.split(" ").filter(Boolean);
+  const res=[];
+  for(const e of baseIdx){
+    const alvo=e.toks.join(" ");
+    let s=0;
+    if(alvo.startsWith(nq))s=3;
+    else if(toksQ.every(t=>e.toks.some(a=>a.startsWith(t))))s=2;
+    else continue;
+    res.push({w:e.w,s});
+    if(res.length>400)break;
+  }
+  res.sort((a,b)=>b.s-a.s||a.w[0].length-b.w[0].length);
+  const top=res.slice(0,6);
+  if(!top.length){box.classList.add("hidden");return}
+  window.__sugs=top.map(x=>x.w);
+  box.innerHTML=`<div class="sug-head">\ud83c\udf0d BASE MUNDIAL \u2014 TOQUE PARA PREENCHER A FICHA</div>`+
+    top.map((x,i)=>`<div class="sug-item" onclick="preencherDaBase(window.__sugs[${i}])"><i class="dot" style="background:${CORES[x.w[1]]||'#999'}"></i><div class="inf"><b>${nomeExibicao(x.w)}</b><small>${x.w[5]||"\u2014"} \u00b7 ${x.w[4]||"\u2014"} \u00b7 ${x.w[3]||"\u2014"}${x.w[2]?" \u00b7 "+x.w[2]:""}</small></div></div>`).join("");
+  box.classList.remove("hidden");
+}
+document.addEventListener("DOMContentLoaded",()=>{});
+
+/* ================== PRATOS ================== */
+/* pesoTipo: quanto cada tipo de vinho combina (0–40) · perfil ideal do vinho p/ o prato */
+const PRATOS = [
+ {id:"moqueca",em:"🐟",nome:"Moqueca Capixaba",origem:"Brasil",tipos:{Branco:40,Espumante:34,"Rosé":30,Tinto:8,Fortificado:0},corpo:2,tanino:1,acidezMin:4,uvasBonus:["Albariño","Sauvignon Blanc","Loureiro","Arinto","Chardonnay"],regioesBonus:["Rías Baixas","Minho"],ctx:"Peixe delicado cozido no azeite e urucum pede vinho leve, fresco e de acidez alta — taninos brigariam com o pescado."},
+ {id:"feijoada",em:"🍲",nome:"Feijoada completa",origem:"Brasil",tipos:{Tinto:40,Espumante:26,"Rosé":16,Branco:8,Fortificado:4},corpo:4,tanino:3,acidezMin:3,uvasBonus:["Primitivo","Malbec","Touriga Nacional","Aragonez","Tempranillo"],regioesBonus:["Douro","Alentejo","Puglia"],ctx:"Prato untuoso e intenso: o vinho precisa de corpo e acidez para cortar a gordura, com taninos presentes mas macios. Um espumante brut também limpa o paladar."},
+ {id:"churrasco",em:"🥩",nome:"Churrasco",origem:"Brasil",tipos:{Tinto:40,"Rosé":10,Branco:4,Espumante:6,Fortificado:0},corpo:5,tanino:4,acidezMin:2,uvasBonus:["Malbec","Cabernet Sauvignon","Tannat","Syrah"],regioesBonus:["Mendoza"],ctx:"Carne grelhada com gordura e sal pede tintos encorpados e tânicos — a proteína e a gordura domam o tanino."},
+ {id:"filet",em:"🥂",nome:"Carnes nobres (filé, Chateaubriand)",origem:"França",tipos:{Tinto:40,"Rosé":6,Branco:2,Espumante:4,Fortificado:0},corpo:4,tanino:4,acidezMin:3,uvasBonus:["Cabernet Sauvignon","Merlot","Malbec","Pinot Noir"],regioesBonus:["Bordeaux","Haut-Médoc","Borgonha","Mendoza"],ctx:"Cortes nobres e macios como o Chateaubriand pedem tintos estruturados porém elegantes — o par histórico é um Bordeaux de Cabernet e Merlot, com taninos finos que acompanham a suculência sem atropelar a delicadeza da carne."},
+ {id:"bacalhau",em:"🎣",nome:"Bacalhau ao forno",origem:"Portugal",tipos:{Tinto:32,Branco:36,"Rosé":16,Espumante:18,Fortificado:0},corpo:3,tanino:2,acidezMin:3,uvasBonus:["Touriga Nacional","Aragonez","Arinto","Alvarinho","Chardonnay"],regioesBonus:["Douro","Alentejo","Minho"],ctx:"Clássico que aceita dois caminhos: branco estruturado ou tinto português de taninos suaves — tradição ibérica."},
+ {id:"coq",em:"🐓",nome:"Coq au Vin",origem:"França",tipos:{Tinto:40,Branco:6,"Rosé":6,Espumante:2,Fortificado:0},corpo:3,tanino:2,acidezMin:4,uvasBonus:["Pinot Noir","Gamay"],regioesBonus:["Borgonha","Beaujolais"],ctx:"O prato é cozido em vinho da Borgonha — a harmonização regional clássica: Pinot Noir leve, ácido e elegante."},
+ {id:"boeuf",em:"🍖",nome:"Boeuf Bourguignon",origem:"França",tipos:{Tinto:40,Branco:2,"Rosé":2,Espumante:0,Fortificado:0},corpo:4,tanino:3,acidezMin:3,uvasBonus:["Pinot Noir","Grenache","Syrah"],regioesBonus:["Borgonha","Vale do Rhône"],ctx:"Cozido longo e profundo pede tinto de corpo médio-pleno com boa acidez — Borgonha é o par histórico."},
+ {id:"ossobuco",em:"🦴",nome:"Ossobuco alla Milanese",origem:"Itália",tipos:{Tinto:40,Branco:4,"Rosé":4,Espumante:0,Fortificado:0},corpo:5,tanino:4,acidezMin:4,uvasBonus:["Nebbiolo","Sangiovese Grosso","Corvina"],regioesBonus:["Piemonte","Toscana"],ctx:"Prato rico do norte italiano: pede um tinto de acidez alta e taninos firmes — Nebbiolo é a resposta piemontesa."},
+ {id:"ragu",em:"🍝",nome:"Massa ao ragù",origem:"Itália",tipos:{Tinto:40,Branco:6,"Rosé":12,Espumante:2,Fortificado:0},corpo:3,tanino:3,acidezMin:4,uvasBonus:["Sangiovese","Primitivo","Nebbiolo"],regioesBonus:["Toscana","Puglia"],ctx:"Molho de tomate tem acidez alta — o vinho precisa acompanhar: Sangiovese é o par natural de qualquer ragù."},
+ {id:"pizza",em:"🍕",nome:"Pizza margherita",origem:"Itália",tipos:{Tinto:36,"Rosé":26,Espumante:20,Branco:10,Fortificado:0},corpo:3,tanino:2,acidezMin:4,uvasBonus:["Sangiovese","Primitivo","Gamay","Glera"],regioesBonus:["Toscana","Puglia","Vêneto"],ctx:"Tomate e muçarela pedem tinto jovem de acidez viva e taninos leves — ou um rosé seco e alegre."},
+ {id:"risoto",em:"🍚",nome:"Risoto de funghi",origem:"Itália",tipos:{Tinto:34,Branco:34,"Rosé":8,Espumante:10,Fortificado:0},corpo:3,tanino:2,acidezMin:3,uvasBonus:["Pinot Noir","Nebbiolo","Chardonnay"],regioesBonus:["Borgonha","Piemonte"],ctx:"Cogumelos têm notas terrosas que espelham Pinot Noir e Nebbiolo; um Chardonnay barricado abraça a cremosidade."},
+ {id:"frutosmar",em:"🦐",nome:"Frutos do mar & ostras",origem:"Litoral",tipos:{Branco:40,Espumante:36,"Rosé":24,Tinto:2,Fortificado:0},corpo:1,tanino:1,acidezMin:5,uvasBonus:["Albariño","Sauvignon Blanc","Chardonnay","Loureiro"],regioesBonus:["Chablis","Rías Baixas","Minho","Borgonha (Chablis)"],ctx:"Iodo e salinidade pedem o máximo de frescor: brancos minerais de acidez elétrica ou um espumante brut."},
+ {id:"sushi",em:"🍣",nome:"Sushi & sashimi",origem:"Japão",tipos:{Espumante:38,Branco:38,"Rosé":22,Tinto:4,Fortificado:0},corpo:1,tanino:1,acidezMin:4,uvasBonus:["Riesling","Glera","Chardonnay","Sauvignon Blanc"],regioesBonus:["Mosel","Champagne"],ctx:"Delicadeza do peixe cru + shoyu: Riesling com leve doçura e espumantes secos equilibram sal e umami."},
+ {id:"curry",em:"🍛",nome:"Comida apimentada",origem:"Índia / Tailândia",tipos:{Branco:38,"Rosé":28,Espumante:24,Tinto:6,Fortificado:0},corpo:2,tanino:1,acidezMin:3,docMin:2,uvasBonus:["Riesling","Gewürztraminer"],regioesBonus:["Mosel","Alsácia"],ctx:"Pimenta amplifica álcool e tanino — a defesa é doçura leve e aromas exuberantes: Riesling e Gewürztraminer."},
+ {id:"queijos",em:"🧀",nome:"Tábua de queijos curados",origem:"Variado",tipos:{Fortificado:38,Tinto:34,Branco:16,Espumante:14,"Rosé":6},corpo:4,tanino:3,acidezMin:2,uvasBonus:["Touriga Nacional","Nebbiolo","Tempranillo"],regioesBonus:["Douro","Rioja"],ctx:"Queijos intensos e salgados adoram o contraste doce de um Porto — ou tintos estruturados de guarda."},
+ {id:"chocolate",em:"🍫",nome:"Sobremesa de chocolate",origem:"Sobremesa",tipos:{Fortificado:40,Tinto:14,Branco:2,Espumante:4,"Rosé":2},corpo:4,tanino:2,acidezMin:1,docMin:3,uvasBonus:["Touriga Nacional","Tinta Barroca","Primitivo"],regioesBonus:["Douro"],ctx:"Regra de ouro: o vinho deve ser tão ou mais doce que a sobremesa — Porto Tawny e chocolate são um casamento."},
+ {id:"salada",em:"🥗",nome:"Saladas & entradas leves",origem:"Variado",tipos:{Branco:38,"Rosé":36,Espumante:30,Tinto:4,Fortificado:0},corpo:1,tanino:1,acidezMin:4,uvasBonus:["Sauvignon Blanc","Loureiro","Grenache","Cinsault"],regioesBonus:["Provence","Minho"],ctx:"Folhas, vinagrete e frescor pedem vinhos leves, secos e ácidos — rosés de Provence brilham aqui."}
+];
+
+/* Palavras-chave para busca livre → prato de referência */
+const KEYWORDS = [
+ [/moqueca|capixaba|peixada/i,"moqueca"],[/feijoada|feijão/i,"feijoada"],
+ [/churrasco|picanha|costela|barbecue|bife|carne vermelha|assado/i,"churrasco"],
+ [/bacalhau/i,"bacalhau"],[/coq au vin|frango ao vinho/i,"coq"],
+ [/bourguignon|cozido de carne|ensopado/i,"boeuf"],[/ossobuco|osso buco/i,"ossobuco"],
+ [/rag[uù]|bolonhesa|lasanha|macarrão|massa|espaguete/i,"ragu"],[/pizza/i,"pizza"],
+ [/risoto|cogumelo|funghi/i,"risoto"],
+ [/ostra|camarão|frutos do mar|lagosta|marisco|polvo|lula/i,"frutosmar"],
+ [/sushi|sashimi|japonesa|temaki/i,"sushi"],
+ [/curry|apimentad|pimenta|tailandes|indian/i,"curry"],
+ [/queijo|fondue/i,"queijos"],[/chocolate|sobremesa|doce|brigadeiro/i,"chocolate"],
+ [/salada|entrada|leve|verão|piquenique/i,"salada"],
+ [/peixe|tilápia|robalo|salmão|atum/i,"frutosmar"],
+ [/fil[eé]t?|chateaubriand|mignon|tournedos|entrec[oô]te|steak|medalh[aã]o/i,"filet"],
+ [/grelhado/i,"frutosmar"],
+ [/frango|ave|galinha/i,"coq"],[/porco|leitão|pernil/i,"feijoada"]
+];
+/* ================== ENCONTROS ================== */
+/* Garrafas dos amigos: fichas mínimas para a ordem de serviço (inspiradas na sua foto de sexta!) */
+let NEXT_EV=10;
+let eventos=[
+ {id:1,nome:"Almoço no Fasano",data:"01/08/2026 · sábado",local:"Fasano, Recife",criador:"Jorge",
+  amigos:[
+   {nome:"Ricardo",garrafas:[
+     {nome:"Vega-Sicilia Único 2015",tipo:"Tinto",corpo:5,tanino:5,origem:"Ribera del Duero, Espanha"},
+     {nome:"Louis Roederer Blanc de Blancs 2014",tipo:"Espumante",corpo:3,tanino:1,origem:"Champagne, França"}]},
+   {nome:"Paulo",garrafas:[
+     {nome:"Château Musar 2017",tipo:"Tinto",corpo:4,tanino:3,origem:"Vale do Bekaa, Líbano"},
+     {nome:"Porto Vintage 2012",tipo:"Fortificado",corpo:5,tanino:3,origem:"Douro, Portugal"}]},
+   {nome:"André",garrafas:[
+     {nome:"Chablis 1er Cru Fourchaume 2023",tipo:"Branco",corpo:3,tanino:1,origem:"Borgonha, França"},
+     {nome:"Emilio Moro 2020",tipo:"Tinto",corpo:4,tanino:4,origem:"Ribera del Duero, Espanha"}]}
+  ],
+  minhas:[], /* ids de vinhos da adega do Jorge */
+  chat:[
+   {de:"Ricardo",txt:"Confirmadíssimo! Vou levar o Único 2015 que prometi há dois anos 🍷",hora:"09:12"},
+   {de:"Paulo",txt:"Se o Único vai, eu levo o Musar 2017 pra briga. E o Porto pra sobremesa.",hora:"09:20"},
+   {de:"André",txt:"Fecho as entradas com o Chablis. Alguém combina com o restaurante a taxa de rolha?",hora:"09:41"},
+   {de:"Ricardo",txt:"Já falei com o maître: R$ 90 por garrafa, decanter liberado. 👌",hora:"10:05"}
+  ]
+ }
+];
+/* A Confraria: sua rede de amigos apreciadores. No app real, cada amigo tem sua própria conta e adega. */
+let amigos=[
+ {nome:"Ricardo",cidade:"Recife"},
+ {nome:"Paulo",cidade:"Recife"},
+ {nome:"André",cidade:"Olinda"},
+ {nome:"Fernanda",cidade:"Recife"},
+ {nome:"Beto",cidade:"João Pessoa"}
+];
+const PERFIL_TIPO={Tinto:{corpo:4,tanino:3},Branco:{corpo:2,tanino:1},"Rosé":{corpo:2,tanino:1},Espumante:{corpo:2,tanino:1},Fortificado:{corpo:4,tanino:2}};
+const FASES=[["Espumante","🥂 Recepção"],["Branco","🐟 Entradas e pratos leves"],["Rosé","🌸 Transição"],["Tinto","🥩 Pratos principais"],["Fortificado","🍫 Sobremesa e charutos"]];
+function ordemServico(ev){
+  const todas=[];
+  ev.amigos.forEach(a=>a.garrafas.forEach(g=>todas.push({...g,quem:a.nome})));
+  ev.minhas.forEach(id=>{const v=vinhos.find(x=>x.id===id);if(v)todas.push({nome:`${v.nome} ${safraTxt(v)}`,tipo:v.tipo,corpo:v.corpo,tanino:v.tanino,origem:v.regiao+", "+v.pais,quem:"Você"})});
+  const fase=t=>FASES.findIndex(f=>f[0]===t);
+  return todas.sort((a,b)=>fase(a.tipo)-fase(b.tipo)||(a.corpo+(a.tanino||0))-(b.corpo+(b.tanino||0)));
+}
+function dicaCobertura(ordem){
+  const tem=t=>ordem.some(g=>g.tipo===t);
+  if(!ordem.length)return "Nenhuma garrafa confirmada ainda — seja o primeiro a levar!";
+  if(!tem("Espumante"))return "💡 Dica do sommelier: falta um espumante para a recepção — que tal levar um da sua adega?";
+  if(!tem("Branco"))return "💡 Dica do sommelier: só tintos e espumantes até agora — um branco cairia bem nas entradas.";
+  if(!tem("Fortificado"))return "💡 Dica do sommelier: um Porto fecharia a noite com a sobremesa.";
+  return "✅ Lineup completo: o encontro tem vinhos para todas as fases, da recepção à sobremesa.";
+}
+function renderConfraria(){
+  $("#confraria-chips").innerHTML=amigos.map((a,i)=>
+    `<span class="adega-chip" style="cursor:default">👤 ${a.nome}${a.cidade?` <span class="n">${a.cidade}</span>`:""} <span style="cursor:pointer;opacity:.6" onclick="delAmigo(${i})" title="Remover da confraria">✕</span></span>`).join("")
+    ||'<span style="font-size:13px;color:var(--ink-2)">Nenhum amigo cadastrado ainda.</span>';
+  $("#e-amigos").innerHTML=amigos.map((a,i)=>
+    `<label class="adega-chip" style="user-select:none"><input type="checkbox" class="e-amigo-chk" value="${i}" style="accent-color:var(--wine);padding:0;margin:0"> ${a.nome}</label>`).join("")
+    ||'<span style="font-size:13px;color:var(--ink-2)">Cadastre amigos na Confraria acima para convidá-los.</span>';
+}
+function addAmigo(){
+  const nome=$("#c-amigo-nome").value.trim();
+  if(!nome){toast("Digite o nome do amigo. 👤");return}
+  if(amigos.some(a=>a.nome.toLowerCase()===nome.toLowerCase())){toast(nome+" já está na sua confraria.");return}
+  amigos.push({nome,cidade:$("#c-amigo-cidade").value.trim()});
+  $("#c-amigo-nome").value="";$("#c-amigo-cidade").value="";
+  persist();renderConfraria();
+  toast(nome+" entrou para a sua confraria! 🍷");
+}
+function delAmigo(i){
+  const a=amigos[i];
+  amigos.splice(i,1);persist();renderConfraria();
+  toast(a.nome+" saiu da confraria (os encontros já criados não mudam).");
+}
+function addGarrafaAmigo(evId,ai){
+  const ev=eventos.find(e=>e.id===evId);
+  const nome=$(`#am-nome-${evId}-${ai}`).value.trim();
+  const tipo=$(`#am-tipo-${evId}-${ai}`).value;
+  if(!nome){toast("Digite o vinho que o amigo vai levar. 🍾");return}
+  const perf=PERFIL_TIPO[tipo]||{corpo:3,tanino:2};
+  ev.amigos[ai].garrafas.push({nome,tipo,corpo:perf.corpo,tanino:perf.tanino,origem:"informado pelo grupo"});
+  persist();renderEncontros();
+  toast(`${nome} confirmado por ${ev.amigos[ai].nome}! 🥂`);
+}
+function renderEncontros(){
+  renderConfraria();
+  $("#eventos-list").innerHTML=eventos.map(ev=>{
+    const ordem=ordemServico(ev);
+    const totG=ordem.length;
+    return `<div class="panel" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
+        <div><h3 style="font-size:18px" class="serif">🥂 ${ev.nome}</h3>
+        <div style="font-size:13px;color:var(--ink-2);margin-top:2px">📅 ${ev.data} · 📍 ${ev.local} · ${ev.amigos.length+1} participantes · ${totG} garrafas confirmadas</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:14px">
+        ${ev.amigos.map((a,ai)=>`<div style="background:var(--cream);border-radius:10px;padding:12px 14px">
+          <b style="font-size:13.5px">👤 ${a.nome}</b>
+          ${a.garrafas.map(g=>`<div style="font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:${CORES[g.tipo]}"></i>${g.nome} <span style="color:var(--ink-3)">· ${g.origem}</span></div>`).join("")||'<div style="font-size:12px;color:var(--ink-3);margin-top:6px">ainda não confirmou garrafas</div>'}
+          <div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
+            <input id="am-nome-${ev.id}-${ai}" placeholder="Vinho que ${a.nome} vai levar" style="flex:1 1 110px;min-width:0;font-size:11.5px;padding:6px 8px">
+            <select id="am-tipo-${ev.id}-${ai}" style="font-size:11.5px;padding:6px 4px">${TIPOS.map(t=>`<option>${t}</option>`).join("")}</select>
+            <button class="btn btn-gold btn-sm" style="padding:5px 9px;font-size:11.5px" onclick="addGarrafaAmigo(${ev.id},${ai})">＋</button>
+          </div>
+        </div>`).join("")}
+        <div style="background:#fbf3ea;border:1.5px dashed var(--gold);border-radius:10px;padding:12px 14px">
+          <b style="font-size:13.5px">👤 Você (Jorge)</b>
+          ${ev.minhas.map(id=>{const v=vinhos.find(x=>x.id===id);return v?`<div style="font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:${CORES[v.tipo]}"></i>${v.nome} ${safraTxt(v)} <button class="btn btn-ghost btn-sm" style="padding:1px 7px;font-size:11px" onclick="tirarGarrafaEvento(${ev.id},${id})">✕</button></div>`:""}).join("")||'<div style="font-size:12px;color:var(--ink-3);margin-top:6px">você ainda não escolheu</div>'}
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+            <select id="ev-sel-${ev.id}" style="flex:1 1 140px;min-width:0;max-width:100%;font-size:12px;padding:7px 8px">${vinhos.map(v=>`<option value="${v.id}">${adegaDe(v.adega).icone} ${v.nome} ${safraTxt(v)}</option>`).join("")}</select>
+            <button class="btn btn-gold btn-sm" onclick="levarGarrafaEvento(${ev.id})">Levar</button>
+          </div>
+        </div>
+      </div>
+      <h3 style="margin-top:18px">🍷 Ordem de serviço sugerida</h3>
+      ${(function(){let html="",faseAtual="";ordem.forEach((g,i)=>{
+        const f=FASES.find(x=>x[0]===g.tipo);
+        if(f&&f[1]!==faseAtual){faseAtual=f[1];html+=`<div style="font-size:11.5px;font-weight:700;color:var(--wine);text-transform:uppercase;letter-spacing:.8px;margin:12px 0 6px">${faseAtual}</div>`}
+        html+=`<div class="hist-row" style="padding:9px 14px;margin-bottom:6px"><span style="font-weight:800;color:var(--gold);width:26px">${i+1}º</span><div class="info"><h4 style="font-size:13.5px">${g.nome}</h4><p>${g.origem} · leva: <b>${g.quem}</b></p></div><i class="dot" style="background:${CORES[g.tipo]}"></i></div>`;
+      });return html||'<div class="empty">Sem garrafas ainda.</div>'})()}
+      <div class="explain-box" style="margin-top:10px">${dicaCobertura(ordem)}</div>
+      <div style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" onclick="toggleChat(${ev.id})">💬 ${chatsAbertos.has(ev.id)?"Ocultar conversa":"Conversa do encontro"} (${(ev.chat||[]).length})</button>
+        ${chatsAbertos.has(ev.id)?`
+        <div class="chat-box">
+          <div class="chat-msgs" id="chat-msgs-${ev.id}">
+            ${(ev.chat||[]).map(m=>`<div class="msg ${m.de==="Você"?"minha":"deles"}"><div class="quem">${m.de==="Você"?"Você":"👤 "+m.de}</div>${m.txt}<div class="hora">${m.hora||""}</div></div>`).join("")||'<div style="font-size:12.5px;color:var(--ink-2);text-align:center;padding:10px">Nenhuma mensagem ainda — puxe o assunto! 🥂</div>'}
+          </div>
+          <div class="chat-envio">
+            <input id="chat-in-${ev.id}" placeholder="Mensagem para o grupo…" onkeydown="if(event.key==='Enter')enviarMsg(${ev.id})">
+            <button class="btn btn-primary btn-sm" onclick="enviarMsg(${ev.id})">Enviar</button>
+          </div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:7px;text-align:center">No aplicativo final, cada participante conversa do próprio celular, com notificações.</div>
+        </div>`:""}
+      </div>
+    </div>`;
+  }).join("");
+  chatsAbertos.forEach(id=>{const el=$("#chat-msgs-"+id);if(el)el.scrollTop=el.scrollHeight});
+}
+let chatsAbertos=new Set();
+function toggleChat(id){
+  chatsAbertos.has(id)?chatsAbertos.delete(id):chatsAbertos.add(id);
+  renderEncontros();
+}
+function enviarMsg(evId){
+  const ev=eventos.find(e=>e.id===evId);if(!ev)return;
+  const inp=$("#chat-in-"+evId);
+  const txt=(inp.value||"").trim();
+  if(!txt){toast("Escreva a mensagem primeiro. 💬");return}
+  if(!ev.chat)ev.chat=[];
+  const agora=new Date();
+  ev.chat.push({de:"Você",txt,hora:String(agora.getHours()).padStart(2,"0")+":"+String(agora.getMinutes()).padStart(2,"0")});
+  persist();renderEncontros();
+  const el=$("#chat-in-"+evId);if(el)el.focus();
+}
+function levarGarrafaEvento(evId){
+  const ev=eventos.find(e=>e.id===evId);const id=+$("#ev-sel-"+evId).value;
+  if(ev.minhas.includes(id)){toast("Essa garrafa já está confirmada para o encontro. 🍷");return}
+  ev.minhas.push(id);persist();renderEncontros();
+  const v=vinhos.find(x=>x.id===id);
+  toast(`${v.nome} confirmado para ${ev.nome}! 🥂`);
+}
+function tirarGarrafaEvento(evId,id){
+  const ev=eventos.find(e=>e.id===evId);
+  ev.minhas=ev.minhas.filter(x=>x!==id);persist();renderEncontros();
+}
+function createEvento(){
+  const nome=$("#e-nome").value.trim();
+  if(!nome){toast("Dê um nome ao encontro. 🥂");return}
+  const selecionados=[...document.querySelectorAll(".e-amigo-chk:checked")].map(c=>({nome:amigos[+c.value].nome,garrafas:[]}));
+  eventos.unshift({id:NEXT_EV++,nome,data:$("#e-data").value||"a definir",local:$("#e-local").value||"a definir",criador:"Jorge",amigos:selecionados,minhas:[],chat:[]});
+  persist();["e-nome","e-data","e-local"].forEach(i=>$("#"+i).value="");
+  renderEncontros();window.scrollTo({top:0,behavior:"smooth"});
+  toast(`Encontro "${nome}" criado — convide os amigos! 🥂`);
+}
+
+/* ================== PERSISTÊNCIA LOCAL ==================
+   Salva a adega no armazenamento do navegador do aparelho (quando disponível).
+   Se o navegador não permitir (ex.: visualização dentro de outros apps),
+   o protótipo segue funcionando normalmente, apenas sem memória entre sessões. */
+const STORE_KEY="apotheca_dados_v1";
+let PERSISTE=false;
+function persist(){
+  try{
+    localStorage.setItem(STORE_KEY,JSON.stringify({vinhos,ADEGAS,historico,eventos,amigos,NEXT_ID,NEXT_EV}));
+    PERSISTE=true;
+  }catch(e){PERSISTE=false}
+}
+(function restore(){
+  try{
+    const s=JSON.parse(localStorage.getItem(STORE_KEY));
+    if(s&&Array.isArray(s.vinhos)&&s.vinhos.length){
+      vinhos=s.vinhos;ADEGAS=s.ADEGAS||ADEGAS;historico=s.historico||historico;
+      eventos=s.eventos||eventos;amigos=s.amigos||amigos;NEXT_ID=s.NEXT_ID||NEXT_ID;NEXT_EV=s.NEXT_EV||NEXT_EV;
+    }
+    localStorage.setItem("__apo_t","1");localStorage.removeItem("__apo_t");PERSISTE=true;
+  }catch(e){PERSISTE=false}
+})();
+function resetDemo(){
+  try{localStorage.removeItem(STORE_KEY)}catch(e){}
+  location.reload();
+}
+
+/* ================== UTIL ================== */
+const $=s=>document.querySelector(s);
+const fmt=n=>n.toLocaleString("pt-BR");
+const brl=n=>"R$ "+Math.round(n).toLocaleString("pt-BR");
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2800)}
+function safraTxt(v){return v.safra?v.safra:"NV"}
+/* Nota da comunidade Apotheca (simulada de forma estável por rótulo no protótipo) */
+function comunidade(v){const nota=(3.4+((v.id*37)%16)/10).toFixed(1);const n=(180+(v.id*577)%4200);return {nota,n}}
+function status(v){
+  if(!v.jan) return {k:"auge",txt:"No auge"};
+  if(ANO<v.jan[0]) return {k:"guardar",txt:"Guardar"};
+  if(ANO>v.jan[1]) return {k:"passando",txt:"Passando do ponto"};
+  if(ANO>=v.jan[1]-1) return {k:"logo",txt:"Beber logo"};
+  return {k:"auge",txt:"No auge"};
+}
+
+/* ================== MENU POP-UP ================== */
+function renderMenu(){
+  const tot=id=>vinhos.filter(v=>id==="todas"||v.adega===id).reduce((s,v)=>s+v.qtd,0);
+  $("#menu-adegas").innerHTML=
+    `<div class="mtit">MINHAS ADEGAS</div>`+
+    `<div class="mi ${adegaAtiva==="todas"?"ativo":""}" onclick="fecharMenu();setAdega('todas');go('dashboard')">🍷 Todas as adegas ${adegaAtiva==="todas"?"✓":""}<span class="cont">${tot("todas")}</span></div>`+
+    ADEGAS.map(a=>`<div class="mi ${adegaAtiva===a.id?"ativo":""}" onclick="fecharMenu();setAdega('${a.id}');go('dashboard')">${a.icone} ${a.nome} ${adegaAtiva===a.id?"✓":""}<span class="cont">${tot(a.id)}</span></div>`).join("")+
+    `<div class="mtit" style="border-top:1px solid var(--cream);margin-top:4px">APLICATIVO</div>`;
+}
+function toggleMenu(e){if(e)e.stopPropagation();const aberto=!$("#menu-pop").classList.contains("open");if(aberto)renderMenu();$("#menu-pop").classList.toggle("open",aberto);$("#menu-bg").classList.toggle("open",aberto)}
+function fecharMenu(){$("#menu-pop").classList.remove("open");$("#menu-bg").classList.remove("open")}
+function abrirAjuda(){
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">❓ Ajuda e suporte</h3>
+    <div class="sub">Guia rápido do Apotheca</div>
+    <div style="font-size:13.5px;line-height:1.65">
+      <p style="margin-bottom:10px"><b>➕ Adicionar vinho:</b> toque no botão dourado central. Use o scanner de rótulo (aponte a câmera e aguarde a leitura automática) ou o cadastro manual.</p>
+      <p style="margin-bottom:10px"><b>📷 Dicas do scanner:</b> boa luz, rótulo de frente, celular firme. O app tenta várias leituras e junta o melhor de cada uma. O que ele não identificar, você completa — e passa a valer para sempre.</p>
+      <p style="margin-bottom:10px"><b>🍽️ Harmonizar:</b> escolha o prato (ou descreva) e o app aponta as melhores garrafas DA SUA adega, explicando o porquê.</p>
+      <p style="margin-bottom:10px"><b>🥂 Encontros:</b> cadastre seus amigos na Confraria, crie o evento, escolha quem vai e registre as garrafas de cada um — o app monta a ordem de serviço da noite.</p>
+      <p style="margin-bottom:10px"><b>💾 Seus dados:</b> ficam salvos neste aparelho. Para recomeçar com os dados de demonstração, use "Restaurar" no fim da tela de Histórico.</p>
+      <p><b>💬 Suporte:</b> no aplicativo final, aqui haveria chat e e-mail de suporte. Neste protótipo, fale com o Jorge. 😄</p>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+function abrirSobre(){
+  const tot=vinhos.reduce((s,v)=>s+v.qtd,0);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <div style="text-align:center;padding:8px 0 4px"><div style="font-size:46px">🍷</div>
+    <h3 class="serif" style="font-size:26px">Apotheca</h3>
+    <div style="color:var(--gold);font-size:13px;letter-spacing:1px">SUA ADEGA, INTELIGENTE</div></div>
+    <div style="font-size:13.5px;line-height:1.65;margin-top:14px">
+      <p style="margin-bottom:10px">Protótipo <b>v${APP_VERSION}</b> · julho de 2026<br>Idealizador: <b>Jorge Queiroz</b></p>
+      <p style="margin-bottom:10px">Sua adega hoje: <b>${vinhos.length} rótulos · ${tot} garrafas · ${ADEGAS.length} adegas</b></p>
+      <p style="margin-bottom:10px">Base mundial offline <b>X-Wines</b> (licença CC BY-NC-SA): <b>${baseMundialPronta.length.toLocaleString("pt-BR")} vinhos</b> ${baseMundialPronta.length>1000?"— base completa carregada ✓":"— amostra (a base completa vive no APK)"}</p>
+      <p style="margin-bottom:10px">IA de visão do scanner: <b>${getIaKey()?"ativa neste aparelho ✅":"não configurada — ative no menu 🔑"}</b></p>
+      <p style="color:var(--ink-2)">Este é um protótipo de validação: dados de comunidade simulados.</p>
+    </div>
+    <div style="text-align:center;margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3);letter-spacing:.5px">by <span class="serif" style="font-size:14px;color:var(--wine)">Claude</span></div>`;
+  $("#modal-detail").classList.add("open");
+}
+function abrirConfigIA(){
+  const k=getIaKey();
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🔑 IA de visão para o scanner</h3>
+    <div class="sub">Reconhecimento de rótulos de verdade — até os artísticos, como o Catena Zapata.</div>
+    <div style="font-size:13.5px;line-height:1.6">
+      <p style="margin-bottom:10px">Com uma chave de IA, o "📸 Fotografar rótulo" envia a foto para um modelo de visão que <b>entende a imagem e conhece vinhos</b> — em vez de tentar ler letras. Status atual: <b>${k?"✅ IA ativa neste aparelho":"⚪ não configurada (usando leitor local)"}</b></p>
+      <p style="margin-bottom:6px;font-weight:600">Como criar sua chave gratuita (2 min):</p>
+      <p style="margin-bottom:10px">1. Acesse <b>aistudio.google.com/apikey</b> (endereço direto da página de chaves)<br>2. Entre com sua conta Google e toque em <b>"Create API key"</b><br>3. Copie a chave — copie o valor completo mostrado ao criar — e cole abaixo:</p>
+    </div>
+    <div class="field" style="margin:8px 0 10px"><label>Sua chave de IA (fica só neste aparelho)</label><input id="ia-key" value="${k.replace(/"/g,"&quot;")}" placeholder="AIza…" autocomplete="off"></div>
+    <div id="ia-status" class="explain-box hidden" style="margin-bottom:12px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-gold" onclick="testarIA()">🧪 Testar conexão</button>
+      <button class="btn btn-primary" onclick="salvarIaKey()">Salvar e ativar</button>
+      ${k?`<button class="btn btn-ghost" onclick="document.getElementById('ia-key').value='';salvarIaKey()">Remover</button>`:""}
+    </div>
+    <div class="explain-box" style="margin-top:12px">A chave é salva apenas no seu aparelho e usada exclusivamente para analisar as fotos de rótulo que você tirar. No aplicativo final, isso rodará no servidor do Apotheca, sem o usuário precisar de chave.</div>`;
+  $("#modal-detail").classList.add("open");
+}
+function salvarIaKey(){
+  const k=($("#ia-key").value||"").trim();
+  try{k?localStorage.setItem(IA_KEY_STORE,k):localStorage.removeItem(IA_KEY_STORE)}catch(e){}
+  closeModal("modal-detail");
+  toast(k?"🧠 IA de visão ativada — fotografe um rótulo!":"Chave removida — scanner volta ao leitor local.");
+}
+/* Teste direto com o Google: tira a dúvida sobre a chave em segundos */
+async function testarIA(){
+  const k=($("#ia-key").value||"").trim();
+  const st=$("#ia-status");st.classList.remove("hidden");
+  if(!k){st.innerHTML="Cole uma chave no campo acima primeiro.";return}
+  st.innerHTML="⏳ Testando a chave com o Google…";
+  const modelos=["gemini-3.6-flash","gemini-3.5-flash-lite","gemini-2.5-flash","gemini-flash-latest"];
+  let ultimo="";
+  for(const m of modelos){
+    try{
+      const ctl=new AbortController();const tt=setTimeout(()=>ctl.abort(),15000);
+      const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+m+":generateContent",{
+        method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":k},signal:ctl.signal,
+        body:JSON.stringify({contents:[{parts:[{text:"Responda apenas: OK"}]}]})
+      });
+      clearTimeout(tt);
+      if(r.ok){
+        try{localStorage.setItem(IA_KEY_STORE,k)}catch(e){}
+        st.innerHTML="✅ <b>Chave funcionando!</b> Conectado ao modelo "+m+". Pode fotografar rótulos — a IA está ativa.";
+        return;
+      }
+      ultimo="HTTP "+r.status;
+      if(r.status===400||r.status===403){st.innerHTML="❌ <b>O Google recusou esta chave</b> (erro "+r.status+"). Confira se copiou o valor completo.<br>Acesse <b>aistudio.google.com/apikey</b> → \"Criar chave de API\" → copie a chave gerada (o AI Studio mostra o valor completo ao criar).";return}
+      if(r.status===429){st.innerHTML="⚠️ Chave válida, mas o limite gratuito de hoje foi atingido (erro 429). Tente mais tarde.";return}
+    }catch(e){ultimo=e.message||String(e)}
+  }
+  st.innerHTML="❌ Não consegui conectar ("+ultimo+"). Verifique a internet e se copiou a chave completa.";
+}
+function sairSessao(){$("#login-screen").classList.add("open")}
+function entrarSessao(){$("#login-screen").classList.remove("open");go("dashboard");toast("Bem-vindo de volta, Jorge! 🍷")}
+
+/* ================== BARRA DE ADEGAS ================== */
+function renderAdegaBar(){
+  const tot=id=>vinhos.filter(v=>id==="todas"||v.adega===id).reduce((s,v)=>s+v.qtd,0);
+  $("#adega-bar").innerHTML=
+    `<span class="adega-chip ${adegaAtiva==="todas"?"sel":""}" onclick="setAdega('todas')">🍷 Todas as adegas <span class="n">${tot("todas")}</span></span>`+
+    ADEGAS.map(a=>`<span class="adega-chip ${adegaAtiva===a.id?"sel":""}" onclick="setAdega('${a.id}')">${a.icone} ${a.nome} <span class="n">${tot(a.id)}</span></span>`).join("")+
+    `<span class="adega-chip" onclick="openAdegasManager()" title="Renomear, trocar ícone ou excluir adegas">✏️ Gerenciar</span>`;
+}
+function setAdega(id){
+  adegaAtiva=id;
+  renderAdegaBar();renderDash();renderColecao();
+  $("#pair-results").innerHTML="";document.querySelectorAll(".dish").forEach(d=>d.classList.remove("sel"));
+  const a=adegaDe(id);
+  toast(id==="todas"?"Mostrando todas as suas adegas. 🍷":`Você está na ${a.icone} ${a.nome}.`);
+}
+
+/* ================== NAVEGAÇÃO ================== */
+const VIEWS=["dashboard","colecao","add","harmonizar","encontros","historico"];
+let viewAtual="dashboard";
+function go(view,fromHash){
+  VIEWS.forEach(v=>$("#view-"+v).classList.toggle("hidden",v!==view));
+  $("#adega-bar").classList.toggle("hidden",view!=="dashboard"); /* seletor de adegas só na tela inicial */
+  document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+  if(view==="dashboard")renderDash();
+  if(view==="colecao")renderColecao();
+  if(view==="encontros")renderEncontros();
+  if(view==="historico")renderHist();
+  viewAtual=view;
+  /* cada tela entra no histórico: o botão VOLTAR do Android navega entre as páginas em vez de sair do app */
+  if(!fromHash&&location.hash!=="#"+view){try{location.hash=view}catch(e){}}
+  window.scrollTo({top:0});
+}
+document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.view)));
+function algumOverlayAberto(){
+  return document.querySelector(".modal-bg.open")||$("#scanner").classList.contains("open")||$("#menu-pop").classList.contains("open")||$("#login-screen").classList.contains("open");
+}
+window.addEventListener("hashchange",()=>{
+  const v=location.hash.replace("#","");
+  if(algumOverlayAberto()){
+    /* voltar fecha o que estiver aberto (modal, scanner, menu) e permanece na tela atual */
+    document.querySelectorAll(".modal-bg.open").forEach(m=>m.classList.remove("open"));
+    if($("#scanner").classList.contains("open"))closeScanner();
+    fecharMenu();$("#login-screen").classList.remove("open");
+    if(location.hash!=="#"+viewAtual){try{location.hash=viewAtual}catch(e){}}
+    return;
+  }
+  if(VIEWS.includes(v)&&v!==viewAtual)go(v,true);
+});
+if(!location.hash){try{history.replaceState(null,"","#dashboard")}catch(e){}}
+
+/* ================== DASHBOARD ================== */
+function renderDash(){
+  const VS=vinhosAtivos();
+  const a=adegaDe(adegaAtiva);
+  document.querySelector("#view-dashboard .topbar h2").textContent=adegaAtiva==="todas"?"Minha Adega":a.icone+" "+a.nome;
+  const tot=VS.reduce((s,v)=>s+v.qtd,0)||1e-9;
+  const valor=VS.reduce((s,v)=>s+v.qtd*v.preco,0);
+  const auge=VS.filter(v=>status(v).k==="auge").reduce((s,v)=>s+v.qtd,0);
+  $("#kpi-garrafas").textContent=fmt(Math.round(tot));
+  $("#kpi-rotulos").textContent=VS.length+" rótulos"+(adegaAtiva==="todas"?" em "+ADEGAS.length+" adegas":" nesta adega");
+  $("#kpi-valor").textContent=brl(valor);
+  $("#kpi-auge").textContent=fmt(auge);
+  $("#kpi-consumidas").textContent=historico.length;
+  const media=historico.length?(historico.reduce((s,h)=>s+h.estrelas,0)/historico.length).toFixed(1):"—";
+  $("#kpi-media").textContent="avaliação média "+media+" ★";
+
+  /* stacked bar por tipo — rótulos diretos na legenda (regra de contraste) */
+  const porTipo=TIPOS.map(t=>({t,n:VS.filter(v=>v.tipo===t).reduce((s,v)=>s+v.qtd,0)})).filter(x=>x.n>0);
+  $("#chart-tipos").innerHTML=porTipo.map(x=>`<div style="flex:${x.n};background:${CORES[x.t]}" title="${x.t}: ${x.n} garrafas"></div>`).join("");
+  $("#legend-tipos").innerHTML=porTipo.map(x=>`<span><i class="dot" style="background:${CORES[x.t]}"></i>${x.t} — <b>${x.n}</b> (${Math.round(x.n/tot*100)}%)</span>`).join("");
+
+  /* barras por país — magnitude, um só matiz */
+  const porPais={};VS.forEach(v=>porPais[v.pais]=(porPais[v.pais]||0)+v.qtd);
+  const lista=Object.entries(porPais).sort((a,b)=>b[1]-a[1]);
+  const max=lista.length?lista[0][1]:1;
+  $("#chart-paises").innerHTML=lista.map(([p,n])=>
+    `<div class="hbar" title="${p}: ${n} garrafas"><span class="name">${p}</span><span class="track"><span class="fill" style="width:${n/max*100}%"></span></span><span class="num">${n}</span></div>`).join("");
+
+  /* alertas de janela */
+  const urgentes=VS.map(v=>({v,s:status(v)})).filter(x=>x.s.k==="logo"||x.s.k==="passando");
+  const emGuarda=VS.map(v=>({v,s:status(v)})).filter(x=>x.s.k==="guardar");
+  let html=urgentes.slice(0,5).map(x=>`<div class="alert-row" onclick="openDetail(${x.v.id})"><span class="tag ${x.s.k}">${x.s.txt}</span><span><b>${x.v.nome} ${safraTxt(x.v)}</b> · ${x.v.vinicola} ${adegaAtiva==="todas"?adegaDe(x.v.adega).icone:""} — ${x.v.qtd} gf. ${x.s.k==="passando"?"já passou da janela ideal ("+x.v.jan[1]+")":"janela encerra em "+x.v.jan[1]}</span></div>`).join("");
+  if(urgentes.length>5)html+=`<div class="alert-row" style="cursor:default"><span class="tag logo">+${urgentes.length-5}</span><span>outros rótulos também merecem atenção — veja na Coleção.</span></div>`;
+  html+=emGuarda.slice(0,2).map(x=>`<div class="alert-row" onclick="openDetail(${x.v.id})"><span class="tag guardar">Guardar</span><span><b>${x.v.nome} ${safraTxt(x.v)}</b> — atinge o auge a partir de ${x.v.jan[0]}</span></div>`).join("");
+  $("#alerts").innerHTML=html||`<div class="empty">Tudo em ordem — nenhuma garrafa fora da janela ideal. 🥂</div>`;
+  const dh=$("#dash-hist");
+  if(dh)dh.innerHTML=histRowsHtml(5)+(historico.length>5?`<div style="text-align:center;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="go('historico')">Ver histórico completo (${historico.length}) →</button></div>`:"");
+}
+
+/* ================== COLEÇÃO ================== */
+function renderColecao(){
+  const q=($("#f-busca").value||"").toLowerCase();
+  const ft=$("#f-tipo").value, fp=$("#f-pais").value, ord=$("#f-ordem").value;
+  let lista=vinhosAtivos().filter(v=>{
+    const alvo=(v.nome+" "+v.vinicola+" "+v.regiao+" "+v.uvas.join(" ")).toLowerCase();
+    return (!q||alvo.includes(q))&&(!ft||v.tipo===ft)&&(!fp||v.pais===fp);
+  });
+  const sorters={nome:(a,b)=>a.nome.localeCompare(b.nome),safra:(a,b)=>(a.safra||9999)-(b.safra||9999),preco:(a,b)=>b.preco-a.preco,qtd:(a,b)=>b.qtd-a.qtd};
+  lista.sort(sorters[ord]);
+  const tot=lista.reduce((s,v)=>s+v.qtd,0);
+  const escopoAdega=adegaAtiva==="todas"?"":" em "+adegaDe(adegaAtiva).icone+" "+adegaDe(adegaAtiva).nome;
+  $("#colecao-count").textContent=lista.length+" rótulos · "+tot+" garrafas"+escopoAdega+(q||ft||fp?" (filtrado)":"");
+  $("#wine-grid").innerHTML=lista.map(v=>{
+    const s=status(v);
+    return `<div class="wcard" style="border-left-color:${CORES[v.tipo]}" onclick="openDetail(${v.id})">
+      <div class="top"><div><h4>${v.nome} <span style="color:var(--ink-3);font-weight:400">${safraTxt(v)}</span></h4><div class="vin">${v.vinicola} · ${v.regiao}</div></div>
+      <span class="badge" style="background:${CORES[v.tipo]}">${v.tipo}</span></div>
+      <div class="meta"><span>${v.pais}</span><span>${v.uvas.join(", ")}</span><span class="tag ${s.k}" style="padding:3px 8px">${s.txt}</span>${adegaAtiva==="todas"?`<span class="adega-loc">${adegaDe(v.adega).icone} ${adegaDe(v.adega).nome}</span>`:""}</div>
+      <div class="bottom"><span class="qty">${v.qtd} <small>garrafa${v.qtd>1?"s":""}</small></span><span style="font-size:12.5px;color:var(--ink-2)" title="Nota média da comunidade Apotheca"><span class="stars" style="font-size:13px">★</span> <b>${comunidade(v).nota}</b> · ${fmt(comunidade(v).n)} aval.</span></div>
+    </div>`;
+  }).join("")||`<div class="empty" style="grid-column:1/-1"><div class="big">🔍</div>Nenhum vinho encontrado com esses filtros.</div>`;
+}
+["f-busca","f-tipo","f-pais","f-ordem"].forEach(id=>$("#"+id).addEventListener("input",renderColecao));
+$("#a-nome").addEventListener("input",()=>{clearTimeout(sugTimer);sugTimer=setTimeout(buscarSugestoes,250)});
+document.addEventListener("click",e=>{if(!e.target.closest(".sug-wrap"))$("#nome-sug").classList.add("hidden")});
+
+/* ================== DETALHE / CONSUMO ================== */
+function meter(n){let h="";for(let i=1;i<=5;i++)h+=`<i class="${i<=n?"on":""}"></i>`;return `<span class="meter">${h}</span>`}
+function openDetail(id){
+  const v=vinhos.find(x=>x.id===id);if(!v)return;
+  const s=status(v);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    ${v.foto?`<img src="${v.foto}" alt="Rótulo" style="float:right;width:76px;height:76px;object-fit:cover;border-radius:10px;margin:0 0 8px 10px;border:1px solid var(--line)">`:""}
+    <span class="badge" style="background:${CORES[v.tipo]};margin-bottom:8px;display:inline-block">${v.tipo}</span>
+    <h3 class="serif">${v.nome} ${safraTxt(v)}</h3>
+    <div class="sub">${v.vinicola} · ${v.regiao} · ${v.pais}</div>
+    <div class="spec-grid">
+      <div><b>Uvas</b>${v.uvas.join(", ")}</div>
+      <div><b>Janela de consumo</b>${v.jan[0]}–${v.jan[1]} <span class="tag ${s.k}" style="margin-left:4px;padding:2px 8px">${s.txt}</span></div>
+      <div><b>Corpo</b>${meter(v.corpo)}</div>
+      <div><b>Acidez</b>${meter(v.acidez)}</div>
+      <div><b>Taninos</b>${meter(v.tanino)}</div>
+      <div><b>Doçura</b>${meter(v.doc)}</div>
+      <div><b>Localização</b>${adegaDe(v.adega).icone} ${adegaDe(v.adega).nome} · ${v.qtd} garrafa${v.qtd>1?"s":""}</div>
+      <div><b>Preço de aquisição</b>${brl(v.preco)} / garrafa</div>
+      <div><b>Comunidade Apotheca</b><span class="stars">★</span> ${comunidade(v).nota} / 5,0 <span style="color:var(--ink-3)">(${fmt(comunidade(v).n)} avaliações de usuários)</span></div>
+      <div><b>Sua última nota</b>${(h=>h?`<span class="stars">${"★".repeat(h.estrelas)}${"☆".repeat(5-h.estrelas)}</span>`:"você ainda não avaliou")(historico.find(x=>x.nome.startsWith(v.nome)))}</div>
+    </div>
+    <div class="notes">“${v.notas}”</div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="openConsume(${v.id})">🍷 Abrir uma garrafa</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Fechar</button>
+    </div>
+    <div class="modal-actions" style="margin-top:10px">
+      <button class="btn btn-ghost btn-sm" onclick="editarVinho(${v.id})">✏️ Corrigir ficha</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="excluirVinho(${v.id},this)">🗑️ Excluir da adega</button>
+    </div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+      <div style="font-size:12px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Mover 1 garrafa para outra adega</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${ADEGAS.filter(x=>x.id!==v.adega).map(x=>`<button class="btn btn-ghost btn-sm" onclick="moveOne(${v.id},'${x.id}')">${x.icone} ${x.nome}</button>`).join("")}</div>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+let rateSel=0;
+function openConsume(id,prato){
+  closeModal("modal-detail");
+  const v=vinhos.find(x=>x.id===id);if(!v)return;
+  rateSel=0;
+  $("#modal-consume-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-consume')">✕</button>
+    <h3 class="serif">Abrir ${v.nome} ${safraTxt(v)}</h3>
+    <div class="sub">Registre o consumo — a quantidade em adega será atualizada.</div>
+    <div class="field" style="margin-bottom:12px"><label>Com qual prato?</label><input id="c-prato" placeholder="Ex.: Feijoada de sábado" value="${prato||""}"></div>
+    <label style="font-size:12px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px">Sua avaliação</label>
+    <div class="rate-stars" id="rate">${[1,2,3,4,5].map(i=>`<span data-s="${i}">★</span>`).join("")}</div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="confirmConsume(${v.id})">Confirmar consumo</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-consume')">Cancelar</button>
+    </div>`;
+  document.querySelectorAll("#rate span").forEach(st=>st.addEventListener("click",()=>{
+    rateSel=+st.dataset.s;
+    document.querySelectorAll("#rate span").forEach(x=>x.classList.toggle("on",+x.dataset.s<=rateSel));
+  }));
+  $("#modal-consume").classList.add("open");
+}
+function confirmConsume(id){
+  const v=vinhos.find(x=>x.id===id);if(!v)return;
+  v.qtd--;
+  historico.unshift({nome:`${v.nome} ${safraTxt(v)} · ${v.vinicola}`,prato:$("#c-prato").value||"—",data:new Intl.DateTimeFormat("pt-BR").format(new Date()),estrelas:rateSel||0});
+  if(v.qtd<=0){vinhos=vinhos.filter(x=>x.id!==id);toast(`Última garrafa de ${v.nome} consumida — rótulo movido ao histórico. 🍷`)}
+  else toast(`Saúde! Restam ${v.qtd} garrafa${v.qtd>1?"s":""} de ${v.nome}. 🥂`);
+  closeModal("modal-consume");persist();renderAdegaBar();renderDash();renderColecao();
+}
+/* ===== Gerenciar adegas: renomear, trocar ícone, excluir ===== */
+const ICONES=["🏠","🏖️","🌄","🏢","🍇","🏰","⛵","🍷"];
+function openAdegasManager(){
+  const gfs=id=>vinhos.filter(v=>v.adega===id).reduce((s,v)=>s+v.qtd,0);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">Gerenciar adegas</h3>
+    <div class="sub">Nomeie cada adega do seu jeito — "Adega do Escritório", "Cantinho da Praia", como preferir.</div>
+    ${ADEGAS.map((a,i)=>`
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <select id="adg-ico-${i}" style="width:70px;padding:9px 6px">${ICONES.map(ic=>`<option ${ic===a.icone?"selected":""}>${ic}</option>`).join("")}</select>
+        <input id="adg-nome-${i}" value="${a.nome.replace(/"/g,"&quot;")}" style="flex:1;min-width:150px">
+        <span style="font-size:12px;color:var(--ink-2);white-space:nowrap">${gfs(a.id)} gf.</span>
+        <button class="btn btn-ghost btn-sm" style="${gfs(a.id)>0?"opacity:.35;cursor:not-allowed":""}" onclick="deleteAdega(${i})" title="${gfs(a.id)>0?"Só é possível excluir adegas vazias":"Excluir adega"}">🗑️</button>
+      </div>`).join("")}
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn btn-primary" onclick="saveAdegas()">Salvar alterações</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+    </div>
+    <div class="explain-box" style="margin-top:14px">💡 Para criar uma adega nova, use "➕ Criar nova adega…" na tela de Adicionar vinho. Adegas com garrafas não podem ser excluídas — mova as garrafas antes.</div>`;
+  $("#modal-detail").classList.add("open");
+}
+function saveAdegas(){
+  ADEGAS.forEach((a,i)=>{
+    const nome=($("#adg-nome-"+i)?.value||"").trim();
+    if(nome)a.nome=nome;
+    a.icone=$("#adg-ico-"+i)?.value||a.icone;
+  });
+  closeModal("modal-detail");persist();refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();
+  toast("Adegas atualizadas do seu jeito. ✏️");
+}
+function deleteAdega(i){
+  const a=ADEGAS[i];
+  if(vinhos.some(v=>v.adega===a.id)){toast(`${a.nome} tem garrafas — mova-as antes de excluir.`);return}
+  if(ADEGAS.length<=1){toast("Você precisa de ao menos uma adega.");return}
+  ADEGAS.splice(i,1);
+  if(adegaAtiva===a.id)adegaAtiva="todas";
+  persist();refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();
+  openAdegasManager();
+  toast(`Adega "${a.nome}" excluída.`);
+}
+/* Excluir com confirmação em dois toques — cadastros errados saem sem virar "consumo" */
+function excluirVinho(id,btn){
+  if(btn&&!btn.dataset.armado){
+    btn.dataset.armado="1";
+    btn.textContent="⚠️ Tem certeza? Toque para confirmar";
+    btn.style.background="var(--danger)";btn.style.color="#fff";
+    setTimeout(()=>{if(btn.isConnected){btn.dataset.armado="";btn.textContent="🗑️ Excluir da adega";btn.style.background="";btn.style.color="var(--danger)"}},4000);
+    return;
+  }
+  const v=vinhos.find(x=>x.id===id);if(!v)return;
+  vinhos=vinhos.filter(x=>x.id!==id);
+  eventos.forEach(ev=>{ev.minhas=(ev.minhas||[]).filter(x=>x!==id)});
+  persist();closeModal("modal-detail");
+  refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();
+  toast(`"${v.nome}" excluído da adega (sem registrar consumo). 🗑️`);
+}
+/* Corrigir: reabre o formulário com a ficha preenchida e salva por cima */
+let editandoId=null;
+function editarVinho(id){
+  const v=vinhos.find(x=>x.id===id);if(!v)return;
+  closeModal("modal-detail");
+  go("add");
+  clearForm();
+  editandoId=id;
+  $("#a-nome").value=v.nome;$("#a-vinicola").value=v.vinicola==="—"?"":v.vinicola;
+  if(PAISES.includes(v.pais))$("#a-pais").value=v.pais;
+  $("#a-regiao").value=v.regiao==="—"?"":v.regiao;
+  $("#a-safra").value=v.safra||"";$("#a-tipo").value=v.tipo;
+  $("#a-uvas").value=(v.uvas||[]).join(", ");
+  if(ADEGAS.find(a=>a.id===v.adega))$("#a-adega").value=v.adega;
+  $("#a-qtd").value=v.qtd;$("#a-preco").value=v.preco||"";
+  ["corpo","acidez","tanino"].forEach(k=>{$("#a-"+k).value=v[k]||3;$("#v-"+k).textContent=v[k]||3});
+  $("#a-jan1").value=v.jan?v.jan[0]:"";$("#a-jan2").value=v.jan?v.jan[1]:"";
+  $("#a-notas").value=v.notas==="Sem notas registradas."?"":v.notas;
+  $("#form-title").textContent="✏️ Corrigindo: "+v.nome+" — altere e salve";
+  $("#form-panel").scrollIntoView({behavior:"smooth"});
+}
+function moveOne(id,destino){
+  const v=vinhos.find(x=>x.id===id);if(!v)return;
+  const d=adegaDe(destino);
+  const irmao=vinhos.find(x=>x.id!==v.id&&x.adega===destino&&x.nome===v.nome&&x.safra===v.safra&&x.vinicola===v.vinicola);
+  if(v.qtd<=1&&!irmao){v.adega=destino}          /* última garrafa e sem par no destino: move o rótulo inteiro */
+  else if(irmao){v.qtd--;irmao.qtd++;if(v.qtd<=0)vinhos=vinhos.filter(x=>x.id!==v.id)}
+  else{v.qtd--;vinhos.push({...v,id:NEXT_ID++,qtd:1,adega:destino})}
+  closeModal("modal-detail");persist();renderAdegaBar();renderDash();renderColecao();
+  toast(`1 garrafa de ${v.nome} movida para ${d.icone} ${d.nome}.`);
+}
+function closeModal(id){$("#"+id).classList.remove("open")}
+document.querySelectorAll(".modal-bg").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("open")}));
+
+/* ================== ADICIONAR ================== */
+function refreshAdegaSelect(){
+  $("#a-adega").innerHTML=ADEGAS.map(a=>`<option value="${a.id}">${a.icone} ${a.nome}</option>`).join("")+`<option value="__nova">➕ Criar nova adega…</option>`;
+}
+function initSelects(){
+  refreshAdegaSelect();
+  $("#a-pais").innerHTML=PAISES.map(p=>`<option>${p}</option>`).join("");
+  $("#a-tipo").innerHTML=TIPOS.map(t=>`<option>${t}</option>`).join("");
+  $("#f-tipo").innerHTML+=TIPOS.map(t=>`<option>${t}</option>`).join("");
+  $("#f-pais").innerHTML+=[...new Set(vinhos.map(v=>v.pais))].sort().map(p=>`<option>${p}</option>`).join("");
+}
+function clearForm(){
+  ["a-nome","a-vinicola","a-regiao","a-safra","a-uvas","a-preco","a-jan1","a-jan2","a-notas"].forEach(i=>$("#"+i).value="");
+  $("#a-qtd").value=1;["corpo","acidez","tanino"].forEach(k=>{$("#a-"+k).value=3;$("#v-"+k).textContent=3});
+  /* zera também os seletores — antes eles guardavam o valor do cadastro anterior */
+  $("#a-pais").value=PAISES[0];$("#a-tipo").value=TIPOS[0];
+  if(ADEGAS.length)$("#a-adega").value=(adegaAtiva!=="todas"&&ADEGAS.find(a=>a.id===adegaAtiva))?adegaAtiva:ADEGAS[0].id;
+  $("#nova-adega-wrap").classList.add("hidden");
+  $("#form-title").textContent="Ficha do vinho";lastEan=null;lastFotoRotulo=null;editandoId=null;
+}
+function saveWine(){
+  const nome=$("#a-nome").value.trim();
+  if(!nome){toast("Informe ao menos o nome do vinho. 🍷");return}
+  let adegaSel=$("#a-adega").value;
+  if(adegaSel==="__nova"){
+    const nomeAdega=($("#a-nova-adega").value||"").trim();
+    if(!nomeAdega){toast("Dê um nome à nova adega. 🏠");return}
+    adegaSel=nomeAdega.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||("adega"+NEXT_ID);
+    if(!ADEGAS.find(a=>a.id===adegaSel))ADEGAS.push({id:adegaSel,nome:nomeAdega,icone:"🍇"});
+    refreshAdegaSelect();$("#a-adega").value=adegaSel;
+    $("#nova-adega-wrap").classList.add("hidden");$("#a-nova-adega").value="";
+  }
+  if(editandoId){
+    const v=vinhos.find(x=>x.id===editandoId);
+    if(v){
+      Object.assign(v,{nome,vinicola:$("#a-vinicola").value||"—",pais:$("#a-pais").value,regiao:$("#a-regiao").value||"—",
+        safra:+$("#a-safra").value||0,tipo:$("#a-tipo").value,uvas:($("#a-uvas").value||"").split(",").map(s=>s.trim()).filter(Boolean),
+        corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,adega:adegaSel,
+        qtd:Math.max(1,+$("#a-qtd").value||1),preco:+$("#a-preco").value||0,
+        jan:[+$("#a-jan1").value||ANO,+$("#a-jan2").value||ANO+5],notas:$("#a-notas").value||"Sem notas registradas."});
+      if(lastFotoRotulo)v.foto=lastFotoRotulo;
+    }
+    editandoId=null;
+    toast(`Ficha de "${nome}" corrigida! ✏️`);
+    clearForm();persist();renderAdegaBar();
+    $("#f-pais").innerHTML='<option value="">Todos os países</option>'+[...new Set(vinhos.map(v=>v.pais))].sort().map(p=>`<option>${p}</option>`).join("");
+    go("colecao");
+    return;
+  }
+  vinhos.push({foto:lastFotoRotulo||undefined,ean:lastEan||undefined,adega:adegaSel,id:NEXT_ID++,nome,vinicola:$("#a-vinicola").value||"—",pais:$("#a-pais").value,regiao:$("#a-regiao").value||"—",
+    safra:+$("#a-safra").value||0,tipo:$("#a-tipo").value,uvas:($("#a-uvas").value||"").split(",").map(s=>s.trim()).filter(Boolean),
+    corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,doc:1,
+    qtd:Math.max(1,+$("#a-qtd").value||1),preco:+$("#a-preco").value||0,
+    jan:[+$("#a-jan1").value||ANO,+$("#a-jan2").value||ANO+5],notas:$("#a-notas").value||"Sem notas registradas."});
+  toast(`${nome} adicionado em ${adegaDe(adegaSel).icone} ${adegaDe(adegaSel).nome}! 🍾`);
+  clearForm();persist();renderAdegaBar();
+  $("#f-pais").innerHTML='<option value="">Todos os países</option>'+[...new Set(vinhos.map(v=>v.pais))].sort().map(p=>`<option>${p}</option>`).join("");
+  go("colecao");
+}
+
+/* ===== SCANNER REAL: câmera → EAN → base local → Open Food Facts → cadastro assistido ===== */
+let scanStream=null,scanTimer=null,scanAtivo=false,lastEan=null,lastFotoRotulo=null;
+const setScan=h=>{$("#scan-status").innerHTML=h};
+let temCamera=false;
+function loadAnyScript(urls){
+  return urls.reduce((p,u)=>p.catch(()=>new Promise((ok,err)=>{
+    const s=document.createElement("script");s.src=u;s.onload=ok;s.onerror=err;document.head.appendChild(s);
+  })),Promise.reject());
+}
+async function openScanner(){
+  $("#scanner").classList.add("open");scanAtivo=true;lastEan=null;resetOcrAcc();
+  setScan("Iniciando câmera…");
+  try{
+    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}}});
+    const v=$("#scan-video");v.srcObject=scanStream;await v.play();
+    temCamera=true;$("#btn-capturar").classList.remove("hidden");
+    setScan("Enquadre o <b>rótulo</b> com boa luz e toque em <b>📸 Fotografar</b>");
+  }catch(e){
+    temCamera=false;$("#btn-capturar").classList.add("hidden");
+    setScan("Câmera indisponível neste ambiente.<br>Use o modo demonstração para conhecer o fluxo.");
+  }
+}
+/* ===== Modo rótulo: OCR contínuo no aparelho — sem precisar tirar foto =====
+   A cada ~2,5s o app lê um quadro da câmera; ao encontrar texto legível, preenche a ficha sozinho. */
+let ocrWorker=null,ocrBusy=false,ocrLoopTimer=null,ocrTent=0;
+async function garantirOcr(){
+  if(!window.Tesseract){
+    setScan("Carregando leitor óptico… (só na 1ª vez)");
+    await loadAnyScript(["https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js",
+                         "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js",
+                         "https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"]);
+  }
+  if(!ocrWorker){
+    setScan("Preparando leitor óptico…");
+    ocrWorker=await Tesseract.createWorker("eng");
+    try{await ocrWorker.setParameters({tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ÁÂÃÀÉÊÍÓÔÕÚÜÇáâãàéêíóôõúüç'&.- "})}catch(e){}
+  }
+}
+/* Recorte central + tons de cinza + contraste: menos fundo, letras mais nítidas para o OCR */
+function prepararQuadro(v){
+  const mx=v.videoWidth*0.08,my=v.videoHeight*0.08;
+  const w=v.videoWidth-2*mx,h=v.videoHeight-2*my;
+  const esc=Math.min(1.6,1300/w);
+  const c=document.createElement("canvas");
+  c.width=Math.round(w*esc);c.height=Math.round(h*esc);
+  const ctx=c.getContext("2d");
+  ctx.drawImage(v,mx,my,w,h,0,0,c.width,c.height);
+  const im=ctx.getImageData(0,0,c.width,c.height),d=im.data;
+  for(let i=0;i<d.length;i+=4){
+    let g=0.3*d[i]+0.59*d[i+1]+0.11*d[i+2];
+    g=(g-128)*1.5+128;g=g<0?0:g>255?255:g;
+    d[i]=d[i+1]=d[i+2]=g;
+  }
+  ctx.putImageData(im,0,0);
+  return c;
+}
+function startOcrLoop(){
+  stopOcrLoop();ocrTent=0;
+  ocrLoopTimer=setInterval(()=>tentarLerRotulo(false),2500);
+  setTimeout(()=>tentarLerRotulo(false),700);
+}
+function stopOcrLoop(){if(ocrLoopTimer){clearInterval(ocrLoopTimer);ocrLoopTimer=null}}
+/* Leitura acumulada: cada quadro contribui; o app junta o melhor de vários quadros antes de preencher */
+const deacc=s=>s.normalize("NFD").replace(/[̀-ͯ]/g,"");
+const REGIOES_ROTULO=[
+ [/\bdouro\b/,"Douro","Portugal"],[/\balentejo\b/,"Alentejo","Portugal"],[/\bvinho verde\b|\bminho\b/,"Vinho Verde","Portugal"],[/\bdao\b/,"Dão","Portugal"],[/\bbairrada\b/,"Bairrada","Portugal"],[/\bsetubal\b/,"Setúbal","Portugal"],
+ [/\brioja\b/,"Rioja","Espanha"],[/\bribera del duero\b/,"Ribera del Duero","Espanha"],[/\brias baixas\b/,"Rías Baixas","Espanha"],[/\bpriorat\b/,"Priorat","Espanha"],
+ [/\bmendoza\b/,"Mendoza","Argentina"],[/\bsalta\b|\bcafayate\b/,"Salta","Argentina"],[/\bpatagonia\b/,"Patagônia","Argentina"],
+ [/\bcolchagua\b/,"Valle de Colchagua","Chile"],[/\bmaipo\b/,"Valle del Maipo","Chile"],[/\bcasablanca\b/,"Valle de Casablanca","Chile"],[/\baconcagua\b/,"Aconcágua","Chile"],
+ [/\btoscana\b|\bchianti\b|\bmontalcino\b/,"Toscana","Itália"],[/\bbarolo\b|\bpiemonte\b|\blanghe\b|\bbarbaresco\b/,"Piemonte","Itália"],[/\bvalpolicella\b|\bamarone\b|\bveneto\b|\bsoave\b/,"Vêneto","Itália"],[/\bpuglia\b|\bmanduria\b|\bsalento\b/,"Puglia","Itália"],[/\bsicilia\b|\betna\b/,"Sicília","Itália"],
+ [/\bbordeaux\b|\bmedoc\b|\bmargaux\b|\bpauillac\b|\bsaint emilion\b|\bpomerol\b/,"Bordeaux","França"],[/\bbourgogne\b|\bborgonha\b|\bchablis\b|\bmeursault\b|\bpommard\b/,"Borgonha","França"],[/\bchampagne\b/,"Champagne","França"],[/\bprovence\b/,"Provence","França"],[/\bcotes du rhone\b|\brhone\b|\bchateauneuf\b/,"Vale do Rhône","França"],[/\balsace\b|\balsacia\b/,"Alsácia","França"],[/\bsancerre\b|\bloire\b/,"Vale do Loire","França"],[/\bbeaujolais\b/,"Beaujolais","França"],
+ [/\bmosel\b|\brheingau\b|\bpfalz\b/,"Mosel/Reno","Alemanha"],
+ [/\bmarlborough\b|\bcentral otago\b/,"Marlborough","Nova Zelândia"],[/\bstellenbosch\b|\bswartland\b/,"Stellenbosch","África do Sul"],
+ [/\bnapa\b|\bsonoma\b/,"Califórnia","Estados Unidos"],
+ [/\bvale dos vinhedos\b|\bserra gaucha\b|\bbento goncalves\b|\bpinto bandeira\b/,"Serra Gaúcha","Brasil"],[/\bcampanha gaucha\b|\bcampanha\b/,"Campanha Gaúcha","Brasil"],[/\bvale do sao francisco\b/,"Vale do São Francisco","Brasil"],
+ [/\bcanelones\b|\bmaldonado\b|\bgarzon\b/,"Garzón/Canelones","Uruguai"]
+];
+const TIPOS_ROTULO=[
+ [/\bespumante\b|\bsparkling\b|\bchampagne\b|\bprosecco\b|\bcava\b|\bbrut\b|\bmetodo (tradicional|classico)\b/,"Espumante"],
+ [/\bporto\b|\bport wine\b|\btawny\b|\bruby\b|\blate bottled\b|\bmadeira\b|\bjerez\b|\bsherry\b|\bmoscatel de setubal\b/,"Fortificado"],
+ [/\brose\b|\brosado\b|\brosato\b/,"Rosé"],
+ [/\b(vinho branco|branco|blanc|bianco|white wine|weisswein)\b/,"Branco"],
+ [/\b(vinho tinto|tinto|rouge|rosso|red wine|rotwein)\b/,"Tinto"]
+];
+const LIXO_LINHA=/\b(est|estd|ml|cl|vol|alc|alcool|alcohol|product of|produce of|vinho|wine|vin|vino|garrafa|bottled|engarrafado|produzido|elaborado|contem|sulfitos|750|375|1716|reserva)\b/;
+let ocrAcc=null;
+function resetOcrAcc(){ocrAcc={frames:0,nome:"",nomeScore:0,vinic:"",vinScore:0,safra:"",regiao:"",pais:"",tipo:"",linhas:[],cand:{},match:null}}
+/* Entre candidatos a nome quase iguais (ex.: "MVALLADO" × "VALLADO"), descarta o que é o outro com 1–2
+   caracteres de lixo grudados, e prefere o que apareceu em mais quadros. */
+function melhoresCandidatos(){
+  let cs=Object.entries(ocrAcc.cand).map(([l,v])=>({l,n:v.n,score:v.score}));
+  cs=cs.filter(a=>!cs.some(b=>b!==a&&a.l.length>b.l.length&&a.l.length-b.l.length<=2&&normBM(a.l).includes(normBM(b.l))&&b.n>=a.n));
+  cs.sort((x,y)=>y.n-x.n||y.score-x.score);
+  return cs;
+}
+function tituloCase(s){return s.split(" ").map(w=>w.length>2?w[0].toUpperCase()+w.slice(1).toLowerCase():w).join(" ")}
+function parseFrame(texto){
+  const linhas=texto.split(/\n+/).map(l=>l.replace(/[^\p{L}\p{N}'&. -]/gu," ").replace(/\s+/g," ").trim()).filter(l=>l.length>=3);
+  const norm=deacc(texto.toLowerCase());
+  if(!ocrAcc.safra){const a=(texto.match(/\b(19[5-9]\d|20[0-4]\d)\b/)||[])[0];if(a&&a!=="1716")ocrAcc.safra=a}
+  if(!ocrAcc.regiao){const r=REGIOES_ROTULO.find(([re])=>re.test(norm));if(r){ocrAcc.regiao=r[1];ocrAcc.pais=r[2]}}
+  if(!ocrAcc.tipo){const t=TIPOS_ROTULO.find(([re])=>re.test(norm));if(t)ocrAcc.tipo=t[1]}
+  for(const l of linhas){
+    const nl=deacc(l.toLowerCase());
+    if(/^\d+$/.test(l)||LIXO_LINHA.test(nl)||REGIOES_ROTULO.some(([re])=>re.test(nl))||TIPOS_ROTULO.some(([re])=>re.test(nl)))continue;
+    const score=l.replace(/[^\p{L}]/gu,"").length;
+    const k=l.toUpperCase();
+    ocrAcc.cand[k]=ocrAcc.cand[k]?{n:ocrAcc.cand[k].n+1,score:Math.max(ocrAcc.cand[k].score,score)}:{n:1,score};
+    if(score>ocrAcc.nomeScore){if(ocrAcc.nome&&ocrAcc.nome!==l){ocrAcc.vinic=ocrAcc.nome;ocrAcc.vinScore=ocrAcc.nomeScore}ocrAcc.nome=l;ocrAcc.nomeScore=score}
+    else if(score>ocrAcc.vinScore&&l!==ocrAcc.nome){ocrAcc.vinic=l;ocrAcc.vinScore=score}
+    if(ocrAcc.linhas.length<6&&!ocrAcc.linhas.includes(l))ocrAcc.linhas.push(l);
+  }
+  if(!ocrAcc.match){const m=matchBaseMundial(texto);if(m)ocrAcc.match=m}
+  ocrAcc.frames++;
+}
+/* Aceita automaticamente só com sinal forte: bateu na base mundial, OU o mesmo nome
+   apareceu em 2+ leituras junto com safra/região/tipo — evita aceitar lixo de uma leitura ruim */
+function ocrPronto(){
+  if(ocrAcc.match)return true;
+  const cs=melhoresCandidatos();
+  return cs.length>0&&cs[0].n>=2&&cs[0].score>=5&&(ocrAcc.safra||ocrAcc.regiao||ocrAcc.tipo);
+}
+function achadosTxt(){
+  const p=[];if(ocrAcc.nome)p.push("<b>"+tituloCase(ocrAcc.nome)+"</b>");
+  if(ocrAcc.safra)p.push(ocrAcc.safra);if(ocrAcc.regiao)p.push(ocrAcc.regiao);if(ocrAcc.tipo)p.push(ocrAcc.tipo);
+  return p.join(" · ");
+}
+async function tentarLerRotulo(manual){
+  if(!scanAtivo||ocrBusy)return;
+  const v=$("#scan-video");
+  if(!v.videoWidth){if(manual)toast("Câmera ainda carregando…");return}
+  ocrBusy=true;
+  try{
+    await garantirOcr();
+    if(!scanAtivo){ocrBusy=false;return}
+    const c=prepararQuadro(v);
+    const {data}=await ocrWorker.recognize(c);
+    if(!scanAtivo){ocrBusy=false;return}
+    parseFrame(data.text||"");
+    if((manual&&ocrAcc.nome)||ocrPronto()||(ocrAcc.frames>=8&&ocrAcc.nome)){
+      finalizarRotulo();
+    }else{
+      ocrTent++;
+      const ach=achadosTxt();
+      setScan(`🔄 Lendo o rótulo… (leitura ${ocrTent})${ach?"<br>Já identifiquei: "+ach:""}<br><span style="font-size:12.5px">Segure firme, aproxime e garanta boa luz.${manual?" Ainda não achei texto legível.":""}</span>`);
+    }
+  }catch(e){
+    stopOcrLoop();
+    setScan("Não consegui carregar o leitor óptico (exige internet na 1ª vez).<br>Use o modo demonstração ou o cadastro manual.");
+  }
+  ocrBusy=false;
+}
+function finalizarRotulo(){
+  stopOcrLoop();
+  const acc=ocrAcc;
+  const cs=melhoresCandidatos();
+  if(cs.length){acc.nome=cs[0].l;acc.nomeScore=cs[0].score;if(cs[1]){acc.vinic=cs[1].l;acc.vinScore=cs[1].score}}
+  const fotoCapturada=lastFotoRotulo;
+  pararCamera();closeScanner();clearForm();
+  lastFotoRotulo=fotoCapturada; /* a foto do rótulo sobrevive à limpeza e vai para a ficha */
+  /* preenche com o que o OCR leu (o usuário sempre confere) */
+  $("#a-nome").value=tituloCase(acc.nome);
+  if(acc.vinic&&acc.vinScore>=4)$("#a-vinicola").value=tituloCase(acc.vinic);
+  if(acc.safra)$("#a-safra").value=acc.safra;
+  if(acc.regiao)$("#a-regiao").value=acc.regiao;
+  if(acc.pais&&PAISES.includes(acc.pais))$("#a-pais").value=acc.pais;
+  if(acc.tipo)$("#a-tipo").value=acc.tipo;
+  $("#a-notas").value="Rótulo lido por OCR no aparelho. Texto identificado: "+acc.linhas.join(" · ");
+  $("#form-title").textContent="✓ Rótulo lido — confira, complete e salve";
+  $("#form-panel").scrollIntoView({behavior:"smooth"});
+  /* candidatos na base mundial: o app PERGUNTA em vez de decidir sozinho */
+  const cands=matchBaseMundialTop(acc.nome+" "+(acc.vinic||"")+" "+acc.linhas.join(" "),3);
+  if(cands.length){
+    window.__cands=cands.map(c=>c.w);
+    const safraLida=acc.safra;
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="closeModal('modal-detail')">✕</button>
+      <h3 class="serif">🌍 Encontrei na base mundial</h3>
+      <div class="sub">O rótulo parece com estes vinhos — é algum deles? Toque para preencher a ficha completa.</div>
+      ${cands.map((c,i)=>`<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:8px" onclick="preencherDaBase(window.__cands[${i}]);${safraLida?`document.getElementById('a-safra').value='${safraLida}';`:""}closeModal('modal-detail');toast('Ficha preenchida pela base mundial! 🌍')">
+        <i class="dot" style="background:${CORES[c.w[1]]||'#999'}"></i>
+        <div class="inf"><b>${nomeExibicao(c.w)}</b><small>${c.w[5]||"—"} · ${c.w[4]||"—"} · ${c.w[3]||"—"}${c.w[2]?" · "+c.w[2]:""}</small></div>
+        <span style="font-size:11px;color:var(--ink-3)">${Math.min(99,Math.round(c.score*66))}%</span>
+      </div>`).join("")}
+      <button class="btn btn-ghost" style="width:100%" onclick="closeModal('modal-detail')">Nenhum destes — manter o que o scanner leu</button>`;
+    $("#modal-detail").classList.add("open");
+  }else{
+    toast("Rótulo lido! Sem candidatos claros na base — confira e complete a ficha. 🧱");
+  }
+}
+/* ===== IA de visão: envia a foto para um modelo multimodal que ENTENDE a imagem e conhece vinhos ===== */
+async function analisarComIA(b64){
+  const key=getIaKey();
+  const modelos=["gemini-3.6-flash","gemini-3.5-flash-lite","gemini-2.5-flash","gemini-flash-latest"];
+  const prompt='Você é um sommelier experiente. Identifique o vinho deste rótulo e descreva seu perfil. Responda SOMENTE um JSON válido, sem markdown, no formato: {"nome":"","vinicola":"","pais":"","regiao":"","safra":"","tipo":"","uvas":[],"corpo":3,"acidez":3,"taninos":3,"notas":"","janela_inicio":0,"janela_fim":0,"confianca":0}. Regras: tipo deve ser exatamente um de Tinto, Branco, Rosé, Espumante, Fortificado; pais em português (França, Itália, Portugal, Espanha, Argentina, Chile, Brasil, etc.); safra apenas se visível no rótulo; corpo, acidez e taninos de 1 a 5 conforme o perfil típico deste vinho; notas = notas de degustação em português, 1 a 2 frases (aromas e paladar típicos deste vinho); janela_inicio e janela_fim = anos estimados da janela ideal de consumo desta safra (0 se não souber); confianca de 0 a 100. Se a imagem não for um rótulo de vinho ou for ilegível, retorne confianca 0.';
+  let ultimoErro="";
+  for(const m of modelos){
+    try{
+      const ctl=new AbortController();const tt=setTimeout(()=>ctl.abort(),25000);
+      const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+m+":generateContent",{
+        method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},signal:ctl.signal,
+        body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:"image/jpeg",data:b64}},{text:prompt}]}]})
+      });
+      clearTimeout(tt);
+      if(!r.ok){ultimoErro="HTTP "+r.status;if(r.status===404)continue;throw new Error(r.status===400||r.status===403?"chave inválida ou sem permissão":"erro "+r.status)}
+      const j=await r.json();
+      const txt=((((j.candidates||[])[0]||{}).content||{}).parts||[]).map(p=>p.text||"").join("");
+      const mj=txt.match(/\{[\s\S]*\}/);
+      if(!mj)throw new Error("resposta inesperada da IA");
+      return JSON.parse(mj[0]);
+    }catch(e){ultimoErro=e.message||String(e);if(!/HTTP 404/.test(ultimoErro)&&!/404/.test(ultimoErro))break}
+  }
+  throw new Error(ultimoErro||"IA indisponível");
+}
+function aplicarIA(o){
+  const foto=lastFotoRotulo;
+  pararCamera();closeScanner();clearForm();
+  lastFotoRotulo=foto;
+  $("#a-nome").value=o.nome||"";
+  $("#a-vinicola").value=o.vinicola||"";
+  if(o.pais&&PAISES.includes(o.pais))$("#a-pais").value=o.pais;
+  $("#a-regiao").value=o.regiao||"";
+  if(o.safra&&/^(19|20)\d{2}$/.test(String(o.safra)))$("#a-safra").value=o.safra;
+  if(TIPOS.includes(o.tipo))$("#a-tipo").value=o.tipo;
+  if(Array.isArray(o.uvas)&&o.uvas.length)$("#a-uvas").value=o.uvas.join(", ");
+  /* perfil sensorial: primeiro o que a IA estimou; a base mundial cobre o que faltar */
+  const n15=x=>{x=Math.round(+x);return x>=1&&x<=5?x:0};
+  const top=matchBaseMundialTop((o.nome||"")+" "+(o.vinicola||""),1);
+  const corpo=n15(o.corpo)||(top.length?top[0].w[6]:0)||3;
+  const acidez=n15(o.acidez)||(top.length?top[0].w[7]:0)||3;
+  const tanino=n15(o.taninos)||3;
+  $("#a-corpo").value=corpo;$("#v-corpo").textContent=corpo;
+  $("#a-acidez").value=acidez;$("#v-acidez").textContent=acidez;
+  $("#a-tanino").value=tanino;$("#v-tanino").textContent=tanino;
+  if(!$("#a-uvas").value&&top.length)$("#a-uvas").value=top[0].w[2]||"";
+  /* janela de consumo estimada pelo sommelier-IA */
+  const anoOk=a=>{a=Math.round(+a);return a>=1950&&a<=2060?a:0};
+  if(anoOk(o.janela_inicio))$("#a-jan1").value=anoOk(o.janela_inicio);
+  if(anoOk(o.janela_fim))$("#a-jan2").value=anoOk(o.janela_fim);
+  /* Notas de degustação DE VERDADE — a proveniência fica no título e no aviso, não na ficha */
+  $("#a-notas").value=(o.notas||"").trim();
+  $("#form-title").textContent="🧠 Identificado pela IA: "+(o.nome||"vinho")+(o.vinicola?" ("+o.vinicola+")":"");
+  $("#form-panel").scrollIntoView({behavior:"smooth"});
+  toast("🧠 Rótulo reconhecido pela IA de visão — confira e salve!");
+}
+/* Fluxo fotografar-e-analisar: IA de visão quando ativada; leitor local como retaguarda */
+async function capturarRotulo(){
+  if(ocrBusy)return;
+  const v=$("#scan-video");
+  if(!v.videoWidth){toast("Câmera ainda carregando…");return}
+  ocrBusy=true;$("#btn-capturar").disabled=true;
+  /* miniatura colorida do rótulo — vai para a ficha do vinho */
+  const t=document.createElement("canvas");
+  const et=300/Math.max(v.videoWidth,v.videoHeight);
+  t.width=Math.round(v.videoWidth*et);t.height=Math.round(v.videoHeight*et);
+  t.getContext("2d").drawImage(v,0,0,t.width,t.height);
+  lastFotoRotulo=t.toDataURL("image/jpeg",0.72);
+  /* foto colorida em alta para a IA */
+  const cc=document.createElement("canvas");
+  const ec=Math.min(1,1024/v.videoWidth);
+  cc.width=Math.round(v.videoWidth*ec);cc.height=Math.round(v.videoHeight*ec);
+  cc.getContext("2d").drawImage(v,0,0,cc.width,cc.height);
+  if(getIaKey()){
+    setScan("🧠 IA de visão analisando o rótulo…");
+    try{
+      const o=await analisarComIA(cc.toDataURL("image/jpeg",0.85).split(",")[1]);
+      if(o&&o.nome&&(+o.confianca||0)>=25){aplicarIA(o);ocrBusy=false;$("#btn-capturar").disabled=false;return}
+      setScan("A IA não reconheceu um vinho nesta foto — enquadre o rótulo de frente e tente de novo.");
+      ocrBusy=false;$("#btn-capturar").disabled=false;return;
+    }catch(e){
+      /* falha da IA agora é VISÍVEL — nada de despejar leitura ruim por cima */
+      setScan("❌ <b>A IA não conseguiu responder:</b> "+e.message+"<br>Confira sua chave no menu ☰ → 🔑 IA de visão (botão Testar conexão).<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+      ocrBusy=false;$("#btn-capturar").disabled=false;return;
+    }
+  }
+  try{
+    const c=prepararQuadro(v);
+    setScan("📸 Foto capturada — lendo o rótulo…");
+    await garantirOcr();
+    const {data}=await ocrWorker.recognize(c);
+    resetOcrAcc();parseFrame(data.text||"");
+    if(ocrAcc.nome){finalizarRotulo()}
+    else setScan("Não achei texto legível nesta foto."+(getIaKey()?"":"<br>💡 <b>Ative a IA de visão no menu ☰</b> para reconhecimento de verdade — inclusive de rótulos artísticos.")+"<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+  }catch(e){
+    setScan("Não consegui carregar o leitor óptico (exige internet na 1ª vez).<br>Use o modo demonstração ou o cadastro manual.");
+  }
+  ocrBusy=false;$("#btn-capturar").disabled=false;
+}
+function scanDemo(){
+  const w=BASE_SCANNER[Math.floor(Math.random()*BASE_SCANNER.length)];
+  setScan(`<span class="scan-ok">✓ Rótulo reconhecido (demonstração)!</span><br><b>${w.nome} ${w.safra}</b> — ${w.vinicola}`);
+  setTimeout(()=>{pararCamera();closeScanner();fillForm(w)},1400);
+}
+function pararCamera(){
+  stopOcrLoop();
+  if(scanTimer){clearInterval(scanTimer);scanTimer=null}
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}
+  const v=$("#scan-video");if(v){v.pause();v.srcObject=null}
+}
+function closeScanner(){scanAtivo=false;pararCamera();$("#scanner").classList.remove("open")}
+function fillForm(w){
+  $("#a-nome").value=w.nome;$("#a-vinicola").value=w.vinicola;$("#a-pais").value=w.pais;
+  $("#a-regiao").value=w.regiao;$("#a-safra").value=w.safra;$("#a-tipo").value=w.tipo;
+  $("#a-uvas").value=w.uvas.join(", ");$("#a-preco").value=w.preco;
+  $("#a-jan1").value=w.jan[0];$("#a-jan2").value=w.jan[1];$("#a-notas").value=w.notas;
+  ["corpo","acidez","tanino"].forEach(k=>{$("#a-"+k).value=w[k];$("#v-"+k).textContent=w[k]});
+  $("#a-adega").value=adegaAtiva!=="todas"?adegaAtiva:ADEGAS[0].id;
+  $("#form-title").textContent="✓ Ficha preenchida pelo scanner — confira e salve";
+  $("#form-panel").scrollIntoView({behavior:"smooth"});
+  toast("Ficha preenchida automaticamente — revise e salve. ✨");
+}
+
+/* ================== HARMONIZAÇÃO ================== */
+function scoreWine(v,p){
+  let pts=0;const why=[];
+  const wt=p.tipos[v.tipo]||0;pts+=wt;
+  if(wt>=34)why.push(`O tipo <b>${v.tipo.toLowerCase()}</b> é a escolha clássica para este prato.`);
+  else if(wt>=24)why.push(`${v.tipo} é uma alternativa muito bem-vinda aqui.`);
+  const dc=Math.abs(v.corpo-p.corpo);pts+=Math.max(0,20-6*dc);
+  if(dc<=1)why.push(`O corpo do vinho (${v.corpo}/5) está na medida da intensidade do prato.`);
+  const dt=Math.abs(v.tanino-p.tanino);pts+=Math.max(0,15-5*dt);
+  if(dt<=1&&v.tipo==="Tinto")why.push(p.tanino>=4?`Taninos firmes (${v.tanino}/5) para enfrentar a gordura e a proteína.`:`Taninos na medida certa (${v.tanino}/5), sem atropelar o prato.`);
+  if(v.acidez>=p.acidezMin){pts+=15;if(p.acidezMin>=4)why.push(`Acidez alta (${v.acidez}/5) — o frescor que este prato exige.`)}
+  else pts+=Math.max(0,15-6*(p.acidezMin-v.acidez));
+  if(p.docMin){if(v.doc>=p.docMin){pts+=8;why.push(`A doçura do vinho equilibra o prato — regra clássica de harmonização.`)}}
+  else if(v.doc>=3)pts-=8;
+  const uvaHit=v.uvas.find(u=>p.uvasBonus.some(b=>u.toLowerCase().includes(b.toLowerCase())));
+  if(uvaHit){pts+=10;why.push(`A uva <b>${uvaHit}</b> é referência mundial de harmonização com este prato.`)}
+  const regHit=p.regioesBonus.find(r=>v.regiao.toLowerCase().includes(r.toLowerCase()));
+  if(regHit){pts+=6;why.push(`Harmonização regional: <b>${regHit}</b> é o par histórico deste prato.`)}
+  const s=status(v);
+  if(s.k==="auge")pts+=4;
+  if(s.k==="logo"){pts+=6;why.push(`⏳ Bônus do sommelier: esta garrafa está no fim da janela ideal (${v.jan[1]}) — ótimo momento para abri-la.`)}
+  if(s.k==="passando")pts-=2;
+  if(s.k==="guardar")pts-=3;
+  return {pts,why};
+}
+function harmonizar(pratoId,rotulo){
+  const p=PRATOS.find(x=>x.id===pratoId);if(!p)return;
+  document.querySelectorAll(".dish").forEach(d=>d.classList.toggle("sel",d.dataset.id===pratoId));
+  const ranking=vinhosAtivos().map(v=>({v,...scoreWine(v,p)})).sort((a,b)=>b.pts-a.pts).slice(0,3);
+  const medals=["🥇","🥈","🥉"];
+  const escopo=adegaAtiva==="todas"?"buscando em <b>todas as suas adegas</b>":`buscando apenas na <b>${adegaDe(adegaAtiva).icone} ${adegaDe(adegaAtiva).nome}</b>`;
+  $("#pair-results").innerHTML=`
+    <div class="explain-box"><b>${p.em} ${rotulo||p.nome}</b> — ${p.ctx}<br><span style="font-size:12px">📍 Sugestões ${escopo}. Para trocar, use o seletor na tela Minha Adega.</span></div>
+    ${ranking.map((r,i)=>`
+      <div class="pair-card ${i===0?"first":""}">
+        <div class="medal">${medals[i]}</div>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+            <div><h4 class="serif">${r.v.nome} ${safraTxt(r.v)}</h4><div class="vin">${r.v.vinicola} · ${r.v.regiao} · ${r.v.pais} — <b>${r.v.qtd} gf. em ${adegaDe(r.v.adega).icone} ${adegaDe(r.v.adega).nome}</b></div></div>
+            <span class="match">${Math.min(99,Math.round(r.pts/110*100))}% match</span>
+          </div>
+          <ul class="why">${r.why.slice(0,4).map(w=>`<li>${w}</li>`).join("")||"<li>Boa opção geral dentro da sua adega para este prato.</li>"}</ul>
+          <div class="pair-actions">
+            <button class="btn btn-primary btn-sm" onclick="openConsume(${r.v.id},'${(rotulo||p.nome).replace(/'/g,"")}')">🍷 Abrir esta garrafa</button>
+            <button class="btn btn-ghost btn-sm" onclick="openDetail(${r.v.id})">Ver ficha</button>
+          </div>
+        </div>
+      </div>`).join("")}
+    <div class="explain-box">💡 <b>Como o Apotheca decidiu:</b> cada garrafa da sua adega recebeu uma pontuação combinando o tipo de vinho indicado para o prato, corpo, taninos, acidez e doçura, com bônus para uvas e regiões classicamente harmonizadas — e até para garrafas que estão no fim da janela ideal de consumo.</div>`;
+  $("#pair-results").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function freeSearch(){
+  const q=$("#free-dish").value.trim();
+  if(!q){toast("Descreva o prato para eu harmonizar. 🍽️");return}
+  const hit=KEYWORDS.find(([re])=>re.test(q));
+  if(hit)harmonizar(hit[1],q);
+  else{$("#pair-results").innerHTML=`<div class="empty"><div class="big">🤔</div>Ainda não conheço “${q}” — no aplicativo final, a IA do Apotheca interpretaria qualquer prato.<br>Experimente algo como “peixe grelhado”, “massa à bolonhesa” ou escolha um prato acima.</div>`}
+}
+function renderDishes(){
+  $("#dish-grid").innerHTML=PRATOS.map(p=>`<div class="dish" data-id="${p.id}" onclick="harmonizar('${p.id}')"><div class="em">${p.em}</div><h4>${p.nome}</h4><small>${p.origem}</small></div>`).join("");
+}
+
+/* ================== HISTÓRICO ================== */
+function histRowsHtml(limit){
+  const lista=limit?historico.slice(0,limit):historico;
+  return lista.map(h=>`
+    <div class="hist-row"><div class="em">🍷</div>
+      <div class="info"><h4>${h.nome}</h4><p>${h.prato} · ${h.data}</p></div>
+      <div class="stars" title="${h.estrelas} de 5 estrelas">${"★".repeat(h.estrelas)}${"☆".repeat(5-h.estrelas)}</div>
+    </div>`).join("")||`<div class="empty"><div class="big">📜</div>Nenhuma garrafa consumida ainda.</div>`;
+}
+function renderHist(){$("#hist-list").innerHTML=histRowsHtml()}
+
+/* ================== INIT ================== */
+initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();renderHist();
+(function(){
+  const ok=PERSISTE;
+  const vb=$("#ver-badge");if(vb)vb.textContent="v"+APP_VERSION;
+  const badge=$("#persist-badge");if(badge)badge.textContent=ok?"💾 dados salvos neste aparelho":"⚠️ sem memória neste navegador";
+  const note=$("#persist-note");if(note)note.textContent=ok?"Seus dados ficam salvos neste navegador/aparelho e sobrevivem ao fechar o app.":"Este navegador não permite salvar dados — tudo volta ao estado inicial ao recarregar.";
+})();
+
+</script>
+
+</body>
+</html>
