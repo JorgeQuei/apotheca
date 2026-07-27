@@ -453,6 +453,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   <div class="mi" onclick="fecharMenu();go('historico')">📜 Histórico</div>
   <div class="mi" onclick="fecharMenu();openAdegasManager()">✏️ Gerenciar adegas</div>
   <div class="mi" onclick="fecharMenu();abrirConfigIA()">🔑 IA de visão (scanner)</div>
+  <div class="mi" onclick="fecharMenu();carregarDemo()">🎬 Carregar demonstração</div>
   <div class="mi" onclick="fecharMenu();abrirAjuda()">❓ Ajuda e suporte</div>
   <div class="mi" onclick="fecharMenu();abrirSobre()">ℹ️ Sobre o Apotheca</div>
   <div class="mi sair" onclick="fecharMenu();sairSessao()">🚪 Sair da sessão</div>
@@ -503,7 +504,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.29"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.30"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
@@ -1071,6 +1072,8 @@ function createEvento(){
   toast(`Encontro "${nome}" criado — convide os amigos! 🥂`);
 }
 
+/* Sementes de demonstração congeladas — usuário novo começa vazio; demo só sob demanda */
+const DEMO_SEED=JSON.parse(JSON.stringify({vinhos,historico,eventos,amigos,ADEGAS}));
 /* ================== PERSISTÊNCIA LOCAL ==================
    Salva a adega no armazenamento do navegador do aparelho (quando disponível).
    Se o navegador não permitir (ex.: visualização dentro de outros apps),
@@ -1086,7 +1089,7 @@ function persist(){
 (function restore(){
   try{
     const s=JSON.parse(localStorage.getItem(STORE_KEY));
-    if(s&&Array.isArray(s.vinhos)&&s.vinhos.length){
+    if(s&&Array.isArray(s.vinhos)){
       vinhos=s.vinhos;ADEGAS=s.ADEGAS||ADEGAS;historico=s.historico||historico;
       eventos=s.eventos||eventos;amigos=s.amigos||amigos;perfil=s.perfil||null;if(Array.isArray(s.USUARIOS_APP)&&s.USUARIOS_APP.length)USUARIOS_APP=s.USUARIOS_APP;if(Array.isArray(s.feed)&&s.feed.length)feed=s.feed;NEXT_FEED=s.NEXT_FEED||NEXT_FEED;minhasConfrarias=s.minhasConfrarias||[];if(Array.isArray(s.CONFRARIAS)&&s.CONFRARIAS.length)CONFRARIAS=s.CONFRARIAS;meusBrindes=s.meusBrindes||[];NEXT_ID=s.NEXT_ID||NEXT_ID;NEXT_EV=s.NEXT_EV||NEXT_EV;
     }
@@ -1215,6 +1218,14 @@ async function testarIA(){
 /* ===== SESSÃO E CADASTRO (nome único e definitivo) ===== */
 let provPendente=null;
 const normUser=s=>(s||"").trim().replace(/\s+/g,".").replace(/[^a-zA-Z0-9._-]/g,"");
+function carregarDemo(){
+  const d=JSON.parse(JSON.stringify(DEMO_SEED));
+  vinhos=d.vinhos;historico=d.historico;eventos=d.eventos;amigos=d.amigos;ADEGAS=d.ADEGAS;
+  adegaAtiva="todas";
+  persist();refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();renderHist();
+  toast("🎬 Adega de demonstração carregada — 153 garrafas para explorar!");
+  go("dashboard");
+}
 function sairSessao(){
   $("#login-p1").classList.remove("hidden");$("#login-p2").classList.add("hidden");
   $("#login-screen").classList.add("open");
@@ -1263,7 +1274,10 @@ async function confirmarNome(){
   }
   perfil={user:u,cidade,provedor:provPendente||"Google"};
   USUARIOS_APP.push({user:u,nome:u.split(/[._-]/)[0].replace(/^./,c=>c.toUpperCase()),cidade});
-  persist();
+  vinhos=[];historico=[];eventos=[];amigos=[];
+  ADEGAS=[{id:"casa",nome:"Casa Principal",icone:"🏠"}];
+  adegaAtiva="todas";
+  persist();refreshAdegaSelect();renderAdegaBar();renderColecao();renderHist();
   $("#login-screen").classList.remove("open");
   aplicarPerfilUI();
   go("dashboard");
@@ -1348,15 +1362,21 @@ function renderDash(){
   $("#kpi-media").textContent="avaliação média "+media+" ★";
 
   /* stacked bar por tipo — rótulos diretos na legenda (regra de contraste) */
+  const vazia=vinhos.length===0;
+  if(vazia){
+    $("#chart-tipos").innerHTML="";
+    $("#legend-tipos").innerHTML='<div class="empty" style="padding:14px">🍾 Sua adega está vazia.<br>Toque no <b>+</b> dourado para guardar a primeira garrafa — ou carregue a demonstração no menu ☰.</div>';
+    $("#chart-paises").innerHTML='<div class="empty" style="padding:14px">O mapa da sua coleção nascerá aqui. 🌍</div>';
+  }
   const porTipo=TIPOS.map(t=>({t,n:VS.filter(v=>v.tipo===t).reduce((s,v)=>s+v.qtd,0)})).filter(x=>x.n>0);
-  $("#chart-tipos").innerHTML=porTipo.map(x=>`<div style="flex:${x.n};background:${CORES[x.t]}" title="${x.t}: ${x.n} garrafas"></div>`).join("");
-  $("#legend-tipos").innerHTML=porTipo.map(x=>`<span><i class="dot" style="background:${CORES[x.t]}"></i>${x.t} — <b>${x.n}</b> (${Math.round(x.n/tot*100)}%)</span>`).join("");
+  if(!vazia)$("#chart-tipos").innerHTML=porTipo.map(x=>`<div style="flex:${x.n};background:${CORES[x.t]}" title="${x.t}: ${x.n} garrafas"></div>`).join("");
+  if(!vazia)$("#legend-tipos").innerHTML=porTipo.map(x=>`<span><i class="dot" style="background:${CORES[x.t]}"></i>${x.t} — <b>${x.n}</b> (${Math.round(x.n/tot*100)}%)</span>`).join("");
 
   /* barras por país — magnitude, um só matiz */
   const porPais={};VS.forEach(v=>porPais[v.pais]=(porPais[v.pais]||0)+v.qtd);
   const lista=Object.entries(porPais).sort((a,b)=>b[1]-a[1]);
   const max=lista.length?lista[0][1]:1;
-  $("#chart-paises").innerHTML=lista.map(([p,n])=>
+  if(!vazia)$("#chart-paises").innerHTML=lista.map(([p,n])=>
     `<div class="hbar" title="${p}: ${n} garrafas"><span class="name">${p}</span><span class="track"><span class="fill" style="width:${n/max*100}%"></span></span><span class="num">${n}</span></div>`).join("");
 
   /* alertas de janela */
