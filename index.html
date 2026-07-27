@@ -506,7 +506,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.31"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.32";/* fonte única da versão — Sobre e rodapé leem daqui */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
@@ -1249,20 +1249,16 @@ async function enviarFeedback(){
   }catch(e){toast("Sem conexão agora — tente de novo com internet. 📡")}
 }
 async function abrirFeedbacksFundador(){
-  $("#modal-detail-body").innerHTML=`<button class="close" onclick="closeModal('modal-detail')">✕</button><h3 class="serif">📥 Feedbacks recebidos</h3><div class="sub">⏳ Buscando na nuvem…</div>`;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">📥 Feedbacks recebidos</h3>
+    <div class="sub">Blindagem de segurança ativa desde 27/07</div>
+    <div style="font-size:13.5px;line-height:1.65">
+      <p style="margin-bottom:10px">Os envios continuam chegando normalmente — mas, por segurança, a <b>leitura</b> dos feedbacks agora só acontece no painel autenticado do banco (para que nenhum estranho com conhecimento técnico possa ler as mensagens dos usuários).</p>
+      <p style="margin-bottom:10px"><b>Para ler:</b> acesse <b>supabase.com/dashboard</b> no computador → projeto Apotheca → <b>Table Editor</b> → tabela <b>feedback</b>. Cada linha traz o tipo, o @usuário, a mensagem e o horário.</p>
+      <p style="color:var(--ink-2)">Quando o login Google real for ativado (próxima fase), a leitura volta para dentro do app — restrita à sua conta verificada.</p>
+    </div>`;
   $("#modal-detail").classList.add("open");
-  try{
-    const fbs=await sb("/feedback?select=*&order=id.desc&limit=100");
-    const EMO={elogio:"💚",sugestao:"💡",problema:"🐞",critica:"😤"};
-    $("#modal-detail-body").innerHTML=`
-      <button class="close" onclick="closeModal('modal-detail')">✕</button>
-      <h3 class="serif">📥 Feedbacks recebidos (${fbs.length})</h3>
-      <div class="sub">Direto do banco, em tempo real — só você vê isto.</div>
-      ${fbs.map(f=>`<div style="background:var(--cream);border-radius:10px;padding:11px 13px;margin-bottom:8px">
-        <div style="font-size:12px;color:var(--ink-2);margin-bottom:4px">${EMO[f.tipo]||"💬"} <b>${f.tipo}</b> · @${f.usuario} · ${new Date(f.criado).toLocaleString("pt-BR")}</div>
-        <div style="font-size:13.5px;line-height:1.5">${f.texto}</div>
-      </div>`).join("")||'<div class="empty">Nenhum feedback ainda — compartilhe o link! 📣</div>'}`;
-  }catch(e){$("#modal-detail-body").innerHTML=`<button class="close" onclick="closeModal('modal-detail')">✕</button><div class="empty">Sem conexão com a nuvem agora. 📡</div>`}
 }
 function carregarDemo(){
   const d=JSON.parse(JSON.stringify(DEMO_SEED));
