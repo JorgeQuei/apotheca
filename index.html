@@ -500,7 +500,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.27"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.28"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
@@ -1210,7 +1210,7 @@ async function testarIA(){
 }
 /* ===== SESSÃO E CADASTRO (nome único e definitivo) ===== */
 let provPendente=null;
-const normUser=s=>(s||"").toLowerCase().trim().replace(/\s+/g,".").replace(/[^a-z0-9._-]/g,"");
+const normUser=s=>(s||"").trim().replace(/\s+/g,".").replace(/[^a-zA-Z0-9._-]/g,"");
 function sairSessao(){
   $("#login-p1").classList.remove("hidden");$("#login-p2").classList.add("hidden");
   $("#login-screen").classList.add("open");
@@ -1226,7 +1226,7 @@ function iniciarLogin(prov){
   setTimeout(()=>$("#reg-user").focus(),200);
 }
 function nomeDisponivel(u){
-  return !USUARIOS_APP.some(x=>x.user===u);
+  return !USUARIOS_APP.some(x=>x.user.toLowerCase()===u.toLowerCase());
 }
 let vnTimer=null;
 function verificarNome(){
@@ -1240,7 +1240,7 @@ function verificarNome(){
   clearTimeout(vnTimer);
   vnTimer=setTimeout(async()=>{
     try{
-      const r=await sb("/usuarios?usuario=eq."+encodeURIComponent(u)+"&select=usuario");
+      const r=await sb("/usuarios?usuario=ilike."+encodeURIComponent(u)+"&select=usuario");
       if(normUser($("#reg-user").value)!==u)return;
       fb.innerHTML=r.length?'<span style="color:var(--danger)">✗ @'+u+' já está em uso na comunidade — escolha outro.</span>':'<span style="color:var(--ok)">✓ @'+u+' está disponível na comunidade mundial!</span>';
     }catch(e){fb.innerHTML='<span style="color:var(--ok)">✓ @'+u+' disponível localmente (sem internet — confirmo na nuvem depois).</span>'}
