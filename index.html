@@ -79,7 +79,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .menu-btn{background:var(--card);border:1px solid var(--line);border-radius:12px;width:42px;height:42px;font-size:19px;cursor:pointer;box-shadow:var(--shadow);color:var(--wine);flex:none}
 .menu-bg{position:fixed;inset:0;z-index:85;display:none}
 .menu-bg.open{display:block}
-.menu-pop{position:fixed;top:70px;right:18px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(40,15,25,.28);z-index:90;min-width:236px;overflow:hidden;display:none}
+.menu-pop{position:fixed;top:70px;right:18px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(40,15,25,.28);z-index:90;min-width:236px;display:none;max-height:calc(100vh - 90px);overflow-y:auto;overscroll-behavior:contain}
 .menu-pop.open{display:block}
 .menu-pop .mi{display:flex;gap:11px;align-items:center;padding:13px 17px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--cream);user-select:none}
 .menu-pop .mi:hover{background:var(--cream)}
@@ -506,7 +506,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.35"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.36"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
