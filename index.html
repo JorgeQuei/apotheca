@@ -754,6 +754,11 @@ async function sincronizarComunidade(){
       sb("/confraria_membros?select=*")
     ]);
     USUARIOS_APP=us.map(u=>({user:u.usuario,nome:u.nome,cidade:u.cidade}));
+    if(perfil&&!USUARIOS_APP.some(u=>u.user===perfil.user)){
+      const nomeP=perfil.user.split(/[._-]/)[0].replace(/^./,c=>c.toUpperCase());
+      USUARIOS_APP.push({user:perfil.user,nome:nomeP,cidade:perfil.cidade});
+      sb("/usuarios",{method:"POST",body:JSON.stringify({usuario:perfil.user,nome:nomeP,cidade:perfil.cidade})}).catch(()=>{});
+    }
     CONFRARIAS=cs.map(c=>({id:c.id,nome:c.nome,cidade:c.cidade,desc:c.descricao,aberta:c.aberta,dono:c.dono,membros:c.membros,
       membrosLista:ms.filter(m=>m.confraria_id===c.id&&m.status==="membro").map(m=>m.usuario)}));
     if(perfil)minhasConfrarias=ms.filter(m=>m.usuario===perfil.user).map(m=>({id:m.confraria_id,status:m.status==="membro"?"membro":"pendente"}));
