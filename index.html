@@ -275,9 +275,12 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
     <section id="view-dashboard">
       <div style="display:flex;justify-content:space-between;align-items:center;margin:-6px 0 16px">
         <div class="serif" style="font-size:20px;color:var(--wine);font-weight:700;letter-spacing:.4px">🍷 Apotheca</div>
-        <button class="menu-btn" onclick="toggleMenu(event)" title="Menu" aria-label="Menu">☰</button>
+        <div style="display:flex;gap:9px;align-items:center">
+          <span id="head-user" style="cursor:pointer" title="Meu perfil"></span>
+          <button class="menu-btn" onclick="toggleMenu(event)" title="Menu" aria-label="Menu">☰</button>
+        </div>
       </div>
-      <div class="topbar"><div><h2>Minha Adega</h2><p>Visão geral da sua coleção — atualizada em tempo real.</p></div></div>
+      <div class="topbar"><div><h2>Minha Adega</h2><p id="dash-sub">Visão geral da sua coleção — atualizada em tempo real.</p></div></div>
       <div class="kpis">
         <div class="kpi hero"><div class="lbl">Garrafas na adega</div><div class="val" id="kpi-garrafas">—</div><div class="sub" id="kpi-rotulos">—</div></div>
         <div class="kpi"><div class="lbl">Valor estimado</div><div class="val" id="kpi-valor">—</div><div class="sub">soma dos preços de aquisição</div></div>
@@ -500,7 +503,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.28"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.29"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
@@ -765,6 +768,7 @@ async function sincronizarComunidade(){
     feed=fd.map(f=>({id:f.id,user:f.usuario,txt:f.txt,est:f.est||0,ts:new Date(f.criado).getTime(),brindes:f.brindes||0,meu:meusBrindes.includes(f.id)}));
     nuvemOK=true;
     persist();
+    aplicarPerfilUI();
     if(typeof renderFeed==="function")renderFeed();
     if(!$("#view-encontros").classList.contains("hidden"))renderEncontros();
   }catch(e){nuvemOK=false}
@@ -1267,6 +1271,13 @@ async function confirmarNome(){
 }
 function aplicarPerfilUI(){
   const f=$("#foot-user");if(f)f.textContent=perfil?"@"+perfil.user:"Jorge";
+  const hu=$("#head-user");
+  if(hu){hu.innerHTML=perfil?avatarDe(perfil.user):"";hu.onclick=()=>{if(perfil)abrirPerfil(perfil.user)}}
+  const ds=$("#dash-sub");
+  if(ds){
+    const u=perfil&&USUARIOS_APP.find(x=>x.user===perfil.user);
+    ds.innerHTML=perfil?`Olá, <b>${u?u.nome:perfil.user}</b> · @${perfil.user} · sessão ativa ✅`:"Visão geral da sua coleção — atualizada em tempo real.";
+  }
 }
 
 /* ================== BARRA DE ADEGAS ================== */
