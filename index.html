@@ -388,9 +388,9 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
     <section id="view-encontros" class="hidden">
       <div class="topbar"><div><h2>Encontros & Confrarias</h2><p>Crie o evento, convide os amigos e veja as garrafas que cada um vai levar — com a ordem certa de serviço.</p></div></div>
       <div class="panel" style="margin-bottom:16px">
-        <h3>👥 Minha Confraria <small>· sua rede de apreciadores — cada amigo pode entrar em uns encontros e não em outros</small></h3>
+        <h3>👥 Minha Rede <small>· siga apreciadores, como no Instagram — quem segue você de volta vira 🤝 amigo próximo</small></h3>
         <div id="confraria-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
-        <div style="font-size:12px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Encontrar apreciadores cadastrados no Apotheca</div>
+        <div style="font-size:12px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Encontrar apreciadores</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <select id="c-filtro-cidade" onchange="renderConfraria()" style="min-width:130px"></select>
           <input id="c-busca-user" oninput="renderConfraria()" placeholder="🔍 Buscar por nome ou @usuário" style="flex:1;min-width:150px">
@@ -398,9 +398,12 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
         <div id="confraria-dir"></div>
       </div>
       <div class="panel" style="margin-bottom:16px">
-        <h3>🏛️ Confrarias públicas <small>· clubes de apreciadores — entre na da sua cidade ou peça vaga em outra</small></h3>
+        <h3>🏛️ Confrarias <small>· clubes com identidade própria: abertos, moderados ou privados por convite</small></h3>
         <div id="confrarias-pub"></div>
-        <div style="margin-top:12px"><button class="btn btn-primary btn-sm" onclick="abrirFundarConfraria()">👑 Fundar nova confraria</button></div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="abrirFundarConfraria()">👑 Fundar nova confraria</button>
+          <button class="btn btn-gold btn-sm" onclick="abrirEntrarComCodigo()">🎟️ Entrar com convite</button>
+        </div>
       </div>
       <div id="eventos-list"></div>
       <div class="panel" style="margin-top:16px">
@@ -506,7 +509,8 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.37"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.38"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const SITE_URL = "https://jorgequei.github.io/apotheca/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
@@ -871,10 +875,31 @@ async function sincronizarComunidade(){
       USUARIOS_APP.push({user:perfil.user,nome:nomeP,cidade:perfil.cidade});
       sb("/usuarios",{method:"POST",body:JSON.stringify({usuario:perfil.user,nome:nomeP,cidade:perfil.cidade})}).catch(()=>{});
     }
-    CONFRARIAS=cs.map(c=>({id:c.id,nome:c.nome,cidade:c.cidade,desc:c.descricao,aberta:c.aberta,dono:c.dono,membros:c.membros,
-      membrosLista:ms.filter(m=>m.confraria_id===c.id&&m.status==="membro").map(m=>m.usuario)}));
+    CONFRARIAS=cs.map(c=>({id:c.id,nome:c.nome,cidade:c.cidade,desc:c.descricao,
+      tipo:c.tipo||(c.aberta?"aberta":"moderada"),aberta:c.aberta,dono:c.dono,membros:c.membros,
+      regras:c.regras||"",brasao:c.brasao||"🏛️",convite:c.convite_token||null,quemConvida:c.quem_convida||"diretoria",
+      membrosLista:ms.filter(m=>m.confraria_id===c.id&&m.status==="membro").map(m=>m.usuario),
+      moderadores:ms.filter(m=>m.confraria_id===c.id&&m.papel==="moderador"&&m.status==="membro").map(m=>m.usuario),
+      pendentes:ms.filter(m=>m.confraria_id===c.id&&m.status==="pendente").map(m=>m.usuario)}));
     if(perfil)minhasConfrarias=ms.filter(m=>m.usuario===perfil.user).map(m=>({id:m.confraria_id,status:m.status==="membro"?"membro":"pendente"}));
     feed=fd.map(f=>({id:f.id,user:f.usuario,txt:f.txt,est:f.est||0,ts:new Date(f.criado).getTime(),brindes:f.brindes||0,meu:meusBrindes.includes(f.id)}));
+    /* seguidores e mural: tabelas da v0.38 — se ainda não existirem na nuvem, o resto do app segue normal */
+    try{
+      const sg=await sb("/seguidores?select=*");
+      REDE=sg.map(s=>({de:s.seguidor,para:s.seguido}));
+      if(perfil){
+        const nuvemSigo=REDE.filter(s=>s.de===perfil.user).map(s=>s.para);
+        /* adota na nuvem follows feitos offline */
+        seguindo.filter(a=>a.user&&!nuvemSigo.includes(a.user)).forEach(a=>{
+          sb("/seguidores",{method:"POST",body:JSON.stringify({seguidor:perfil.user,seguido:a.user})}).catch(()=>{});
+        });
+        nuvemSigo.forEach(u2=>{if(!seguindo.some(a=>a.user===u2)){const q=USUARIOS_APP.find(x=>x.user===u2);seguindo.push({user:u2,nome:q?q.nome:u2,cidade:q?q.cidade:""})}});
+      }
+    }catch(e){}
+    try{
+      const ps=await sb("/confraria_posts?select=*&order=id.desc&limit=300");
+      MURAL=ps.map(p=>({id:p.id,cf:p.confraria_id,user:p.usuario,txt:p.texto,ts:new Date(p.criado).getTime()}));
+    }catch(e){}
     nuvemOK=true;
     persist();
     aplicarPerfilUI();
@@ -910,23 +935,24 @@ let feed=[
  {id:8,user:"vivi.riesling",txt:"conquistou o selo <b>⭐ Crítica de Plantão</b> (25 avaliações)",est:0,ts:AGORA-70*3600e3,brindes:6,meu:false}
 ];
 let NEXT_FEED=100;
-/* Confrarias públicas: clubes com cidade e porta de entrada (abertos ou mediante aprovação) */
-let CONFRARIAS=[
- {id:"beiramar",nome:"Confraria Beira-Mar",cidade:"Recife",desc:"Encontros mensais à beira do Capibaribe. Foco em brancos e espumantes.",membros:34,aberta:true,dono:null},
- {id:"malbecsp",nome:"Confraria do Malbec",cidade:"São Paulo",desc:"Devotos de Mendoza. Degustações às cegas toda última quinta.",membros:127,aberta:false},
- {id:"taninos",nome:"Taninos do Agreste",cidade:"Caruaru",desc:"Vinho de altitude e queijo coalho — combinação nordestina.",membros:18,aberta:true},
- {id:"borgonha",nome:"Sociedade Borgonha Brasil",cidade:"São Paulo",desc:"Pinot Noir e Chardonnay em estado de contemplação. Entrada por indicação.",membros:56,aberta:false},
- {id:"maredouro",nome:"Filhos do Douro",cidade:"Olinda",desc:"Portugueses de coração: Douro, Alentejo e um Porto para fechar.",membros:41,aberta:true}
-];
+/* Confrarias: clubes com identidade própria. Tipos: aberta | moderada (pedir vaga) | privada (só convite, invisível).
+   Vêm da nuvem — sem dados de demonstração desde a v0.38. */
+let CONFRARIAS=[];
+const DEMO_CONFRARIAS=["beiramar","malbecsp","taninos","borgonha","maredouro"]; /* ids antigos a expurgar do cache local */
 let minhasConfrarias=[]; /* [{id,status:'membro'|'pendente'}] */
-/* A Confraria: sua rede de amigos apreciadores — apenas usuários cadastrados no app. */
-let amigos=[
+let MURAL=[]; /* posts internos das confrarias: {id,cf,user,txt,ts} — só membros veem */
+/* Minha Rede: quem EU sigo (unilateral, sem aprovação — como Instagram). Mútuo = 🤝 amigo próximo. */
+let seguindo=[
  {user:"ricardo.douro",nome:"Ricardo",cidade:"Recife"},
  {user:"paulo.malbec",nome:"Paulo",cidade:"Recife"},
  {user:"andre.chablis",nome:"André",cidade:"Olinda"},
  {user:"fernanda.bolhas",nome:"Fernanda",cidade:"Recife"},
  {user:"beto.garzon",nome:"Beto",cidade:"João Pessoa"}
 ];
+let REDE=[]; /* grafo global {de,para} vindo da nuvem — para contadores e reciprocidade */
+const meSegue=u=>perfil&&REDE.some(s=>s.de===u&&s.para===perfil.user);
+const sigoEle=u=>seguindo.some(a=>a.user===u);
+const ehAmigoProximo=u=>sigoEle(u)&&meSegue(u);
 const PERFIL_TIPO={Tinto:{corpo:4,tanino:3},Branco:{corpo:2,tanino:1},"Rosé":{corpo:2,tanino:1},Espumante:{corpo:2,tanino:1},Fortificado:{corpo:4,tanino:2}};
 const FASES=[["Espumante","🥂 Recepção"],["Branco","🐟 Entradas e pratos leves"],["Rosé","🌸 Transição"],["Tinto","🥩 Pratos principais"],["Fortificado","🍫 Sobremesa e charutos"]];
 function ordemServico(ev){
@@ -945,95 +971,224 @@ function dicaCobertura(ordem){
   return "✅ Lineup completo: o encontro tem vinhos para todas as fases, da recepção à sobremesa.";
 }
 function renderConfraria(){
-  $("#confraria-chips").innerHTML=amigos.map((a,i)=>
-    `<span class="adega-chip" style="cursor:default">👤 ${a.nome}${a.user?` <span style="font-size:10.5px;opacity:.7">@${a.user}</span>`:""}${a.cidade?` <span class="n">${a.cidade}</span>`:""} <span style="cursor:pointer;opacity:.6" onclick="delAmigo(${i})" title="Remover da confraria">✕</span></span>`).join("")
-    ||'<span style="font-size:13px;color:var(--ink-2)">Nenhum amigo na confraria ainda — encontre-os abaixo.</span>';
-  $("#e-amigos").innerHTML=amigos.map((a,i)=>
-    `<label class="adega-chip" style="user-select:none"><input type="checkbox" class="e-amigo-chk" value="${i}" style="accent-color:var(--wine);padding:0;margin:0"> ${a.nome}</label>`).join("")
-    ||'<span style="font-size:13px;color:var(--ink-2)">Adicione amigos da comunidade acima para convidá-los.</span>';
-  /* diretório da comunidade: só usuários cadastrados, com filtro por cidade */
+  /* chips: quem eu sigo (🤝 = segue de volta) */
+  $("#confraria-chips").innerHTML=seguindo.map((a,i)=>
+    `<span class="adega-chip" style="cursor:default">${ehAmigoProximo(a.user)?"🤝":"👤"} ${a.nome}${a.user?` <span style="font-size:10.5px;opacity:.7">@${a.user}</span>`:""}${a.cidade?` <span class="n">${a.cidade}</span>`:""} <span style="cursor:pointer;opacity:.6" onclick="deixarDeSeguir(${i})" title="Deixar de seguir">✕</span></span>`).join("")
+    ||'<span style="font-size:13px;color:var(--ink-2)">Você ainda não segue ninguém — encontre apreciadores abaixo.</span>';
+  $("#e-amigos").innerHTML=seguindo.map((a,i)=>
+    `<label class="adega-chip" style="user-select:none"><input type="checkbox" class="e-amigo-chk" value="${i}" style="accent-color:var(--wine);padding:0;margin:0"> ${ehAmigoProximo(a.user)?"🤝 ":""}${a.nome}</label>`).join("")
+    ||'<span style="font-size:13px;color:var(--ink-2)">Siga apreciadores na sua rede para convidá-los.</span>';
+  /* busca de apreciadores: nasce filtrada pela SUA cidade — gente de longe aparece buscando pelo nome */
   const sel=$("#c-filtro-cidade");
-  const atual=sel.value||"";
   const cidades=[...new Set(USUARIOS_APP.map(u=>u.cidade))].sort();
+  let atual=sel.dataset.tocado?sel.value:(perfil&&cidades.includes(perfil.cidade)?perfil.cidade:"");
   sel.innerHTML='<option value="">🌎 Todas as cidades</option>'+cidades.map(c=>`<option ${c===atual?"selected":""}>${c}</option>`).join("");
+  sel.onchange=()=>{sel.dataset.tocado="1";renderConfraria()};
   const busca=($("#c-busca-user").value||"").toLowerCase();
-  const lista=USUARIOS_APP.filter(u=>
+  let lista=USUARIOS_APP.filter(u=>
     (!perfil||u.user!==perfil.user)&&
-    !amigos.some(a=>a.user===u.user||a.nome===u.nome)&&
+    !seguindo.some(a=>a.user===u.user)&&
     (!sel.value||u.cidade===sel.value)&&
     (!busca||u.nome.toLowerCase().includes(busca)||u.user.includes(busca))
   );
+  const total=lista.length;
+  lista=lista.slice(0,30); /* nunca despeja a comunidade inteira na tela */
   window.__dir=lista;
   $("#confraria-dir").innerHTML=lista.map((u,i)=>
     `<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:6px">
-      <span style="font-size:18px">👤</span>
-      <div class="inf"><b>${esc(u.nome)}</b><small>@${esc(u.user)} · 📍 ${esc(u.cidade)}</small></div>
-      <button class="btn btn-gold btn-sm" onclick="addAmigoDir(${i})">＋ Adicionar</button>
+      <span style="cursor:pointer" onclick="abrirPerfil('${u.user}')">${avatarDe(u.user,30)}</span>
+      <div class="inf" style="cursor:pointer" onclick="abrirPerfil('${u.user}')"><b>${esc(u.nome)}</b><small>@${esc(u.user)} · 📍 ${esc(u.cidade)}${meSegue(u.user)?" · segue você":""}</small></div>
+      <button class="btn btn-gold btn-sm" onclick="seguirDir(${i})">＋ Seguir</button>
     </div>`).join("")
-    ||'<div style="font-size:12.5px;color:var(--ink-2);padding:8px">Nenhum usuário encontrado com esse filtro.</div>';
+    +(total>30?`<div style="font-size:12px;color:var(--ink-2);padding:6px">Mostrando 30 de ${total} — refine pela busca ou cidade.</div>`:"")
+    ||'<div style="font-size:12.5px;color:var(--ink-2);padding:8px">Nenhum apreciador encontrado com esse filtro.</div>';
   renderConfrariasPub();
 }
+const TIPO_LABEL={aberta:"aberta",moderada:"requer aprovação",privada:"privada · por convite"};
 function renderConfrariasPub(){
   const el=$("#confrarias-pub");if(!el)return;
   const cidadeF=$("#c-filtro-cidade")?$("#c-filtro-cidade").value:"";
-  const lista=CONFRARIAS.filter(c=>!cidadeF||c.cidade===cidadeF);
+  /* privadas são invisíveis para não-membros — nem o nome aparece */
+  const lista=CONFRARIAS.filter(c=>{
+    const m=minhasConfrarias.find(x=>x.id===c.id);
+    const sou=perfil&&c.dono===perfil.user;
+    if(c.tipo==="privada"&&!m&&!sou)return false;
+    return !cidadeF||c.cidade===cidadeF||!!m||sou; /* minhas confrarias aparecem sempre */
+  });
   el.innerHTML=lista.map(c=>{
     const m=minhasConfrarias.find(x=>x.id===c.id);
     const sou=perfil&&c.dono===perfil.user;
+    const pend=(sou||ehModerador(c))&&(c.pendentes||[]).length?` <span class="tag logo" style="padding:2px 7px">⏳ ${c.pendentes.length} pedido${c.pendentes.length>1?"s":""}</span>`:"";
     const status=sou?`<button class="btn btn-primary btn-sm" onclick="abrirGestaoConfraria('${c.id}')">👑 Gerenciar</button>`:
       m?(m.status==="membro"
-        ?`<span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex:none"><span class="tag auge" style="padding:3px 9px">✓ Membro</span><button class="btn btn-ghost btn-sm" style="padding:3px 9px;font-size:11px;color:var(--danger);border-color:var(--danger)" onclick="sairConfraria('${c.id}')">Sair</button></span>`
-        :`<span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex:none"><span class="tag logo" style="padding:3px 9px">⏳ Aguardando</span><button class="btn btn-ghost btn-sm" style="padding:3px 9px;font-size:11px" onclick="sairConfraria('${c.id}')">Cancelar</button></span>`):
-      `<button class="btn btn-gold btn-sm" onclick="entrarConfraria('${c.id}')">${c.aberta?"Entrar":"Pedir para entrar"}</button>`;
+        ?`<span class="tag auge" style="padding:3px 9px;flex:none">✓ Membro</span>`
+        :`<span class="tag logo" style="padding:3px 9px;flex:none">⏳ Aguardando</span>`):
+      `<button class="btn btn-gold btn-sm" onclick="entrarConfraria('${c.id}')">${c.tipo==="aberta"?"Entrar":"Pedir vaga"}</button>`;
     return `<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:6px">
-      <span style="font-size:20px">🏛️</span>
-      <div class="inf"><b>${esc(c.nome)}</b> <span style="font-size:11px;color:var(--ink-3)">${c.aberta?"· aberta":"· requer aprovação"}</span><small>📍 ${esc(c.cidade)} · ${c.membros} membros · ${esc(c.desc)}</small></div>
+      <span style="font-size:20px;cursor:pointer" onclick="abrirConfraria('${c.id}')">${c.brasao||"🏛️"}</span>
+      <div class="inf" style="cursor:pointer" onclick="abrirConfraria('${c.id}')"><b>${esc(c.nome)}</b> <span style="font-size:11px;color:var(--ink-3)">· ${TIPO_LABEL[c.tipo]||c.tipo}</span>${pend}<small>📍 ${esc(c.cidade)} · ${c.membros} membros · ${esc(c.desc)}</small></div>
       ${status}
     </div>`;
-  }).join("")||'<div style="font-size:12.5px;color:var(--ink-2);padding:8px">Nenhuma confraria nesta cidade ainda — que tal fundar a primeira?</div>';
+  }).join("")||'<div style="font-size:12.5px;color:var(--ink-2);padding:8px">Nenhuma confraria na sua cidade ainda — funde a primeira e seja o 👑 fundador!</div>';
 }
+function ehModerador(c){return perfil&&(c.moderadores||[]).includes(perfil.user)}
+function ehDiretoria(c){return perfil&&(c.dono===perfil.user||ehModerador(c))}
 /* ===== Fundar e gerenciar a própria confraria ===== */
 function abrirFundarConfraria(){
   if(!perfil){toast("Entre com sua conta primeiro. 👤");return}
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
     <h3 class="serif">👑 Fundar confraria</h3>
-    <div class="sub">Você será o fundador — aprova quem entra e organiza os encontros.</div>
+    <div class="sub">O app não cria a confraria — ele a abriga. Traga o nome, o brasão e as regras que o grupo já tem.</div>
     <div class="field" style="margin-bottom:10px"><label>Nome da confraria</label><input id="cf-nome" placeholder="Ex.: Confraria do Agreste"></div>
-    <div class="field" style="margin-bottom:10px"><label>Cidade</label><input id="cf-cidade" value="${perfil.cidade!=="—"?perfil.cidade:""}" placeholder="Ex.: Recife"></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div class="field" style="width:90px"><label>Brasão</label><input id="cf-brasao" value="🏛️" maxlength="4" style="text-align:center;font-size:18px"></div>
+      <div class="field" style="flex:1"><label>Cidade</label><input id="cf-cidade" value="${perfil.cidade!=="—"?perfil.cidade:""}" placeholder="Ex.: Recife"></div>
+    </div>
     <div class="field" style="margin-bottom:10px"><label>Descrição</label><input id="cf-desc" placeholder="Ex.: Tintos robustos toda primeira sexta"></div>
-    <div class="field" style="margin-bottom:16px"><label>Porta de entrada</label>
-      <select id="cf-tipo" style="width:100%"><option value="1">Aberta — qualquer usuário entra</option><option value="0">Fechada — entra quem eu aprovar</option></select></div>
+    <div class="field" style="margin-bottom:10px"><label>Regras / estatuto (opcional)</label><textarea id="cf-regras" rows="2" style="width:100%;resize:vertical" placeholder="Ex.: Cada membro leva 1 garrafa por encontro. Convidado só com aval da diretoria."></textarea></div>
+    <div class="field" style="margin-bottom:10px"><label>Porta de entrada</label>
+      <select id="cf-tipo" style="width:100%">
+        <option value="aberta">🌐 Aberta — qualquer usuário entra na hora</option>
+        <option value="moderada">🚪 Moderada — pede vaga e a diretoria aprova</option>
+        <option value="privada" selected>🔒 Privada — invisível; entra só quem tem o convite</option>
+      </select></div>
+    <div class="field" style="margin-bottom:16px"><label>Quem pode convidar</label>
+      <select id="cf-convida" style="width:100%">
+        <option value="diretoria" selected>👑 Só a diretoria (fundador + moderadores)</option>
+        <option value="todos">👥 Qualquer membro</option>
+      </select></div>
     <button class="btn btn-primary" style="width:100%" onclick="criarConfraria()">Fundar confraria</button>`;
   $("#modal-detail").classList.add("open");
 }
+function gerarConvite(){let s="";const A="ABCDEFGHJKMNPQRSTUVWXYZ23456789";for(let i=0;i<6;i++)s+=A[Math.floor(Math.random()*A.length)];return "APO-"+s}
 function criarConfraria(){
   const nome=($("#cf-nome").value||"").trim();
   if(!nome){toast("Dê um nome à confraria. 🏛️");return}
+  const tipo=$("#cf-tipo").value;
   const c={id:"cf"+Date.now(),nome,cidade:($("#cf-cidade").value||"").trim()||perfil.cidade,desc:($("#cf-desc").value||"").trim()||"Confraria de apreciadores.",
-    membros:1,aberta:$("#cf-tipo").value==="1",dono:perfil.user,membrosLista:[perfil.user]};
+    tipo,aberta:tipo==="aberta",regras:($("#cf-regras").value||"").trim(),brasao:($("#cf-brasao").value||"🏛️").trim()||"🏛️",
+    convite:gerarConvite(),quemConvida:$("#cf-convida").value,
+    membros:1,dono:perfil.user,membrosLista:[perfil.user],moderadores:[],pendentes:[]};
   CONFRARIAS.unshift(c);
   minhasConfrarias.push({id:c.id,status:"membro"});
-  sb("/confrarias",{method:"POST",body:JSON.stringify({id:c.id,nome:c.nome,cidade:c.cidade,descricao:c.desc,aberta:c.aberta,dono:c.dono,membros:1})})
-    .then(()=>sb("/confraria_membros",{method:"POST",body:JSON.stringify({confraria_id:c.id,usuario:perfil.user,status:"membro"})})).catch(()=>{});
-  addAtividade(`fundou a confraria <b>🏛️ ${nome}</b> (${c.cidade})`);
+  const corpoNovo={id:c.id,nome:c.nome,cidade:c.cidade,descricao:c.desc,aberta:c.aberta,dono:c.dono,membros:1,
+    tipo:c.tipo,regras:c.regras,brasao:c.brasao,convite_token:c.convite,quem_convida:c.quemConvida};
+  const corpoAntigo={id:c.id,nome:c.nome,cidade:c.cidade,descricao:c.desc,aberta:c.aberta,dono:c.dono,membros:1};
+  sb("/confrarias",{method:"POST",body:JSON.stringify(corpoNovo)})
+    .catch(()=>sb("/confrarias",{method:"POST",body:JSON.stringify(corpoAntigo)})) /* nuvem ainda sem as colunas v0.38 */
+    .then(()=>sb("/confraria_membros",{method:"POST",body:JSON.stringify({confraria_id:c.id,usuario:perfil.user,status:"membro",papel:"fundador"})})
+      .catch(()=>sb("/confraria_membros",{method:"POST",body:JSON.stringify({confraria_id:c.id,usuario:perfil.user,status:"membro"})}))).catch(()=>{});
+  if(tipo!=="privada")addAtividade(`fundou a confraria <b>${c.brasao} ${nome}</b> (${c.cidade})`);
   persist();closeModal("modal-detail");renderConfrariasPub();
-  toast(`👑 Confraria "${nome}" fundada — adicione os membros em Gerenciar!`);
+  toast(`👑 Confraria "${nome}" fundada${tipo==="privada"?" — compartilhe o convite para trazer o grupo!":"!"}`);
+  setTimeout(()=>abrirGestaoConfraria(c.id),400);
 }
 function abrirGestaoConfraria(id){
-  const c=CONFRARIAS.find(x=>x.id===id);if(!c||c.dono!==(perfil&&perfil.user))return;
+  const c=CONFRARIAS.find(x=>x.id===id);if(!c||!ehDiretoria(c))return;
   c.membrosLista=c.membrosLista||[perfil.user];
-  const candidatos=USUARIOS_APP.filter(u=>!c.membrosLista.includes(u.user));
-  window.__cand=candidatos;
+  const sou=c.dono===perfil.user;
+  const linkConvite=SITE_URL+"?convite="+encodeURIComponent(c.convite||"");
+  const pend=(c.pendentes||[]).filter(p=>!c.membrosLista.includes(p));
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
-    <h3 class="serif">🏛️ ${c.nome}</h3>
-    <div class="sub">📍 ${c.cidade} · ${c.aberta?"aberta":"fechada"} · você é o 👑 fundador</div>
-    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:10px 0 6px">MEMBROS (${c.membrosLista.length})</div>
-    ${c.membrosLista.map(m=>{const u=USUARIOS_APP.find(x=>x.user===m);return `<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:6px"><span>👤</span><div class="inf"><b>${m===perfil.user?"Você":(u?u.nome:m)}</b><small>@${m}${m===c.dono?" · 👑 fundador":""}</small></div>${m!==c.dono?`<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="removerMembroConfraria('${c.id}','${m}')">✕</button>`:""}</div>`}).join("")}
-    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:14px 0 6px">ADICIONAR DA COMUNIDADE</div>
-    ${candidatos.map((u,i)=>`<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:6px"><span>👤</span><div class="inf"><b>${u.nome}</b><small>@${u.user} · 📍 ${u.cidade}</small></div><button class="btn btn-gold btn-sm" onclick="addMembroConfraria('${c.id}','${u.user}')">＋</button></div>`).join("")||'<div style="font-size:12.5px;color:var(--ink-2)">Todos os usuários já são membros.</div>'}`;
+    <h3 class="serif">${c.brasao||"🏛️"} ${esc(c.nome)}</h3>
+    <div class="sub">📍 ${esc(c.cidade)} · ${TIPO_LABEL[c.tipo]||c.tipo} · você é ${sou?"👑 fundador":"🛡️ moderador"}</div>
+    ${pend.length?`<div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">⏳ PEDIDOS DE VAGA (${pend.length})</div>
+      ${pend.map(p=>{const u=USUARIOS_APP.find(x=>x.user===p);return `<div class="sug-item" style="border:1px solid var(--gold,#b8860b);border-radius:10px;margin-bottom:6px"><span style="cursor:pointer" onclick="abrirPerfil('${p}')">${avatarDe(p,30)}</span><div class="inf"><b>${u?esc(u.nome):p}</b><small>@${p}${u?" · 📍 "+esc(u.cidade):""}</small></div><span style="display:flex;gap:6px;flex:none"><button class="btn btn-gold btn-sm" onclick="aprovarPendente('${c.id}','${p}')">✓ Aprovar</button><button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="recusarPendente('${c.id}','${p}')">✕</button></span></div>`}).join("")}`:""}
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">🎟️ CONVITE DA CONFRARIA</div>
+    <div style="background:var(--cream);border-radius:12px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <b style="font-size:20px;letter-spacing:2px">${c.convite||"—"}</b>
+        <button class="btn btn-ghost btn-sm" onclick="copiarConvite('${c.id}')">📋 Copiar link</button>
+        <button class="btn btn-ghost btn-sm" onclick="mostrarQR('${c.id}')">📱 QR code</button>
+        ${sou?`<button class="btn btn-ghost btn-sm" onclick="novoConvite('${c.id}')" title="Invalida o código atual">♻️ Gerar novo</button>`:""}
+      </div>
+      <div id="qr-box-${c.id}" style="margin-top:8px"></div>
+      <div style="font-size:11.5px;color:var(--ink-2);margin-top:6px">Quem usar o código ou o link entra direto como membro — mostre o QR num encontro presencial.</div>
+    </div>
+    ${sou?`<div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">⚙️ GOVERNANÇA</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <select id="g-tipo-${c.id}" onchange="mudarTipoConfraria('${c.id}')" style="flex:1;min-width:150px">
+        <option value="aberta" ${c.tipo==="aberta"?"selected":""}>🌐 Aberta</option>
+        <option value="moderada" ${c.tipo==="moderada"?"selected":""}>🚪 Moderada</option>
+        <option value="privada" ${c.tipo==="privada"?"selected":""}>🔒 Privada</option>
+      </select>
+      <select id="g-convida-${c.id}" onchange="mudarQuemConvida('${c.id}')" style="flex:1;min-width:150px">
+        <option value="diretoria" ${c.quemConvida!=="todos"?"selected":""}>👑 Só a diretoria convida</option>
+        <option value="todos" ${c.quemConvida==="todos"?"selected":""}>👥 Qualquer membro convida</option>
+      </select>
+    </div>`:""}
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">MEMBROS (${c.membrosLista.length})</div>
+    ${c.membrosLista.map(m=>{const u=USUARIOS_APP.find(x=>x.user===m);const mod=(c.moderadores||[]).includes(m);
+      return `<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:6px"><span style="cursor:pointer" onclick="abrirPerfil('${m}')">${avatarDe(m,30)}</span><div class="inf"><b>${m===perfil.user?"Você":(u?esc(u.nome):m)}</b><small>@${m}${m===c.dono?" · 👑 fundador":mod?" · 🛡️ moderador":""}</small></div>
+      <span style="display:flex;gap:6px;flex:none">
+      ${sou&&m!==c.dono?`<button class="btn btn-ghost btn-sm" title="${mod?"Destituir moderador":"Nomear moderador"}" onclick="alternarModerador('${c.id}','${m}')">${mod?"🛡️✕":"🛡️"}</button>`:""}
+      ${m!==c.dono&&(sou||(ehModerador(c)&&!mod))?`<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="removerMembroConfraria('${c.id}','${m}')">✕</button>`:""}
+      </span></div>`}).join("")}`;
   $("#modal-detail").classList.add("open");
+}
+function aprovarPendente(id,user){
+  const c=CONFRARIAS.find(x=>x.id===id);if(!c||!ehDiretoria(c))return;
+  c.pendentes=(c.pendentes||[]).filter(p=>p!==user);
+  if(!c.membrosLista.includes(user)){c.membrosLista.push(user);c.membros=c.membrosLista.length}
+  sb("/confraria_membros?confraria_id=eq."+encodeURIComponent(id)+"&usuario=eq."+encodeURIComponent(user),{method:"PATCH",body:JSON.stringify({status:"membro"})})
+    .then(()=>sb("/confrarias?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({membros:c.membros})})).catch(()=>{});
+  const u=USUARIOS_APP.find(x=>x.user===user);
+  persist();abrirGestaoConfraria(id);renderConfrariasPub();
+  toast(`${u?u.nome:user} aprovado — bem-vindo à ${c.nome}! 🥂`);
+}
+function recusarPendente(id,user){
+  const c=CONFRARIAS.find(x=>x.id===id);if(!c||!ehDiretoria(c))return;
+  c.pendentes=(c.pendentes||[]).filter(p=>p!==user);
+  sb("/confraria_membros?confraria_id=eq."+encodeURIComponent(id)+"&usuario=eq."+encodeURIComponent(user)+"&status=eq.pendente",{method:"DELETE"}).catch(()=>{});
+  persist();abrirGestaoConfraria(id);renderConfrariasPub();
+  toast("Pedido recusado.");
+}
+function alternarModerador(id,user){
+  const c=CONFRARIAS.find(x=>x.id===id);if(!c||c.dono!==perfil.user)return;
+  c.moderadores=c.moderadores||[];
+  const era=c.moderadores.includes(user);
+  if(era)c.moderadores=c.moderadores.filter(m=>m!==user);else c.moderadores.push(user);
+  sb("/confraria_membros?confraria_id=eq."+encodeURIComponent(id)+"&usuario=eq."+encodeURIComponent(user),{method:"PATCH",body:JSON.stringify({papel:era?"membro":"moderador"})}).catch(()=>{});
+  const u=USUARIOS_APP.find(x=>x.user===user);
+  persist();abrirGestaoConfraria(id);
+  toast(era?`${u?u.nome:user} não é mais moderador.`:`🛡️ ${u?u.nome:user} agora é moderador da ${c.nome}!`);
+}
+function mudarTipoConfraria(id){
+  const c=CONFRARIAS.find(x=>x.id===id);if(!c||c.dono!==perfil.user)return;
+  c.tipo=$("#g-tipo-"+id).value;c.aberta=c.tipo==="aberta";
+  sb("/confrarias?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({tipo:c.tipo,aberta:c.aberta})})
+    .catch(()=>sb("/confrarias?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({aberta:c.aberta})})).catch(()=>{});
+  persist();renderConfrariasPub();
+  toast(`Porta de entrada: ${TIPO_LABEL[c.tipo]}.`);
+}
+function mudarQuemConvida(id){
+  const c=CONFRARIAS.find(x=>x.id===id);if(!c||c.dono!==perfil.user)return;
+  c.quemConvida=$("#g-convida-"+id).value;
+  sb("/confrarias?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({quem_convida:c.quemConvida})}).catch(()=>{});
+  persist();
+  toast(c.quemConvida==="todos"?"👥 Agora qualquer membro pode convidar.":"👑 Agora só a diretoria convida.");
+}
+function novoConvite(id){
+  const c=CONFRARIAS.find(x=>x.id===id);if(!c||c.dono!==perfil.user)return;
+  c.convite=gerarConvite();
+  sb("/confrarias?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({convite_token:c.convite})}).catch(()=>{});
+  persist();abrirGestaoConfraria(id);
+  toast("♻️ Novo convite gerado — o código antigo não vale mais.");
+}
+function copiarConvite(id){
+  const c=CONFRARIAS.find(x=>x.id===id);if(!c)return;
+  const link=SITE_URL+"?convite="+encodeURIComponent(c.convite||"");
+  const msg=`🍷 Você foi convidado para a confraria "${c.nome}" no Apotheca!\nEntre pelo link: ${link}\nOu use o código ${c.convite} em Encontros → Entrar com convite.`;
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(msg).then(()=>toast("📋 Convite copiado — cole no WhatsApp do grupo!")).catch(()=>toast(msg));
+  else toast("Código: "+c.convite);
+}
+function mostrarQR(id){
+  const c=CONFRARIAS.find(x=>x.id===id);if(!c)return;
+  const box=$("#qr-box-"+id);if(!box)return;
+  const link=SITE_URL+"?convite="+encodeURIComponent(c.convite||"");
+  box.innerHTML=box.innerHTML?"":`<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(link)}" width="180" height="180" style="border-radius:10px;border:6px solid #fff" alt="QR do convite"><div style="font-size:11px;color:var(--ink-2)">Aponte a câmera — abre o app já com o convite aplicado.</div>`;
 }
 function addMembroConfraria(id,user){
   const c=CONFRARIAS.find(x=>x.id===id);if(!c)return;
@@ -1055,19 +1210,101 @@ function removerMembroConfraria(id,user){
 }
 function entrarConfraria(id){
   const c=CONFRARIAS.find(x=>x.id===id);if(!c)return;
-  const st=c.aberta?"membro":"pendente";
-  if(perfil)sb("/confraria_membros",{method:"POST",body:JSON.stringify({confraria_id:id,usuario:perfil.user,status:st})}).catch(()=>{});
-  if(c.aberta){
+  if(!perfil){toast("Entre com sua conta primeiro. 👤");return}
+  const aberta=c.tipo==="aberta";
+  const st=aberta?"membro":"pendente";
+  sb("/confraria_membros",{method:"POST",body:JSON.stringify({confraria_id:id,usuario:perfil.user,status:st})}).catch(()=>{});
+  if(aberta){
     minhasConfrarias.push({id,status:"membro"});
-    c.membros++;
+    c.membros++;c.membrosLista=(c.membrosLista||[]);c.membrosLista.push(perfil.user);
     sb("/confrarias?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({membros:c.membros})}).catch(()=>{});
-    addAtividade(`entrou na confraria <b>🏛️ ${c.nome}</b> (${c.cidade})`);
+    addAtividade(`entrou na confraria <b>${c.brasao||"🏛️"} ${c.nome}</b> (${c.cidade})`);
     toast(`🥂 Você agora é membro da ${c.nome}!`);
   }else{
     minhasConfrarias.push({id,status:"pendente"});
-    toast(`Solicitação enviada ao fundador da ${c.nome} — você será avisado. ⏳`);
+    c.pendentes=(c.pendentes||[]);c.pendentes.push(perfil.user);
+    toast(`Pedido de vaga enviado à diretoria da ${c.nome} — você será avisado. ⏳`);
   }
   persist();renderConfrariasPub();
+}
+/* ===== Página da confraria (v0.38): brasão, regras, membros, mural e degustações ===== */
+function abrirConfraria(id){
+  const c=CONFRARIAS.find(x=>x.id===id);if(!c)return;
+  const m=minhasConfrarias.find(x=>x.id===id);
+  const sou=perfil&&c.dono===perfil.user;
+  const membro=sou||(m&&m.status==="membro");
+  const posts=MURAL.filter(p=>p.cf===id).slice(0,25);
+  const degust=feed.filter(f=>(c.membrosLista||[]).includes(f.user)).slice(0,8);
+  const podeConvidar=membro&&(c.quemConvida==="todos"||ehDiretoria(c));
+  const acao=sou||ehDiretoria(c)?`<button class="btn btn-primary btn-sm" onclick="abrirGestaoConfraria('${c.id}')">👑 Gerenciar</button>`:
+    m?(m.status==="membro"?`<button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="sairConfraria('${c.id}')">Sair da confraria</button>`
+      :`<button class="btn btn-ghost btn-sm" onclick="sairConfraria('${c.id}')">⏳ Aguardando — cancelar pedido</button>`):
+    `<button class="btn btn-gold btn-sm" onclick="entrarConfraria('${c.id}');abrirConfraria('${c.id}')">${c.tipo==="aberta"?"Entrar na confraria":"Pedir vaga"}</button>`;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <div style="display:flex;gap:14px;align-items:center;margin-bottom:10px">
+      <span style="font-size:44px;flex:none">${c.brasao||"🏛️"}</span>
+      <div><h3 class="serif" style="font-size:22px">${esc(c.nome)}</h3>
+      <div style="font-size:13px;color:var(--ink-2)">📍 ${esc(c.cidade)} · ${c.membros} membros · ${TIPO_LABEL[c.tipo]||c.tipo}</div></div>
+    </div>
+    <p style="font-size:13.5px;margin-bottom:10px">${esc(c.desc||"")}</p>
+    ${c.regras?`<div class="explain-box" style="margin-bottom:10px">📜 <b>Regras da casa:</b> ${esc(c.regras)}</div>`:""}
+    <div style="margin-bottom:12px">${acao}${podeConvidar?` <button class="btn btn-gold btn-sm" onclick="copiarConvite('${c.id}')">🎟️ Convidar</button>`:""}</div>
+    ${membro?`
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:10px 0 6px">💬 MURAL DA CONFRARIA <span style="font-weight:400">· só membros veem</span></div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <input id="mural-in-${c.id}" placeholder="Um aviso, uma garrafa, o próximo encontro…" style="flex:1" onkeydown="if(event.key==='Enter')postarMural('${c.id}')">
+      <button class="btn btn-primary btn-sm" onclick="postarMural('${c.id}')">Publicar</button>
+    </div>
+    ${posts.map(p=>{const u=USUARIOS_APP.find(x=>x.user===p.user);return `<div class="hist-row" style="align-items:flex-start"><span>${avatarDe(p.user,30)}</span><div class="info"><h4 style="font-size:13px;font-weight:600">${p.user===(perfil&&perfil.user)?"Você":(u?esc(u.nome):"@"+p.user)}</h4><p style="font-size:13px;color:var(--ink-1)">${esc(p.txt)}</p><p>${tempoRel(p.ts)}</p></div></div>`}).join("")||'<div style="font-size:12.5px;color:var(--ink-2);padding:4px 0 8px">Mural vazio — inaugure com o próximo encontro!</div>'}
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">🍷 DEGUSTAÇÕES DOS MEMBROS</div>
+    ${degust.map(feedItemHtml).join("")||'<div style="font-size:12.5px;color:var(--ink-2);padding:4px 0 8px">Nenhuma atividade dos membros ainda.</div>'}
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">MEMBROS (${(c.membrosLista||[]).length})</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${(c.membrosLista||[]).map(mb=>{const u=USUARIOS_APP.find(x=>x.user===mb);return `<span class="adega-chip" style="cursor:pointer" onclick="abrirPerfil('${mb}')">${mb===c.dono?"👑":(c.moderadores||[]).includes(mb)?"🛡️":"👤"} ${mb===(perfil&&perfil.user)?"Você":(u?esc(u.nome):mb)}</span>`}).join("")}</div>`
+    :`<div class="explain-box">🔐 O mural, as degustações e a lista de membros são reservados aos membros da confraria.</div>`}`;
+  $("#modal-detail").classList.add("open");
+}
+function postarMural(id){
+  const inp=$("#mural-in-"+id);if(!inp)return;
+  const txt=(inp.value||"").trim();if(!txt){toast("Escreva algo primeiro. ✍️");return}
+  const p={id:"m"+Date.now(),cf:id,user:perfil.user,txt,ts:Date.now()};
+  MURAL.unshift(p);
+  sb("/confraria_posts",{method:"POST",body:JSON.stringify({confraria_id:id,usuario:perfil.user,texto:txt})}).then(r=>{if(r&&r[0]){p.id=r[0].id;persist()}}).catch(()=>{});
+  persist();abrirConfraria(id);
+  toast("Publicado no mural! 💬");
+}
+function abrirEntrarComCodigo(){
+  if(!perfil){toast("Entre com sua conta primeiro. 👤");return}
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🎟️ Entrar com convite</h3>
+    <div class="sub">Recebeu um código de uma confraria privada? Digite-o aqui e entre direto — sem aprovação de ninguém de fora do grupo.</div>
+    <div class="field" style="margin:12px 0"><label>Código do convite</label><input id="conv-cod" placeholder="APO-XXXXXX" style="text-transform:uppercase;letter-spacing:2px" onkeydown="if(event.key==='Enter')usarConvite()"></div>
+    <button class="btn btn-primary" style="width:100%" onclick="usarConvite()">Entrar na confraria</button>`;
+  $("#modal-detail").classList.add("open");
+  setTimeout(()=>{const i=$("#conv-cod");if(i)i.focus()},200);
+}
+async function usarConvite(codigo){
+  const cod=(codigo||($("#conv-cod")&&$("#conv-cod").value)||"").trim().toUpperCase();
+  if(!cod){toast("Digite o código do convite. 🎟️");return}
+  if(!perfil){localStorage.setItem("apo_convite",cod);toast("Entre com sua conta — o convite será aplicado em seguida. 👤");return}
+  let c=CONFRARIAS.find(x=>(x.convite||"").toUpperCase()===cod);
+  if(!c&&nuvemOK){
+    try{const r=await sb("/confrarias?convite_token=eq."+encodeURIComponent(cod)+"&select=*");
+      if(r&&r[0]){const rc=r[0];c={id:rc.id,nome:rc.nome,cidade:rc.cidade,desc:rc.descricao,tipo:rc.tipo||(rc.aberta?"aberta":"moderada"),aberta:rc.aberta,dono:rc.dono,membros:rc.membros,regras:rc.regras||"",brasao:rc.brasao||"🏛️",convite:rc.convite_token,quemConvida:rc.quem_convida||"diretoria",membrosLista:[],moderadores:[],pendentes:[]};CONFRARIAS.unshift(c)}
+    }catch(e){}
+  }
+  if(!c){toast("Convite não encontrado ou já substituído — confirme o código com quem te convidou. 🤔");return}
+  if(minhasConfrarias.some(x=>x.id===c.id)){toast("Você já está na "+c.nome+"! 🥂");closeModal("modal-detail");abrirConfraria(c.id);return}
+  minhasConfrarias.push({id:c.id,status:"membro"});
+  c.membrosLista=(c.membrosLista||[]);c.membrosLista.push(perfil.user);
+  c.membros=(c.membros||0)+1;
+  sb("/confraria_membros",{method:"POST",body:JSON.stringify({confraria_id:c.id,usuario:perfil.user,status:"membro"})})
+    .then(()=>sb("/confrarias?id=eq."+encodeURIComponent(c.id),{method:"PATCH",body:JSON.stringify({membros:c.membros})})).catch(()=>{});
+  localStorage.removeItem("apo_convite");
+  persist();closeModal("modal-detail");renderConfrariasPub();
+  toast(`🥂 Convite aceito — você agora é membro da ${c.nome}!`);
+  setTimeout(()=>abrirConfraria(c.id),400);
 }
 async function sairConfraria(id){
   const c=CONFRARIAS.find(x=>x.id===id);
@@ -1083,6 +1320,7 @@ async function sairConfraria(id){
     }catch(e){toast("Sem conexão com a nuvem agora — tente de novo com internet. 📡");return}
   }
   minhasConfrarias=minhasConfrarias.filter(x=>x.id!==id);
+  c.pendentes=(c.pendentes||[]).filter(u=>u!==perfil.user);
   if(eraMembro){
     c.membros=Math.max(0,c.membros-1);
     c.membrosLista=(c.membrosLista||[]).filter(u=>u!==perfil.user);
@@ -1091,16 +1329,27 @@ async function sairConfraria(id){
   persist();renderConfrariasPub();
   toast(eraMembro?`Você saiu da ${c.nome}. 👋`:"Pedido de entrada cancelado.");
 }
-function addAmigoDir(i){
-  const u=window.__dir[i];if(!u)return;
-  amigos.push({user:u.user,nome:u.nome,cidade:u.cidade});
+function seguir(user){
+  const u=USUARIOS_APP.find(x=>x.user===user);
+  if(seguindo.some(a=>a.user===user))return;
+  seguindo.push({user,nome:u?u.nome:user,cidade:u?u.cidade:""});
+  if(perfil){
+    REDE.push({de:perfil.user,para:user});
+    sb("/seguidores",{method:"POST",body:JSON.stringify({seguidor:perfil.user,seguido:user})}).catch(()=>{});
+  }
   persist();renderConfraria();
-  toast(`${u.nome} (@${u.user}) entrou para a sua confraria! 🍷`);
+  toast(ehAmigoProximo(user)?`🤝 ${u?u.nome:user} também segue você — amigos próximos!`:`Você agora segue ${u?u.nome:user}. 🍷`);
 }
-function delAmigo(i){
-  const a=amigos[i];
-  amigos.splice(i,1);persist();renderConfraria();
-  toast(a.nome+" saiu da confraria (os encontros já criados não mudam).");
+function seguirDir(i){const u=window.__dir[i];if(u)seguir(u.user)}
+function deixarDeSeguir(i){
+  const a=seguindo[i];if(!a)return;
+  seguindo.splice(i,1);
+  if(perfil&&a.user){
+    REDE=REDE.filter(s=>!(s.de===perfil.user&&s.para===a.user));
+    sb("/seguidores?seguidor=eq."+encodeURIComponent(perfil.user)+"&seguido=eq."+encodeURIComponent(a.user),{method:"DELETE"}).catch(()=>{});
+  }
+  persist();renderConfraria();
+  toast("Você deixou de seguir "+a.nome+" (os encontros já criados não mudam).");
 }
 function addGarrafaAmigo(evId,ai){
   const ev=eventos.find(e=>e.id===evId);
@@ -1196,7 +1445,7 @@ function tirarGarrafaEvento(evId,id){
 function createEvento(){
   const nome=$("#e-nome").value.trim();
   if(!nome){toast("Dê um nome ao encontro. 🥂");return}
-  const selecionados=[...document.querySelectorAll(".e-amigo-chk:checked")].map(c=>({nome:amigos[+c.value].nome,garrafas:[]}));
+  const selecionados=[...document.querySelectorAll(".e-amigo-chk:checked")].map(c=>({nome:seguindo[+c.value].nome,garrafas:[]}));
   eventos.unshift({id:NEXT_EV++,nome,data:$("#e-data").value||"a definir",local:$("#e-local").value||"a definir",criador:"Jorge",amigos:selecionados,minhas:[],chat:[]});
   persist();["e-nome","e-data","e-local"].forEach(i=>$("#"+i).value="");
   renderEncontros();window.scrollTo({top:0,behavior:"smooth"});
@@ -1205,7 +1454,7 @@ function createEvento(){
 }
 
 /* Sementes de demonstração congeladas — usuário novo começa vazio; demo só sob demanda */
-const DEMO_SEED=JSON.parse(JSON.stringify({vinhos,historico,eventos,amigos,ADEGAS}));
+const DEMO_SEED=JSON.parse(JSON.stringify({vinhos,historico,eventos,seguindo,ADEGAS}));
 /* ================== PERSISTÊNCIA LOCAL ==================
    Salva a adega no armazenamento do navegador do aparelho (quando disponível).
    Se o navegador não permitir (ex.: visualização dentro de outros apps),
@@ -1214,7 +1463,7 @@ const STORE_KEY="apotheca_dados_v1";
 let PERSISTE=false;
 function persist(){
   try{
-    localStorage.setItem(STORE_KEY,JSON.stringify({vinhos,ADEGAS,historico,eventos,amigos,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,meusBrindes,NEXT_ID,NEXT_EV}));
+    localStorage.setItem(STORE_KEY,JSON.stringify({vinhos,ADEGAS,historico,eventos,seguindo,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,MURAL,meusBrindes,NEXT_ID,NEXT_EV}));
     PERSISTE=true;
   }catch(e){PERSISTE=false}
 }
@@ -1223,7 +1472,11 @@ function persist(){
     const s=JSON.parse(localStorage.getItem(STORE_KEY));
     if(s&&Array.isArray(s.vinhos)){
       vinhos=s.vinhos;ADEGAS=s.ADEGAS||ADEGAS;historico=s.historico||historico;
-      eventos=s.eventos||eventos;amigos=s.amigos||amigos;perfil=s.perfil||null;if(Array.isArray(s.USUARIOS_APP)&&s.USUARIOS_APP.length)USUARIOS_APP=s.USUARIOS_APP;if(Array.isArray(s.feed)&&s.feed.length)feed=s.feed;NEXT_FEED=s.NEXT_FEED||NEXT_FEED;minhasConfrarias=s.minhasConfrarias||[];if(Array.isArray(s.CONFRARIAS)&&s.CONFRARIAS.length)CONFRARIAS=s.CONFRARIAS;meusBrindes=s.meusBrindes||[];NEXT_ID=s.NEXT_ID||NEXT_ID;NEXT_EV=s.NEXT_EV||NEXT_EV;
+      eventos=s.eventos||eventos;seguindo=s.seguindo||s.amigos||seguindo;perfil=s.perfil||null;if(Array.isArray(s.USUARIOS_APP)&&s.USUARIOS_APP.length)USUARIOS_APP=s.USUARIOS_APP;if(Array.isArray(s.feed)&&s.feed.length)feed=s.feed;NEXT_FEED=s.NEXT_FEED||NEXT_FEED;minhasConfrarias=s.minhasConfrarias||[];
+      /* migração v0.38: expurga as confrarias-demo antigas do cache e normaliza o tipo */
+      if(Array.isArray(s.CONFRARIAS)&&s.CONFRARIAS.length)CONFRARIAS=s.CONFRARIAS.filter(c=>!DEMO_CONFRARIAS.includes(c.id)).map(c=>({...c,tipo:c.tipo||(c.aberta?"aberta":"moderada"),brasao:c.brasao||"🏛️",moderadores:c.moderadores||[],pendentes:c.pendentes||[],quemConvida:c.quemConvida||"diretoria"}));
+      minhasConfrarias=minhasConfrarias.filter(m=>!DEMO_CONFRARIAS.includes(m.id));
+      MURAL=s.MURAL||[];meusBrindes=s.meusBrindes||[];NEXT_ID=s.NEXT_ID||NEXT_ID;NEXT_EV=s.NEXT_EV||NEXT_EV;
     }
     localStorage.setItem("__apo_t","1");localStorage.removeItem("__apo_t");PERSISTE=true;
   }catch(e){PERSISTE=false}
@@ -1271,7 +1524,7 @@ function abrirAjuda(){
       <p style="margin-bottom:10px"><b>➕ Adicionar vinho:</b> toque no botão dourado central. Use o scanner de rótulo (aponte a câmera e aguarde a leitura automática) ou o cadastro manual.</p>
       <p style="margin-bottom:10px"><b>📷 Dicas do scanner:</b> boa luz, rótulo de frente, celular firme. O app tenta várias leituras e junta o melhor de cada uma. O que ele não identificar, você completa — e passa a valer para sempre.</p>
       <p style="margin-bottom:10px"><b>🍽️ Harmonizar:</b> escolha o prato (ou descreva) e o app aponta as melhores garrafas DA SUA adega, explicando o porquê.</p>
-      <p style="margin-bottom:10px"><b>🥂 Encontros:</b> cadastre seus amigos na Confraria, crie o evento, escolha quem vai e registre as garrafas de cada um — o app monta a ordem de serviço da noite.</p>
+      <p style="margin-bottom:10px"><b>🥂 Encontros:</b> siga apreciadores na sua Rede, funde ou entre numa confraria, crie o evento e registre as garrafas de cada um — o app monta a ordem de serviço da noite.</p>
       <p style="margin-bottom:10px"><b>💾 Seus dados:</b> ficam salvos neste aparelho. Para recomeçar com os dados de demonstração, use "Restaurar" no fim da tela de Histórico.</p>
       <p><b>💬 Suporte:</b> no aplicativo final, aqui haveria chat e e-mail de suporte. Neste protótipo, fale com o Jorge. 😄</p>
     </div>`;
@@ -1413,7 +1666,7 @@ async function abrirFeedbacksFundador(){
 }
 function carregarDemo(){
   const d=JSON.parse(JSON.stringify(DEMO_SEED));
-  vinhos=d.vinhos;historico=d.historico;eventos=d.eventos;amigos=d.amigos;ADEGAS=d.ADEGAS;
+  vinhos=d.vinhos;historico=d.historico;eventos=d.eventos;seguindo=d.seguindo;ADEGAS=d.ADEGAS;
   adegaAtiva="todas";
   persist();refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();renderHist();
   toast("🎬 Adega de demonstração carregada — 153 garrafas para explorar!");
@@ -1486,7 +1739,7 @@ async function confirmarNome(){
   perfil={user:u,cidade,provedor:provPendente||"Google"};
   USUARIOS_APP.push({user:u,nome:u.split(/[._-]/)[0].replace(/^./,c=>c.toUpperCase()),cidade});
   /* conta nova nasce com a adega ZERADA — a demonstração fica no menu, sob demanda */
-  vinhos=[];historico=[];eventos=[];amigos=[];
+  vinhos=[];historico=[];eventos=[];seguindo=[];
   ADEGAS=[{id:"casa",nome:"Casa Principal",icone:"🏠"}];
   adegaAtiva="todas";
   persist();refreshAdegaSelect();renderAdegaBar();renderColecao();renderHist();
@@ -2347,14 +2600,20 @@ function abrirPerfil(user){
     badges=all.filter((_,i)=>(h>>i)&1).map(([em,nome])=>({em,nome,desc:"",ok:true}));
     if(!badges.length)badges=[{em:"🍾",nome:"Primeira Garrafa",desc:"",ok:true}];
   }
-  const naConfraria=!sou&&amigos.some(a=>a.user===user);
+  const jaSigo=!sou&&sigoEle(user);
+  const segMe=meSegue(user);
+  const nSeguidores=REDE.filter(s=>s.para===user).length;
+  const nSeguindoEle=REDE.filter(s=>s.de===user).length;
+  const confrariasDele=CONFRARIAS.filter(c=>(c.membrosLista||[]).includes(user)&&(c.tipo!=="privada"||minhasConfrarias.some(m=>m.id===c.id&&m.status==="membro")||(perfil&&c.dono===perfil.user)));
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
       <span style="flex:none">${avatarDe(user,60)}</span>
-      <div><h3 class="serif" style="font-size:22px">${sou?"Você":u.nome}</h3>
-      <div style="font-size:13px;color:var(--ink-2)">@${user} · 📍 ${sou?perfil.cidade:u.cidade}</div></div>
+      <div><h3 class="serif" style="font-size:22px">${sou?"Você":u.nome}${!sou&&jaSigo&&segMe?' <span class="tag auge" style="font-size:10.5px;padding:2px 8px;vertical-align:middle">🤝 amigo próximo</span>':""}</h3>
+      <div style="font-size:13px;color:var(--ink-2)">@${user} · 📍 ${sou?perfil.cidade:u.cidade}</div>
+      <div style="font-size:12px;color:var(--ink-2);margin-top:2px"><b>${nSeguidores}</b> seguidores · segue <b>${nSeguindoEle}</b>${!sou&&segMe?" · segue você":""}</div></div>
     </div>
+    ${confrariasDele.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${confrariasDele.map(c=>`<span class="adega-chip" style="cursor:pointer" onclick="closeModal('modal-detail');abrirConfraria('${c.id}')">${c.brasao||"🏛️"} ${esc(c.nome)}</span>`).join("")}</div>`:""}
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
       ${stats.map(([l,v])=>`<div style="background:var(--cream);border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:19px;font-weight:800">${v}</div><div style="font-size:10.5px;color:var(--ink-2)">${l}</div></div>`).join("")}
     </div>
@@ -2363,8 +2622,8 @@ function abrirPerfil(user){
       ${(sou?badges:badges).map(b=>`<span class="adega-chip" style="cursor:default;${sou&&!b.ok?"opacity:.35":""}" title="${b.desc||b.nome}">${b.em} ${b.nome}</span>`).join("")}
     </div>
     ${sou?'<div class="explain-box">Selos apagados são metas a conquistar — cada um vira uma atividade no feed da comunidade quando desbloqueado.</div>':
-      naConfraria?'<div class="explain-box">✓ Este apreciador já está na sua confraria.</div>':
-      `<button class="btn btn-gold" style="width:100%" onclick="closeModal('modal-detail');amigos.push({user:'${user}',nome:'${u?u.nome:user}',cidade:'${u?u.cidade:""}'});persist();renderConfraria&&renderConfraria();toast('${u?u.nome:user} entrou para a sua confraria! 🍷')">＋ Adicionar à confraria</button>`}
+      jaSigo?`<button class="btn btn-ghost" style="width:100%" onclick="closeModal('modal-detail');deixarDeSeguir(seguindo.findIndex(a=>a.user==='${user}'))">✓ Seguindo — deixar de seguir</button>`:
+      `<button class="btn btn-gold" style="width:100%" onclick="closeModal('modal-detail');seguir('${user}')">＋ Seguir${segMe?" de volta":""}</button>`}
   `;
   $("#modal-detail").classList.add("open");
 }
@@ -2391,7 +2650,14 @@ initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();rende
   if(veioDoGoogle){await aposLoginGoogle()}
   else if(!perfil){sairSessao()}
   else{aplicarPerfilUI()}
-  sincronizarComunidade();
+  /* convite de confraria chegando pela URL (?convite=APO-XXXXXX) ou guardado de antes do login */
+  try{
+    const pc=new URLSearchParams(location.search).get("convite");
+    if(pc)localStorage.setItem("apo_convite",pc.toUpperCase());
+  }catch(e){}
+  await sincronizarComunidade();
+  const convPend=localStorage.getItem("apo_convite");
+  if(convPend&&perfil)usarConvite(convPend);
 })();
 setInterval(sincronizarComunidade,60000);
 setInterval(garantirSessaoValida,10*60*1000);
