@@ -469,7 +469,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
     <p style="color:var(--gold-soft);margin-top:-10px">Sua adega, inteligente</p>
     <button class="btn" style="background:#fff;color:#333;min-width:250px;display:flex;align-items:center;justify-content:center;gap:10px" onclick="iniciarLogin('Google')"><b style="color:#4285F4">G</b> Entrar com Google</button>
     <button class="btn" style="background:#000;color:#fff;min-width:250px;display:flex;align-items:center;justify-content:center;gap:10px" onclick="iniciarLogin('Apple')"> Entrar com Apple</button>
-    <p style="font-size:11.5px;max-width:280px;opacity:.75;line-height:1.5">Protótipo: a autenticação é simulada. No aplicativo final, o login Google/Apple traz seu e-mail verificado — você só escolhe o nome.</p>
+    <p id="login-nota" style="font-size:11.5px;max-width:290px;opacity:.75;line-height:1.5">Login verdadeiro: você autoriza na tela oficial do Google e o app recebe seu e-mail verificado.</p>
   </div>
   <div id="login-p2" class="hidden" style="background:var(--card);color:var(--ink);border-radius:18px;padding:24px;max-width:340px;width:92%;text-align:left">
     <h3 class="serif" style="font-size:22px;margin-bottom:4px">Escolha seu nome</h3>
@@ -506,7 +506,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.32";/* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.33"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
@@ -590,6 +590,9 @@ let baseMundialPronta=BASE_MUNDIAL.slice();
     x.send();
   }catch(e){}
 })();
+/* Sanitização: texto de terceiros nunca vira código. esc() neutraliza tudo; escB() preserva apenas <b> */
+const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+const escB=t=>esc(t).replace(/&lt;b&gt;/g,"<b>").replace(/&lt;\/b&gt;/g,"</b>");
 const normBM=s=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
 /* Palavras gen\u00e9ricas que n\u00e3o identificam um vinho \u2014 ignoradas dos dois lados da compara\u00e7\u00e3o */
 const STOP_BM=new Set(["reserva","reserve","riserva","gran","grand","grande","vinho","vino","wine","wines","vineyard","vineyards","estate","seleccion","selecao","selection","cuvee","edition","edicao","especial","special","premium","classic","classico","clasico","tinto","branco","blanc","bianco","rosso","rouge","white","red","blend","old","vines","vina","vinha","vinhas","dos","das","del","dela","the","and","brut","seco","dry"]);
@@ -741,12 +744,97 @@ let eventos=[
 ];
 /* ===== FASE 1 · BACKEND REAL (Supabase) =====
    A chave abaixo é a publicável — feita para viver no aplicativo; as regras do banco protegem os dados. */
-const SB_URL="https://zetjhmldjpsluswieyft.supabase.co/rest/v1";
+const SB_BASE="https://zetjhmldjpsluswieyft.supabase.co";
+const SB_URL=SB_BASE+"/rest/v1";
 const SB_KEY="sb_publishable_1OC9vFYu5QatZk2vd0uEAA_KHcwbsgF";
 let nuvemOK=false,meusBrindes=[];
+/* ===== SESSÃO GOOGLE REAL (Supabase Auth) =====
+   No site (https) o login Google é verdadeiro: o usuário autoriza na tela do próprio Google
+   e o app recebe um token pessoal. No APK (file://) o Google bloqueia OAuth em WebView,
+   então a entrada por nome continua valendo até a versão com navegador externo. */
+let sessao=null; /* {access_token,refresh_token,expira,uid,email,nome,foto} */
+try{sessao=JSON.parse(localStorage.getItem("apotheca_sessao"))||null}catch(e){}
+function ehSite(){return location.protocol==="https:"||location.protocol==="http:"}
+function tokenAtual(){return (sessao&&sessao.access_token)?sessao.access_token:SB_KEY}
+function salvarSessao(){try{sessao?localStorage.setItem("apotheca_sessao",JSON.stringify(sessao)):localStorage.removeItem("apotheca_sessao")}catch(e){}}
+function entrarGoogleReal(){
+  const volta=location.origin+location.pathname;
+  location.href=SB_BASE+"/auth/v1/authorize?provider=google&redirect_to="+encodeURIComponent(volta);
+}
+async function capturarRetornoOAuth(){
+  const h=location.hash||"";
+  if(h.indexOf("access_token=")<0)return false;
+  const p=new URLSearchParams(h.replace(/^#/,""));
+  const at=p.get("access_token"),rt=p.get("refresh_token"),ei=parseInt(p.get("expires_in")||"3600",10);
+  try{history.replaceState(null,"",location.pathname+location.search+"#dashboard")}catch(e){}
+  if(!at)return false;
+  sessao={access_token:at,refresh_token:rt,expira:Date.now()+(ei-120)*1000};
+  try{
+    const r=await fetch(SB_BASE+"/auth/v1/user",{headers:{apikey:SB_KEY,Authorization:"Bearer "+at}});
+    if(!r.ok)throw new Error("auth "+r.status);
+    const u=await r.json();
+    sessao.uid=u.id;sessao.email=u.email||"";
+    sessao.nome=(u.user_metadata&&(u.user_metadata.full_name||u.user_metadata.name))||(u.email||"").split("@")[0];
+    sessao.foto=(u.user_metadata&&(u.user_metadata.avatar_url||u.user_metadata.picture))||null;
+    salvarSessao();
+    return true;
+  }catch(e){sessao=null;salvarSessao();return false}
+}
+async function renovarSessao(){
+  if(!sessao||!sessao.refresh_token)return false;
+  try{
+    const r=await fetch(SB_BASE+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:sessao.refresh_token})});
+    if(!r.ok)throw 0;
+    const d=await r.json();
+    sessao.access_token=d.access_token;
+    sessao.refresh_token=d.refresh_token||sessao.refresh_token;
+    sessao.expira=Date.now()+((d.expires_in||3600)-120)*1000;
+    salvarSessao();
+    return true;
+  }catch(e){sessao=null;salvarSessao();return false}
+}
+async function garantirSessaoValida(){
+  if(sessao&&sessao.expira&&Date.now()>sessao.expira)await renovarSessao();
+}
+async function aposLoginGoogle(){
+  /* 1) esta conta Google já tem um usuário Apotheca? entra direto */
+  try{
+    const r=await sb("/usuarios?auth_id=eq."+sessao.uid+"&select=usuario,nome,cidade");
+    if(r&&r.length){
+      perfil={user:r[0].usuario,cidade:r[0].cidade,provedor:"Google"};
+      persist();aplicarPerfilUI();
+      $("#login-screen").classList.remove("open");go("dashboard");
+      toast("🍷 Bem-vindo de volta, @"+r[0].usuario+"! Conta Google verificada.");
+      return;
+    }
+    /* 2) já existe perfil local (criado antes do login real)? vincula à conta Google */
+    if(perfil){
+      try{
+        await sb("/usuarios?usuario=eq."+encodeURIComponent(perfil.user)+"&auth_id=is.null",{method:"PATCH",body:JSON.stringify({auth_id:sessao.uid})});
+        toast("🔗 Conta Google ("+sessao.email+") vinculada a @"+perfil.user+"!");
+      }catch(e){toast("Conta Google conectada — sincronizo o vínculo quando a nuvem responder.")}
+      persist();aplicarPerfilUI();
+      $("#login-screen").classList.remove("open");go("dashboard");
+      return;
+    }
+  }catch(e){}
+  /* 3) conta nova: falta só escolher o nome definitivo */
+  provPendente="Google";
+  $("#login-screen").classList.add("open");
+  $("#login-p1").classList.add("hidden");$("#login-p2").classList.remove("hidden");
+  const fb=$("#reg-feedback");
+  if(fb&&sessao&&sessao.email)fb.innerHTML='<span style="color:var(--ok)">✓ Conectado como '+sessao.email+'</span>';
+  setTimeout(()=>{
+    const i=$("#reg-user");
+    if(i){
+      if(!i.value&&sessao&&sessao.nome){i.value=normUser(sessao.nome.split(/\s+/).slice(0,2).join("."));verificarNome()}
+      i.focus();
+    }
+  },250);
+}
 async function sb(caminho,opts){
   const o=opts||{};
-  const r=await fetch(SB_URL+caminho,{...o,headers:{apikey:SB_KEY,Authorization:"Bearer "+SB_KEY,"Content-Type":"application/json",Prefer:"return=representation",...(o.headers||{})}});
+  const r=await fetch(SB_URL+caminho,{...o,headers:{apikey:SB_KEY,Authorization:"Bearer "+tokenAtual(),"Content-Type":"application/json",Prefer:"return=representation",...(o.headers||{})}});
   if(!r.ok)throw new Error("nuvem "+r.status);
   const t=await r.text();
   return t?JSON.parse(t):null;
@@ -760,6 +848,7 @@ async function sincronizarComunidade(){
       sb("/confraria_membros?select=*")
     ]);
     USUARIOS_APP=us.map(u=>({user:u.usuario,nome:u.nome,cidade:u.cidade}));
+    /* adota na nuvem os perfis criados antes do backend (ou registrados offline) */
     if(perfil&&!USUARIOS_APP.some(u=>u.user===perfil.user)){
       const nomeP=perfil.user.split(/[._-]/)[0].replace(/^./,c=>c.toUpperCase());
       USUARIOS_APP.push({user:perfil.user,nome:nomeP,cidade:perfil.cidade});
@@ -861,7 +950,7 @@ function renderConfraria(){
   $("#confraria-dir").innerHTML=lista.map((u,i)=>
     `<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:6px">
       <span style="font-size:18px">👤</span>
-      <div class="inf"><b>${u.nome}</b><small>@${u.user} · 📍 ${u.cidade}</small></div>
+      <div class="inf"><b>${esc(u.nome)}</b><small>@${esc(u.user)} · 📍 ${esc(u.cidade)}</small></div>
       <button class="btn btn-gold btn-sm" onclick="addAmigoDir(${i})">＋ Adicionar</button>
     </div>`).join("")
     ||'<div style="font-size:12.5px;color:var(--ink-2);padding:8px">Nenhum usuário encontrado com esse filtro.</div>';
@@ -879,7 +968,7 @@ function renderConfrariasPub(){
       `<button class="btn btn-gold btn-sm" onclick="entrarConfraria('${c.id}')">${c.aberta?"Entrar":"Pedir para entrar"}</button>`;
     return `<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:6px">
       <span style="font-size:20px">🏛️</span>
-      <div class="inf"><b>${c.nome}</b> <span style="font-size:11px;color:var(--ink-3)">${c.aberta?"· aberta":"· requer aprovação"}</span><small>📍 ${c.cidade} · ${c.membros} membros · ${c.desc}</small></div>
+      <div class="inf"><b>${esc(c.nome)}</b> <span style="font-size:11px;color:var(--ink-3)">${c.aberta?"· aberta":"· requer aprovação"}</span><small>📍 ${esc(c.cidade)} · ${c.membros} membros · ${esc(c.desc)}</small></div>
       ${status}
     </div>`;
   }).join("")||'<div style="font-size:12.5px;color:var(--ink-2);padding:8px">Nenhuma confraria nesta cidade ainda — que tal fundar a primeira?</div>';
@@ -1023,7 +1112,7 @@ function renderEncontros(){
         ${chatsAbertos.has(ev.id)?`
         <div class="chat-box">
           <div class="chat-msgs" id="chat-msgs-${ev.id}">
-            ${(ev.chat||[]).map(m=>`<div class="msg ${m.de==="Você"?"minha":"deles"}"><div class="quem">${m.de==="Você"?"Você":"👤 "+m.de}</div>${m.txt}<div class="hora">${m.hora||""}</div></div>`).join("")||'<div style="font-size:12.5px;color:var(--ink-2);text-align:center;padding:10px">Nenhuma mensagem ainda — puxe o assunto! 🥂</div>'}
+            ${(ev.chat||[]).map(m=>`<div class="msg ${m.de==="Você"?"minha":"deles"}"><div class="quem">${m.de==="Você"?"Você":"👤 "+esc(m.de)}</div>${esc(m.txt)}<div class="hora">${m.hora||""}</div></div>`).join("")||'<div style="font-size:12.5px;color:var(--ink-2);text-align:center;padding:10px">Nenhuma mensagem ainda — puxe o assunto! 🥂</div>'}
           </div>
           <div class="chat-envio">
             <input id="chat-in-${ev.id}" placeholder="Mensagem para o grupo…" onkeydown="if(event.key==='Enter')enviarMsg(${ev.id})">
@@ -1122,7 +1211,7 @@ function status(v){
 /* ================== MENU POP-UP ================== */
 function renderMenu(){
   const mf=$("#mi-fundador");
-  if(mf)mf.classList.toggle("hidden",!(perfil&&perfil.user==="Jorge.Queiroz"));
+  if(mf)mf.classList.toggle("hidden",!((perfil&&perfil.user==="Jorge.Queiroz")||(sessao&&sessao.email==="wp7jorge@gmail.com")));
   const tot=id=>vinhos.filter(v=>id==="todas"||v.adega===id).reduce((s,v)=>s+v.qtd,0);
   $("#menu-adegas").innerHTML=
     `<div class="mtit">MINHAS ADEGAS</div>`+
@@ -1249,14 +1338,35 @@ async function enviarFeedback(){
   }catch(e){toast("Sem conexão agora — tente de novo com internet. 📡")}
 }
 async function abrirFeedbacksFundador(){
+  /* Com a conta Google do fundador verificada, a leitura acontece aqui dentro — o banco só entrega
+     as mensagens a um token cujo e-mail seja o do fundador (regra no servidor, impossível de forjar). */
+  if(sessao&&sessao.email==="wp7jorge@gmail.com"){
+    try{
+      await garantirSessaoValida();
+      const fbs=await sb("/feedback?select=*&order=criado.desc&limit=100");
+      const linhas=(fbs&&fbs.length)?fbs.map(f=>`
+        <div style="border-bottom:1px solid var(--cream);padding:10px 0">
+          <div style="font-size:12px;color:var(--ink-2)">${f.tipo||"—"} · @${f.usuario||"anônimo"} · ${new Date(f.criado).toLocaleString("pt-BR")}</div>
+          <div style="font-size:13.5px;margin-top:3px;white-space:pre-wrap">${(f.texto||"").replace(/</g,"&lt;")}</div>
+        </div>`).join("")
+        :'<div class="empty" style="padding:20px 0"><div class="big">📭</div>Nenhum feedback ainda — a caixa está vazia.</div>';
+      $("#modal-detail-body").innerHTML=`
+        <button class="close" onclick="closeModal('modal-detail')">✕</button>
+        <h3 class="serif">📥 Feedbacks recebidos</h3>
+        <div class="sub">${fbs?fbs.length:0} mensagem(ns) · leitura restrita à sua conta Google ✅</div>
+        <div style="max-height:60vh;overflow:auto">${linhas}</div>`;
+      $("#modal-detail").classList.add("open");
+      return;
+    }catch(e){/* sem nuvem agora: cai na explicação abaixo */}
+  }
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
     <h3 class="serif">📥 Feedbacks recebidos</h3>
-    <div class="sub">Blindagem de segurança ativa desde 27/07</div>
+    <div class="sub">Leitura protegida por login Google</div>
     <div style="font-size:13.5px;line-height:1.65">
-      <p style="margin-bottom:10px">Os envios continuam chegando normalmente — mas, por segurança, a <b>leitura</b> dos feedbacks agora só acontece no painel autenticado do banco (para que nenhum estranho com conhecimento técnico possa ler as mensagens dos usuários).</p>
-      <p style="margin-bottom:10px"><b>Para ler:</b> acesse <b>supabase.com/dashboard</b> no computador → projeto Apotheca → <b>Table Editor</b> → tabela <b>feedback</b>. Cada linha traz o tipo, o @usuário, a mensagem e o horário.</p>
-      <p style="color:var(--ink-2)">Quando o login Google real for ativado (próxima fase), a leitura volta para dentro do app — restrita à sua conta verificada.</p>
+      <p style="margin-bottom:10px">Para ler os feedbacks aqui dentro, entre pelo <b>site</b> (jorgequei.github.io/apotheca) com o botão <b>Entrar com Google</b> usando a conta do fundador — o banco só entrega as mensagens ao seu e-mail verificado.</p>
+      <p style="margin-bottom:10px"><b>Alternativa no computador:</b> supabase.com/dashboard → projeto Apotheca → <b>Table Editor</b> → tabela <b>feedback</b>.</p>
+      <p style="color:var(--ink-2)">Neste APK de teste (sem login Google), a leitura dentro do app fica indisponível de propósito — é a trava que impede estranhos de lerem as mensagens.</p>
     </div>`;
   $("#modal-detail").classList.add("open");
 }
@@ -1269,14 +1379,24 @@ function carregarDemo(){
   go("dashboard");
 }
 function sairSessao(){
+  if(sessao){ /* encerra a sessão Google de verdade (melhor esforço) */
+    try{fetch(SB_BASE+"/auth/v1/logout",{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+sessao.access_token}}).catch(()=>{})}catch(e){}
+    sessao=null;salvarSessao();
+  }
+  const nota=$("#login-nota");
+  if(nota)nota.textContent=ehSite()
+    ?"Login verdadeiro: você autoriza na tela oficial do Google e o app recebe seu e-mail verificado. Nenhuma senha passa pelo Apotheca."
+    :"Neste APK de teste a entrada é pelo nome de usuário. O login Google real já funciona no site (jorgequei.github.io/apotheca) e chega ao aplicativo na próxima versão.";
   $("#login-p1").classList.remove("hidden");$("#login-p2").classList.add("hidden");
   $("#login-screen").classList.add("open");
 }
 function iniciarLogin(prov){
   provPendente=prov;
-  if(perfil){ /* conta já existe neste aparelho: entra direto */
+  if(prov==="Google"&&ehSite()){entrarGoogleReal();return} /* OAuth verdadeiro no site */
+  if(prov==="Apple"){toast("🍎 O login Apple entra na fase de publicação na App Store — por enquanto, use o Google.");return}
+  if(perfil){ /* APK: conta já existe neste aparelho, entra direto */
     $("#login-screen").classList.remove("open");go("dashboard");
-    toast(`Bem-vindo de volta, @${perfil.user}! (via ${prov}) 🍷`);
+    toast(`Bem-vindo de volta, @${perfil.user}! 🍷`);
     return;
   }
   $("#login-p1").classList.add("hidden");$("#login-p2").classList.remove("hidden");
@@ -1309,13 +1429,15 @@ async function confirmarNome(){
   if(!verificarNome()){toast("Escolha um nome disponível primeiro.");return}
   const cidade=($("#reg-cidade").value||"").trim()||"—";
   try{
-    await sb("/usuarios",{method:"POST",body:JSON.stringify({usuario:u,nome:u.split(/[._-]/)[0].replace(/^./,c=>c.toUpperCase()),cidade})});
+    const extra=(sessao&&sessao.uid)?{auth_id:sessao.uid}:{};
+    await sb("/usuarios",{method:"POST",body:JSON.stringify({usuario:u,nome:u.split(/[._-]/)[0].replace(/^./,c=>c.toUpperCase()),cidade,...extra})});
     nuvemOK=true;
   }catch(e){
     if(String(e.message).includes("409")){$("#reg-feedback").innerHTML='<span style="color:var(--danger)">✗ @'+u+' acabou de ser registrado por outra pessoa — escolha outro.</span>';return}
   }
   perfil={user:u,cidade,provedor:provPendente||"Google"};
   USUARIOS_APP.push({user:u,nome:u.split(/[._-]/)[0].replace(/^./,c=>c.toUpperCase()),cidade});
+  /* conta nova nasce com a adega ZERADA — a demonstração fica no menu, sob demanda */
   vinhos=[];historico=[];eventos=[];amigos=[];
   ADEGAS=[{id:"casa",nome:"Casa Principal",icone:"🏠"}];
   adegaAtiva="todas";
@@ -1328,11 +1450,17 @@ async function confirmarNome(){
 function aplicarPerfilUI(){
   const f=$("#foot-user");if(f)f.textContent=perfil?"@"+perfil.user:"Jorge";
   const hu=$("#head-user");
-  if(hu){hu.innerHTML=perfil?avatarDe(perfil.user):"";hu.onclick=()=>{if(perfil)abrirPerfil(perfil.user)}}
+  if(hu){
+    hu.innerHTML=(sessao&&sessao.foto)
+      ?`<img src="${sessao.foto}" referrerpolicy="no-referrer" style="width:30px;height:30px;border-radius:50%;border:2px solid var(--gold);display:block" alt="">`
+      :(perfil?avatarDe(perfil.user):"");
+    hu.onclick=()=>{if(perfil)abrirPerfil(perfil.user)};
+  }
   const ds=$("#dash-sub");
   if(ds){
     const u=perfil&&USUARIOS_APP.find(x=>x.user===perfil.user);
-    ds.innerHTML=perfil?`Olá, <b>${u?u.nome:perfil.user}</b> · @${perfil.user} · sessão ativa ✅`:"Visão geral da sua coleção — atualizada em tempo real.";
+    const selo=sessao?"conta Google verificada ✅":"sessão ativa ✅";
+    ds.innerHTML=perfil?`Olá, <b>${u?u.nome:perfil.user}</b> · @${perfil.user} · ${selo}`:"Visão geral da sua coleção — atualizada em tempo real.";
   }
 }
 
@@ -2125,7 +2253,7 @@ function feedItemHtml(f){
   return `<div class="hist-row" style="align-items:flex-start">
     <span style="cursor:pointer" onclick="abrirPerfil('${f.user}')">${avatarDe(f.user)}</span>
     <div class="info">
-      <h4 style="font-size:13.5px;font-weight:600"><span style="cursor:pointer;color:var(--wine)" onclick="abrirPerfil('${f.user}')">${nome}</span> ${f.txt}${f.est?` <span class="stars" style="font-size:12px">${"★".repeat(f.est)}</span>`:""}</h4>
+      <h4 style="font-size:13.5px;font-weight:600"><span style="cursor:pointer;color:var(--wine)" onclick="abrirPerfil('${f.user}')">${nome}</span> ${escB(f.txt)}${f.est?` <span class="stars" style="font-size:12px">${"★".repeat(f.est)}</span>`:""}</h4>
       <p>${cidade?"📍 "+cidade+" · ":""}${tempoRel(f.ts)}</p>
     </div>
     <button class="btn btn-sm ${f.meu?"btn-gold":"btn-ghost"}" style="flex:none;padding:5px 10px" onclick="brindar(${f.id})">🥂 ${f.brindes||""}</button>
@@ -2204,7 +2332,20 @@ function histRowsHtml(limit){
 function renderHist(){$("#hist-list").innerHTML=histRowsHtml()}
 
 /* ================== INIT ================== */
-initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();renderHist();renderFeed();aplicarPerfilUI();if(!perfil)sairSessao();sincronizarComunidade();setInterval(sincronizarComunidade,60000);
+initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();renderHist();renderFeed();aplicarPerfilUI();
+(async function(){
+  /* 1) se a página voltou do Google com tokens no endereço, captura a sessão */
+  let veioDoGoogle=false;
+  try{veioDoGoogle=await capturarRetornoOAuth()}catch(e){}
+  /* 2) sessão salva de visitas anteriores: renova se estiver vencida */
+  if(!veioDoGoogle){try{await garantirSessaoValida()}catch(e){}}
+  if(veioDoGoogle){await aposLoginGoogle()}
+  else if(!perfil){sairSessao()}
+  else{aplicarPerfilUI()}
+  sincronizarComunidade();
+})();
+setInterval(sincronizarComunidade,60000);
+setInterval(garantirSessaoValida,10*60*1000);
 (function(){
   const ok=PERSISTE;
   const vb=$("#ver-badge");if(vb)vb.textContent="v"+APP_VERSION;
