@@ -506,7 +506,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.36"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.37"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
@@ -795,6 +795,23 @@ async function renovarSessao(){
 }
 async function garantirSessaoValida(){
   if(sessao&&sessao.expira&&Date.now()>sessao.expira)await renovarSessao();
+}
+/* Chamada pelo Android quando o navegador devolve o usuário via apotheca://auth#tokens */
+async function processarTokensExternos(frag){
+  const p=new URLSearchParams((frag||"").replace(/^#/,""));
+  const at=p.get("access_token"),rt=p.get("refresh_token"),ei=parseInt(p.get("expires_in")||"3600",10);
+  if(!at){toast("Login não concluído — tente de novo. 🔁");return}
+  sessao={access_token:at,refresh_token:rt,expira:Date.now()+(ei-120)*1000};
+  try{
+    const r=await fetch(SB_BASE+"/auth/v1/user",{headers:{apikey:SB_KEY,Authorization:"Bearer "+at}});
+    if(!r.ok)throw new Error("auth "+r.status);
+    const u=await r.json();
+    sessao.uid=u.id;sessao.email=u.email||"";
+    sessao.nome=(u.user_metadata&&(u.user_metadata.full_name||u.user_metadata.name))||(u.email||"").split("@")[0];
+    sessao.foto=(u.user_metadata&&(u.user_metadata.avatar_url||u.user_metadata.picture))||null;
+    salvarSessao();
+    await aposLoginGoogle();
+  }catch(e){sessao=null;salvarSessao();toast("Não consegui validar o login — verifique a internet e tente de novo. 📡")}
 }
 async function aposLoginGoogle(){
   /* 1) esta conta Google já tem um usuário Apotheca? entra direto */
@@ -1408,15 +1425,22 @@ function sairSessao(){
     sessao=null;salvarSessao();
   }
   const nota=$("#login-nota");
-  if(nota)nota.textContent=ehSite()
+  if(nota)nota.textContent=(ehSite()||window.Apk)
     ?"Login verdadeiro: você autoriza na tela oficial do Google e o app recebe seu e-mail verificado. Nenhuma senha passa pelo Apotheca."
-    :"Neste APK de teste a entrada é pelo nome de usuário. O login Google real já funciona no site (jorgequei.github.io/apotheca) e chega ao aplicativo na próxima versão.";
+    :"Neste visualizador local a entrada é pelo nome de usuário. O login Google real funciona no site e no aplicativo Android.";
   $("#login-p1").classList.remove("hidden");$("#login-p2").classList.add("hidden");
   $("#login-screen").classList.add("open");
 }
 function iniciarLogin(prov){
   provPendente=prov;
   if(prov==="Google"&&ehSite()){entrarGoogleReal();return} /* OAuth verdadeiro no site */
+  if(prov==="Google"&&window.Apk&&Apk.abrirNavegador){
+    /* APK: o Google não permite login dentro do WebView, então abrimos o navegador
+       verdadeiro do celular; o retorno chega pelo endereço apotheca://auth */
+    Apk.abrirNavegador(SB_BASE+"/auth/v1/authorize?provider=google&redirect_to="+encodeURIComponent("apotheca://auth"));
+    toast("🌐 Complete o login no navegador que abriu — eu trago você de volta.");
+    return;
+  }
   if(prov==="Apple"){toast("🍎 O login Apple entra na fase de publicação na App Store — por enquanto, use o Google.");return}
   if(perfil){ /* APK: conta já existe neste aparelho, entra direto */
     $("#login-screen").classList.remove("open");go("dashboard");
