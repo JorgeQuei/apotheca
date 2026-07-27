@@ -241,10 +241,10 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 .empty .big{font-size:40px;margin-bottom:10px}
 
 @media(max-width:900px){
-  .app{grid-template-columns:1fr}
+  .app{grid-template-columns:minmax(0,1fr)} /* 1fr puro não encolhe abaixo do conteúdo — era a causa da rolagem lateral em Encontros */
   .sidebar{display:none}
   .bottomnav{display:flex}
-  .main{padding:20px 16px 110px}
+  .main{padding:20px 16px 110px;min-width:0;overflow-x:clip}
   .grid2{grid-template-columns:1fr}
   .add-modes{grid-template-columns:1fr}
 }
@@ -506,7 +506,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.33"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.34"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
