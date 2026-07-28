@@ -274,7 +274,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 <body>
 <div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#b8860b;color:#fff;
   font:600 12px/1.5 -apple-system,sans-serif;text-align:center;padding:5px 10px;letter-spacing:.3px">
-  🧪 VERSÃO DE TESTE v0.39 — o app oficial continua em jorgequei.github.io/apotheca/
+  🧪 VERSÃO DE TESTE v0.39.1 — o app oficial continua em jorgequei.github.io/apotheca/
 </div>
 <div style="height:26px"></div>
 <div class="app">
@@ -561,7 +561,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.39"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.39.1"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://jorgequei.github.io/apotheca/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -958,7 +958,10 @@ async function sincronizarComunidade(){
       const sg=await sb("/seguidores?select=*");
       const existe=u2=>USUARIOS_APP.some(x=>x.user===u2);
       /* descarta laços apontando para quem não existe mais (era a origem dos "amigos fantasmas") */
-      REDE=sg.filter(s=>existe(s.de)&&existe(s.para)).map(s=>({de:s.seguidor,para:s.seguido,ts:new Date(s.criado).getTime()}));
+      /* atenção: as colunas da nuvem chamam-se seguidor/seguido — o apelido de/para
+         só existe depois do map. Filtrar por de/para aqui zerava a rede inteira. */
+      REDE=sg.filter(s=>existe(s.seguidor)&&existe(s.seguido))
+             .map(s=>({de:s.seguidor,para:s.seguido,ts:new Date(s.criado).getTime()}));
       if(perfil){
         seguindo=REDE.filter(s=>s.de===perfil.user).map(s=>{
           const q=USUARIOS_APP.find(x=>x.user===s.para);
@@ -1411,16 +1414,22 @@ async function seguir(user){
   seguindo.push({user,nome:u?u.nome:user,cidade:u?u.cidade:""});
   REDE.push({de:perfil.user,para:user,ts:Date.now()});
   redesenharSocial();
-  try{
-    await sb("/seguidores",{method:"POST",body:JSON.stringify({seguidor:perfil.user,seguido:user})});
+  /* o erro 409 significa "já segue" — é sucesso, não falha.
+     Antes qualquer erro virava "entre com o Google", o que confundia quem já estava logado. */
+  const r=await fetch(SB_URL+"/seguidores",{method:"POST",
+    headers:{apikey:SB_KEY,Authorization:"Bearer "+tokenAtual(),"Content-Type":"application/json"},
+    body:JSON.stringify({seguidor:perfil.user,seguido:user})}).catch(()=>null);
+  if(r&&(r.ok||r.status===409)){
     persist();
     toast(meSegue(user)?`🤝 ${u?u.nome:user} também segue você — amigos próximos!`:`Você agora segue ${u?u.nome:user}. 🍷`);
-  }catch(e){
-    seguindo=seguindo.filter(a=>a.user!==user);
-    REDE=REDE.filter(s=>!(s.de===perfil.user&&s.para===user));
-    redesenharSocial();
-    toast("Não consegui salvar — entre com o Google e tente de novo. 🔐");
+    return;
   }
+  seguindo=seguindo.filter(a=>a.user!==user);
+  REDE=REDE.filter(s=>!(s.de===perfil.user&&s.para===user));
+  redesenharSocial();
+  if(!r)toast("Sem conexão com a internet agora. 📡");
+  else if(r.status===401||r.status===403)toast("Sua sessão expirou — saia e entre de novo com o Google. 🔐");
+  else toast("Não consegui salvar agora (erro "+r.status+"). Tente de novo. 🍷");
 }
 async function deixarDeSeguirUser(user){
   if(!perfil)return;
@@ -1428,14 +1437,13 @@ async function deixarDeSeguirUser(user){
   seguindo=seguindo.filter(a=>a.user!==user);
   REDE=REDE.filter(s=>!(s.de===perfil.user&&s.para===user));
   redesenharSocial();
-  try{
-    await sb("/seguidores?seguidor=eq."+encodeURIComponent(perfil.user)+"&seguido=eq."+encodeURIComponent(user),{method:"DELETE"});
-    persist();
-    toast("Você deixou de seguir "+nomeDe(user)+".");
-  }catch(e){
-    seguindo=guardaS;REDE=guardaR;redesenharSocial();
-    toast("Não consegui salvar — verifique a conexão. 📡");
-  }
+  const r=await fetch(SB_URL+"/seguidores?seguidor=eq."+encodeURIComponent(perfil.user)+"&seguido=eq."+encodeURIComponent(user),
+    {method:"DELETE",headers:{apikey:SB_KEY,Authorization:"Bearer "+tokenAtual(),"Content-Type":"application/json"}}).catch(()=>null);
+  if(r&&r.ok){persist();toast("Você deixou de seguir "+nomeDe(user)+".");return}
+  seguindo=guardaS;REDE=guardaR;redesenharSocial();
+  if(!r)toast("Sem conexão com a internet agora. 📡");
+  else if(r.status===401||r.status===403)toast("Sua sessão expirou — saia e entre de novo com o Google. 🔐");
+  else toast("Não consegui salvar agora (erro "+r.status+").");
 }
 function deixarDeSeguir(i){const a=seguindo[i];if(a)deixarDeSeguirUser(a.user)}
 function seguirDir(i){const u=window.__dir&&window.__dir[i];if(u)seguir(u.user)}
