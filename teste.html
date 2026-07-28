@@ -254,6 +254,10 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 .bell{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;width:42px;height:42px;
   font-size:18px;cursor:pointer;box-shadow:var(--shadow);flex:none}
 .bell .badge-n{position:absolute;top:-5px;right:-5px}
+.nav-badge{position:absolute;top:5px;right:14px}
+.bottomnav button{position:relative}
+.nav-btn{position:relative}
+@media(max-width:900px){.nav-badge{top:3px;right:calc(50% - 22px)}}
 .pessoa{display:flex;gap:11px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:7px;background:var(--card)}
 .pessoa .inf{flex:1;min-width:0}
 .pessoa .inf b{font-size:14px;display:block}
@@ -274,7 +278,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 <body>
 <div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#b8860b;color:#fff;
   font:600 12px/1.5 -apple-system,sans-serif;text-align:center;padding:5px 10px;letter-spacing:.3px">
-  🧪 VERSÃO DE TESTE v0.39.2 — o app oficial continua em jorgequei.github.io/apotheca/
+  🧪 VERSÃO DE TESTE v0.40 — o app oficial continua em apotheca.app.br
 </div>
 <div style="height:26px"></div>
 <div class="app">
@@ -507,6 +511,9 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   <div class="mi" onclick="fecharMenu();abrirPerfil(perfil?perfil.user:null)">👤 Meu perfil</div>
   <div class="mi" onclick="fecharMenu();go('historico')">📜 Histórico</div>
   <div class="mi" onclick="fecharMenu();openAdegasManager()">✏️ Gerenciar adegas</div>
+  <div class="mi" id="mi-privacidade" onclick="fecharMenu();abrirPrivacidadeAdega()">🔒 Quem vê minha adega</div>
+  <div class="mi" id="mi-avisos" onclick="fecharMenu();abrirConfigAvisos()">🔔 Avisos no celular</div>
+  <div class="mi" id="mi-som" onclick="alternarSom()">🔊 Bip dos avisos</div>
   <div class="mi" onclick="fecharMenu();abrirConfigIA()">🔑 IA de visão (scanner)</div>
   <div class="mi" onclick="fecharMenu();carregarDemo()">🎬 Carregar demonstração</div>
   <div class="mi" onclick="fecharMenu();abrirFeedback()">💬 Enviar feedback</div>
@@ -561,8 +568,8 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.39.2"; /* fonte única da versão — Sobre e rodapé leem daqui */
-const SITE_URL = "https://jorgequei.github.io/apotheca/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
+const APP_VERSION = "0.40"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
 const ANO = 2026;
@@ -880,8 +887,13 @@ async function aposLoginGoogle(){
   try{
     const r=await sb("/usuarios?auth_id=eq."+sessao.uid+"&select=usuario,nome,cidade");
     if(r&&r.length){
+      const guardado=(()=>{try{return JSON.parse(localStorage.getItem(STORE_KEY))||{}}catch(e){return {}}})();
+      /* a adega deste aparelho é minha mesmo? se for de outra pessoa — ou a de
+         demonstração que vem no app — começo com a adega vazia, que é a verdade. */
+      if(adegaDemo||(guardado.dono&&guardado.dono!==r[0].usuario))limparAdegaLocal();
       perfil={user:r[0].usuario,cidade:r[0].cidade,provedor:"Google"};
       persist();aplicarPerfilUI();
+      renderDash();renderColecao();renderHist();refreshAdegaSelect&&refreshAdegaSelect();
       $("#login-screen").classList.remove("open");go("dashboard");
       toast("🍷 Bem-vindo de volta, @"+r[0].usuario+"! Conta Google verificada.");
       return;
@@ -1002,6 +1014,18 @@ async function sincronizarComunidade(){
       const ps=await sb("/confraria_posts?select=*&order=id.desc&limit=300");
       MURAL=ps.map(p=>({id:p.id,cf:p.confraria_id,user:p.usuario,txt:p.texto,ts:new Date(p.criado).getTime()}));
     }catch(e){}
+    /* Estatísticas da adega: cada um publica só os SEUS números agregados.
+       O valor estimado e a lista de rótulos nunca saem do aparelho. */
+    try{
+      const ps=await sb("/perfil_stats?select=*");
+      STATS={};ps.forEach(p=>{STATS[p.usuario]={garrafas:p.garrafas,rotulos:p.rotulos,
+        paises:p.paises,abertas:p.abertas,selos:(p.selos||"").split("|").filter(Boolean),
+        visibilidade:p.visibilidade}});
+      if(sessao&&sessao.uid&&perfil){
+        try{privacidadeAdega=await rpc("minha_privacidade_adega",{})||"amigos"}catch(e){}
+        await publicarMinhasStats();
+      }
+    }catch(e){}
     /* brindes com autoria e comentários — a interação da comunidade */
     try{
       const bs=await sb("/feed_brindes?select=*");
@@ -1017,6 +1041,7 @@ async function sincronizarComunidade(){
     persist();
     aplicarPerfilUI();
     atualizarSinoNotif();
+    avisarNovidades();
     if(typeof renderFeed==="function")renderFeed();
     if(!$("#view-comunidade").classList.contains("hidden"))renderComunidade();
     if(!$("#view-encontros").classList.contains("hidden"))renderEncontros();
@@ -1067,6 +1092,8 @@ let seguindo=[
 let REDE=[];        /* grafo global {de,para,ts} — quem segue quem */
 let BRINDES=[];     /* {fid,user,ts} — brindes com autoria */
 let COMENTARIOS=[]; /* {id,fid,user,txt,ts} — conversa nas garrafas */
+let STATS={};        /* números REAIS da adega de cada um, publicados pelo próprio dono */
+let privacidadeAdega="amigos"; /* 'publica' | 'amigos' | 'privada' */
 const meSegue=u=>perfil&&REDE.some(s=>s.de===u&&s.para===perfil.user);
 const sigoEle=u=>seguindo.some(a=>a.user===u);
 const ehAmigoProximo=u=>sigoEle(u)&&meSegue(u);
@@ -1425,7 +1452,7 @@ async function sairConfraria(id){
   if(nuvemOK&&perfil){
     try{
       const r=await sb("/confraria_membros?confraria_id=eq."+encodeURIComponent(id)+"&usuario=eq."+encodeURIComponent(perfil.user),{method:"DELETE"});
-      if(!r||!r.length){toast("🔐 Para sair de vez, entre pelo site (jorgequei.github.io/apotheca) com o login Google — é ele que prova que a conta é sua.");return}
+      if(!r||!r.length){toast("🔐 Para sair de vez, entre pelo site (apotheca.app.br) com o login Google — é ele que prova que a conta é sua.");return}
     }catch(e){toast("Sem conexão com a nuvem agora — tente de novo com internet. 📡");return}
   }
   minhasConfrarias=minhasConfrarias.filter(x=>x.id!==id);
@@ -1592,6 +1619,14 @@ function createEvento(){
 
 /* Sementes de demonstração congeladas — usuário novo começa vazio; demo só sob demanda */
 const DEMO_SEED=JSON.parse(JSON.stringify({vinhos,historico,eventos,seguindo,ADEGAS}));
+/* A adega que vem no código é vitrine, não pertence a ninguém. Enquanto esta marca
+   estiver ligada, esses vinhos NÃO contam como coleção real nem viram estatística. */
+let adegaDemo=true;
+function assumirAdegaReal(){ if(adegaDemo){adegaDemo=false;persist()} }
+function limparAdegaLocal(){
+  vinhos=[];historico=[];eventos=[];adegaDemo=false;
+  try{adegaAtiva="todas"}catch(e){}
+}
 /* ================== PERSISTÊNCIA LOCAL ==================
    Salva a adega no armazenamento do navegador do aparelho (quando disponível).
    Se o navegador não permitir (ex.: visualização dentro de outros apps),
@@ -1600,7 +1635,7 @@ const STORE_KEY="apotheca_dados_v1";
 let PERSISTE=false;
 function persist(){
   try{
-    localStorage.setItem(STORE_KEY,JSON.stringify({vinhos,ADEGAS,historico,eventos,seguindo,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,MURAL,meusBrindes,NEXT_ID,NEXT_EV}));
+    localStorage.setItem(STORE_KEY,JSON.stringify({dono:perfil?perfil.user:null,adegaDemo,vinhos,ADEGAS,historico,eventos,seguindo,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,MURAL,meusBrindes,NEXT_ID,NEXT_EV}));
     PERSISTE=true;
   }catch(e){PERSISTE=false}
 }
@@ -1608,7 +1643,10 @@ function persist(){
   try{
     const s=JSON.parse(localStorage.getItem(STORE_KEY));
     if(s&&Array.isArray(s.vinhos)){
-      vinhos=s.vinhos;ADEGAS=s.ADEGAS||ADEGAS;historico=s.historico||historico;
+      /* a adega guardada só volta se for do mesmo dono — em aparelho compartilhado
+         ninguém abre a coleção do outro por engano */
+      vinhos=s.vinhos;adegaDemo=(s.adegaDemo!==undefined?s.adegaDemo:false);
+      ADEGAS=s.ADEGAS||ADEGAS;historico=s.historico||historico;
       eventos=s.eventos||eventos;seguindo=s.seguindo||s.amigos||seguindo;perfil=s.perfil||null;if(Array.isArray(s.USUARIOS_APP)&&s.USUARIOS_APP.length)USUARIOS_APP=s.USUARIOS_APP;if(Array.isArray(s.feed)&&s.feed.length)feed=s.feed;NEXT_FEED=s.NEXT_FEED||NEXT_FEED;minhasConfrarias=s.minhasConfrarias||[];
       /* migração v0.38: expurga as confrarias-demo antigas do cache e normaliza o tipo */
       if(Array.isArray(s.CONFRARIAS)&&s.CONFRARIAS.length)CONFRARIAS=s.CONFRARIAS.filter(c=>!DEMO_CONFRARIAS.includes(c.id)).map(c=>({...c,tipo:c.tipo||(c.aberta?"aberta":"moderada"),brasao:c.brasao||"🏛️",moderadores:c.moderadores||[],pendentes:c.pendentes||[],quemConvida:c.quemConvida||"diretoria"}));
@@ -1643,6 +1681,17 @@ function status(v){
 function renderMenu(){
   const mf=$("#mi-fundador");
   if(mf)mf.classList.toggle("hidden",!((perfil&&perfil.user==="Jorge.Queiroz")||(sessao&&sessao.email==="wp7jorge@gmail.com")));
+  const mp=$("#mi-privacidade");
+  if(mp)mp.innerHTML="🔒 Quem vê minha adega"+(privacidadeAdega==="publica"?'<span class="cont">todos</span>'
+    :privacidadeAdega==="privada"?'<span class="cont">ninguém</span>':'<span class="cont">amigos</span>');
+  const ma=$("#mi-avisos");
+  if(ma){
+    const p=(window.Apk&&Apk.notificar)?"granted":permissaoNotif();
+    ma.innerHTML="🔔 Avisos no celular"+(p==="granted"?'<span class="cont">ligados ✓</span>'
+      :p==="denied"?'<span class="cont">bloqueados</span>':'<span class="cont">ativar</span>');
+  }
+  const ms=$("#mi-som");
+  if(ms)ms.innerHTML="🔊 Bip dos avisos"+(localStorage.getItem("apotheca_som")==="0"?'<span class="cont">desligado</span>':'<span class="cont">ligado ✓</span>');
   const tot=id=>vinhos.filter(v=>id==="todas"||v.adega===id).reduce((s,v)=>s+v.qtd,0);
   $("#menu-adegas").innerHTML=
     `<div class="mtit">MINHAS ADEGAS</div>`+
@@ -1795,7 +1844,7 @@ async function abrirFeedbacksFundador(){
     <h3 class="serif">📥 Feedbacks recebidos</h3>
     <div class="sub">Leitura protegida por login Google</div>
     <div style="font-size:13.5px;line-height:1.65">
-      <p style="margin-bottom:10px">Para ler os feedbacks aqui dentro, entre pelo <b>site</b> (jorgequei.github.io/apotheca) com o botão <b>Entrar com Google</b> usando a conta do fundador — o banco só entrega as mensagens ao seu e-mail verificado.</p>
+      <p style="margin-bottom:10px">Para ler os feedbacks aqui dentro, entre pelo <b>site</b> (apotheca.app.br) com o botão <b>Entrar com Google</b> usando a conta do fundador — o banco só entrega as mensagens ao seu e-mail verificado.</p>
       <p style="margin-bottom:10px"><b>Alternativa no computador:</b> supabase.com/dashboard → projeto Apotheca → <b>Table Editor</b> → tabela <b>feedback</b>.</p>
       <p style="color:var(--ink-2)">Neste APK de teste (sem login Google), a leitura dentro do app fica indisponível de propósito — é a trava que impede estranhos de lerem as mensagens.</p>
     </div>`;
@@ -1803,7 +1852,7 @@ async function abrirFeedbacksFundador(){
 }
 function carregarDemo(){
   const d=JSON.parse(JSON.stringify(DEMO_SEED));
-  vinhos=d.vinhos;historico=d.historico;eventos=d.eventos;seguindo=d.seguindo;ADEGAS=d.ADEGAS;
+  vinhos=d.vinhos;historico=d.historico;eventos=d.eventos;seguindo=d.seguindo;ADEGAS=d.ADEGAS;adegaDemo=true;
   adegaAtiva="todas";
   persist();refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();renderHist();
   toast("🎬 Adega de demonstração carregada — 153 garrafas para explorar!");
@@ -1876,7 +1925,7 @@ async function confirmarNome(){
   perfil={user:u,cidade,provedor:provPendente||"Google"};
   USUARIOS_APP.push({user:u,nome:u.split(/[._-]/)[0].replace(/^./,c=>c.toUpperCase()),cidade});
   /* conta nova nasce com a adega ZERADA — a demonstração fica no menu, sob demanda */
-  vinhos=[];historico=[];eventos=[];seguindo=[];
+  vinhos=[];historico=[];eventos=[];seguindo=[];adegaDemo=false;
   ADEGAS=[{id:"casa",nome:"Casa Principal",icone:"🏠"}];
   adegaAtiva="todas";
   persist();refreshAdegaSelect();renderAdegaBar();renderColecao();renderHist();
@@ -2235,6 +2284,7 @@ function saveWine(){
     go("colecao");
     return;
   }
+  assumirAdegaReal(); /* a partir do primeiro vinho cadastrado, a adega é de verdade */
   vinhos.push({foto:lastFotoRotulo||undefined,ean:lastEan||undefined,adega:adegaSel,id:NEXT_ID++,nome,vinicola:$("#a-vinicola").value||"—",pais:$("#a-pais").value,regiao:$("#a-regiao").value||"—",
     safra:+$("#a-safra").value||0,tipo:$("#a-tipo").value,uvas:($("#a-uvas").value||"").split(",").map(s=>s.trim()).filter(Boolean),
     corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,doc:1,
@@ -2836,6 +2886,61 @@ function renderRede(){
       ||'<div class="empty"><div class="big">🔍</div>Nenhum apreciador novo com esse filtro.</div>';
   }
 }
+/* ---------- Estatísticas da adega (números reais, com privacidade) ---------- */
+async function publicarMinhasStats(){
+  if(!perfil||!sessao||!sessao.uid)return;
+  if(adegaDemo)return; /* vitrine não vira número de ninguém */
+  if(privacidadeAdega==="privada"){ /* mesmo assim publica: a trava é na leitura, feita pelo servidor */ }
+  const garrafas=vinhos.reduce((s,v)=>s+v.qtd,0);
+  const selos=calcularBadges().filter(b=>b.ok).map(b=>b.em+" "+b.nome).join("|");
+  const dados={p_garrafas:garrafas,p_rotulos:vinhos.length,
+    p_paises:new Set(vinhos.map(v=>v.pais)).size,p_abertas:historico.length,p_selos:selos};
+  const igual=STATS[perfil.user]&&STATS[perfil.user].garrafas===garrafas
+    &&STATS[perfil.user].rotulos===vinhos.length&&STATS[perfil.user].abertas===historico.length;
+  if(igual)return; /* nada mudou: não incomoda a nuvem */
+  try{
+    await rpc("publicar_stats",dados);
+    STATS[perfil.user]={garrafas,rotulos:vinhos.length,paises:dados.p_paises,
+      abertas:historico.length,selos:selos.split("|").filter(Boolean),visibilidade:privacidadeAdega};
+  }catch(e){}
+}
+async function abrirPrivacidadeAdega(){
+  let atual=privacidadeAdega;
+  try{atual=await rpc("minha_privacidade_adega",{})||"amigos";privacidadeAdega=atual}catch(e){}
+  const op=(v,em,tit,txt)=>`<div class="mi" style="border:1px solid ${v===atual?"var(--wine)":"var(--line)"};
+      border-radius:12px;margin-bottom:8px;align-items:flex-start" onclick="salvarPrivacidadeAdega('${v}')">
+      <span style="font-size:20px">${em}</span>
+      <div class="inf"><b>${tit} ${v===atual?"✓":""}</b><small style="display:block;color:var(--ink-2);font-size:12px">${txt}</small></div></div>`;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🔒 Privacidade da minha adega</h3>
+    <div class="sub">Quem pode ver quantas garrafas você tem.</div>
+    <div style="margin:12px 0">
+      ${op("publica","🌐","Qualquer apreciador","Todo usuário do Apotheca vê seus números.")}
+      ${op("amigos","🤝","Só amigos próximos","Apenas quem você segue e que também segue você. É o padrão.")}
+      ${op("privada","🔒","Ninguém","Seu perfil aparece como adega reservada para todos.")}
+    </div>
+    <div class="explain-box">
+      Em nenhuma dessas opções o Apotheca mostra o <b>valor estimado</b> da sua coleção nem a
+      <b>lista dos seus rótulos</b> — esses dois nunca saem do seu aparelho. O que pode circular
+      são só os totais: garrafas, rótulos, países, garrafas abertas e suas conquistas.
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+async function salvarPrivacidadeAdega(nivel){
+  try{
+    const r=await rpc("definir_privacidade_adega",{nivel});
+    if(r&&r.ok){
+      privacidadeAdega=nivel;
+      if(STATS[perfil.user])STATS[perfil.user].visibilidade=nivel;
+      closeModal("modal-detail");
+      toast(nivel==="publica"?"🌐 Sua adega agora é visível para todos."
+        :nivel==="amigos"?"🤝 Sua adega agora é visível só para amigos próximos."
+        :"🔒 Sua adega ficou reservada — ninguém vê seus números.");
+      await publicarMinhasStats();
+    }else toast("Entre com o Google para alterar a privacidade. 🔐");
+  }catch(e){toast("Sem conexão para salvar agora. 📡")}
+}
 /* ---------- Notificações ---------- */
 function notificacoes(){
   if(!perfil)return [];
@@ -2868,9 +2973,153 @@ function renderNotificacoes(){
 }
 function atualizarSinoNotif(){
   const novas=notificacoes().filter(x=>x.ts>ultimaVista()).length;
+  const marca=novas?`<span class="badge-n">${novas>9?"9+":novas}</span>`:"";
   const b=$("#notif-badge"),s=$("#sino-badge");
-  if(b)b.innerHTML=novas?`<span class="badge-n">${novas>9?"9+":novas}</span>`:"";
-  if(s)s.innerHTML=novas?`<span class="badge-n">${novas>9?"9+":novas}</span>`:"";
+  if(b)b.innerHTML=marca;
+  if(s)s.innerHTML=marca;
+  /* o contador acompanha o botão Comunidade — assim aparece em qualquer tela,
+     tanto na barra lateral do computador quanto na barra de baixo do celular */
+  document.querySelectorAll('[data-view="comunidade"]').forEach(bt=>{
+    let p=bt.querySelector(".nav-badge");
+    if(!novas){if(p)p.remove();return}
+    if(!p){p=document.createElement("span");p.className="nav-badge";bt.appendChild(p)}
+    p.innerHTML=marca;
+  });
+}
+
+/* ===================== AVISOS NO CELULAR (v0.40) =====================
+   Três camadas: o número no sino (dentro do app), um bip discreto e a
+   notificação do próprio sistema — Android pela ponte do APK, iPhone e
+   navegadores pela API de notificações do próprio celular. */
+const NOTIF_AVISADO="apotheca_notif_avisado";
+const ultimoAvisado=()=>{try{return +localStorage.getItem(NOTIF_AVISADO)||0}catch(e){return 0}};
+const marcarAvisado=t=>{try{localStorage.setItem(NOTIF_AVISADO,String(t))}catch(e){}};
+
+/* Bip curto em duas notas, gerado na hora — não depende de arquivo de som */
+function bipAviso(){
+  if(localStorage.getItem("apotheca_som")==="0")return;
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;
+    const ctx=new Ctx();
+    if(ctx.state==="suspended")ctx.resume();
+    [[880,0],[1320,.12]].forEach(([hz,atraso])=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type="sine";o.frequency.value=hz;
+      const t0=ctx.currentTime+atraso;
+      g.gain.setValueAtTime(0,t0);
+      g.gain.linearRampToValueAtTime(.14,t0+.02);
+      g.gain.exponentialRampToValueAtTime(.0001,t0+.22);
+      o.connect(g);g.connect(ctx.destination);
+      o.start(t0);o.stop(t0+.25);
+    });
+    setTimeout(()=>{try{ctx.close()}catch(e){}},700);
+  }catch(e){}
+}
+
+function permissaoNotif(){
+  return (typeof Notification!=="undefined")?Notification.permission:"indisponivel";
+}
+async function pedirPermissaoNotif(silencioso){
+  /* Android empacotado: quem manda o aviso é o próprio aplicativo */
+  if(window.Apk&&Apk.notificar)return true;
+  if(typeof Notification==="undefined"){
+    if(!silencioso)toast("Este navegador não suporta avisos do sistema. 🔕");
+    return false;
+  }
+  if(Notification.permission==="granted")return true;
+  if(Notification.permission==="denied"){
+    if(!silencioso)toast("Os avisos estão bloqueados nas configurações do navegador. 🔕");
+    return false;
+  }
+  try{
+    const p=await Notification.requestPermission();
+    if(p==="granted"&&!silencioso)toast("🔔 Avisos ligados — você será chamado quando comentarem.");
+    return p==="granted";
+  }catch(e){return false}
+}
+/* Mostra o aviso no sistema do celular */
+async function avisoDoSistema(titulo,corpo){
+  try{
+    if(window.Apk&&Apk.notificar){Apk.notificar(titulo,corpo);return true}
+    if(typeof Notification==="undefined"||Notification.permission!=="granted")return false;
+    const opc={body:corpo,icon:"icon-192.png",badge:"icon-192.png",tag:"apotheca",renotify:true};
+    /* No iPhone instalado na tela de início o aviso precisa sair pelo service worker.
+       A espera tem prazo: se o registro falhar, "ready" nunca responde e o aviso
+       ficaria preso para sempre — por isso o caminho direto entra como reserva. */
+    if(navigator.serviceWorker){
+      const reg=await Promise.race([
+        navigator.serviceWorker.ready.catch(()=>null),
+        new Promise(r=>setTimeout(()=>r(null),1500))
+      ]);
+      if(reg&&reg.showNotification){
+        try{ await reg.showNotification(titulo,opc); return true }catch(e){}
+      }
+    }
+    new Notification(titulo,opc);
+    return true;
+  }catch(e){return false}
+}
+/* Chamada a cada sincronização: só avisa do que é realmente novo */
+async function avisarNovidades(){
+  if(!perfil)return;
+  const corte=Math.max(ultimoAvisado(),ultimaVista());
+  const novas=notificacoes().filter(x=>x.ts>corte&&x.ts<=Date.now());
+  if(!novas.length)return;
+  marcarAvisado(Math.max(...novas.map(x=>x.ts)));
+  bipAviso();
+  const limpa=t=>String(t).replace(/<[^>]*>/g,"").replace(/&nbsp;/g," ").trim();
+  const titulo=novas.length===1?"🍷 Apotheca":`🍷 Apotheca — ${novas.length} novidades`;
+  const corpo=novas.length===1?limpa(novas[0].txt):novas.slice(0,3).map(x=>"• "+limpa(x.txt)).join("\n");
+  avisoDoSistema(titulo,corpo);
+}
+function abrirConfigAvisos(){
+  const noApk=!!(window.Apk&&Apk.notificar);
+  const p=noApk?"granted":permissaoNotif();
+  const iOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  const instalado=window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🔔 Avisos no celular</h3>
+    <div class="sub">Para você saber na hora quando comentarem sua garrafa, brindarem ou começarem a te seguir.</div>
+    <div class="explain-box" style="margin:12px 0">
+      Situação agora: <b>${p==="granted"?"ligados ✅":p==="denied"?"bloqueados pelo aparelho ⛔":"ainda não ativados"}</b>
+      ${noApk?" · aplicativo Android":iOS?" · iPhone":""}
+    </div>
+    ${p!=="granted"?`<button class="btn btn-primary" style="width:100%;margin-bottom:10px" onclick="ativarAvisos()">Ativar avisos agora</button>`:
+      `<button class="btn btn-gold" style="width:100%;margin-bottom:10px" onclick="testarAviso()">🔔 Testar o aviso</button>`}
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:12px" onclick="alternarSom();closeModal('modal-detail')">
+      ${localStorage.getItem("apotheca_som")==="0"?"🔊 Ligar o bip":"🔕 Desligar o bip"}
+    </button>
+    ${iOS&&!instalado?`<div class="explain-box" style="border-left-color:var(--gold)">
+      <b>📱 No iPhone, um passo a mais:</b> a Apple só permite avisos quando o Apotheca está instalado na tela de início.
+      Toque no botão <b>Compartilhar</b> (o quadradinho com a seta para cima), escolha
+      <b>“Adicionar à Tela de Início”</b> e abra o app por esse ícone. Depois volte aqui e ative os avisos.
+    </div>`:""}
+    ${p==="denied"?`<div class="explain-box">Os avisos foram bloqueados. Para liberar: Ajustes do aparelho → Notificações →
+      procure ${iOS?"Apotheca":"o navegador"} → permitir. Depois volte aqui.</div>`:""}
+    <div style="font-size:12px;color:var(--ink-2);margin-top:10px">
+      O aviso chega enquanto o Apotheca está aberto ou em segundo plano. Com o aplicativo totalmente fechado,
+      a mensagem aparece assim que você o abrir de novo.
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+async function ativarAvisos(){
+  const ok=await pedirPermissaoNotif();
+  closeModal("modal-detail");
+  if(ok){bipAviso();avisoDoSistema("🍷 Apotheca","Pronto! É assim que os avisos vão chegar para você.")}
+}
+function testarAviso(){
+  bipAviso();
+  avisoDoSistema("🍷 Apotheca","Teste de aviso — Sergio comentou na sua garrafa.");
+  closeModal("modal-detail");
+  toast("Enviei um aviso de teste. 🔔");
+}
+function alternarSom(){
+  const desligado=localStorage.getItem("apotheca_som")==="0";
+  localStorage.setItem("apotheca_som",desligado?"1":"0");
+  toast(desligado?"🔊 Bip dos avisos ligado.":"🔕 Bip dos avisos desligado.");
+  if(desligado)bipAviso();
+  renderMenu&&renderMenu();
 }
 function irNotificacoes(){go("comunidade");abaComunidade("notif")}
 /* Conquistas: as SUAS são calculadas dos seus dados reais */
@@ -2900,11 +3149,16 @@ function abrirPerfil(user){
     stats=[["Garrafas",tot],["Rótulos",vinhos.length],["Países",new Set(vinhos.map(v=>v.pais)).size],["Abertas",historico.length]];
     badges=calcularBadges();
   }else{
-    let h=0;for(const c of user)h=(h*31+c.charCodeAt(0))>>>0;
-    stats=[["Garrafas",50+h%400],["Rótulos",15+h%80],["Países",3+h%9],["Abertas",5+h%40]];
-    const all=[["🍾","Primeira Garrafa"],["🌍","Cidadão do Mundo"],["⭐","Crítico"],["🥂","Anfitrião"],["🏛️","Colecionador"],["📸","Scanner Pro"]];
-    badges=all.filter((_,i)=>(h>>i)&1).map(([em,nome])=>({em,nome,desc:"",ok:true}));
-    if(!badges.length)badges=[{em:"🍾",nome:"Primeira Garrafa",desc:"",ok:true}];
+    /* Números REAIS, publicados pela própria pessoa. Se ela não autorizou,
+       o servidor simplesmente não entrega a linha e mostramos adega reservada.
+       (Até a v0.39 estes valores eram inventados a partir do nome — nunca mais.) */
+    const st=STATS[user];
+    if(st){
+      stats=[["Garrafas",st.garrafas],["Rótulos",st.rotulos],["Países",st.paises],["Abertas",st.abertas]];
+      badges=(st.selos||[]).map(t=>{const i=t.indexOf(" ");return {em:t.slice(0,i),nome:t.slice(i+1),desc:"",ok:true}});
+    }else{
+      stats=null;badges=[];
+    }
   }
   const jaSigo=!sou&&sigoEle(user);
   const segMe=meSegue(user);
@@ -2920,14 +3174,15 @@ function abrirPerfil(user){
       <div style="font-size:12px;color:var(--ink-2);margin-top:2px"><b>${nSeguidores}</b> ${nSeguidores===1?"seguidor":"seguidores"} · segue <b>${nSeguindoEle}</b>${!sou&&segMe?" · segue você":""}</div></div>
     </div>
     ${confrariasDele.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${confrariasDele.map(c=>`<span class="adega-chip" style="cursor:pointer" onclick="closeModal('modal-detail');abrirConfraria('${escJS(c.id)}')">${c.brasao||"🏛️"} ${esc(c.nome)}</span>`).join("")}</div>`:""}
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+    ${stats?`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
       ${stats.map(([l,v])=>`<div style="background:var(--cream);border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:19px;font-weight:800">${v}</div><div style="font-size:10.5px;color:var(--ink-2)">${l}</div></div>`).join("")}
-    </div>
-    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin-bottom:8px">CONQUISTAS</div>
+    </div>`:`<div class="explain-box" style="margin-bottom:14px">🔒 <b>Adega reservada.</b> ${esc(u?u.nome:user)} escolheu não mostrar os números da coleção${!jaSigo||!segMe?" — adegas assim ficam visíveis só entre amigos próximos (quando vocês dois se seguem)":""}.</div>`}
+    ${badges.length?`<div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin-bottom:8px">CONQUISTAS</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-      ${(sou?badges:badges).map(b=>`<span class="adega-chip" style="cursor:default;${sou&&!b.ok?"opacity:.35":""}" title="${b.desc||b.nome}">${b.em} ${b.nome}</span>`).join("")}
-    </div>
-    ${sou?'<div class="explain-box">Selos apagados são metas a conquistar — cada um vira uma atividade no feed da comunidade quando desbloqueado.</div>':
+      ${badges.map(b=>`<span class="adega-chip" style="cursor:default;${sou&&!b.ok?"opacity:.35":""}" title="${esc(b.desc||b.nome)}">${b.em} ${esc(b.nome)}</span>`).join("")}
+    </div>`:""}
+    ${sou?`<div class="explain-box">Selos apagados são metas a conquistar — cada um vira uma atividade no feed da comunidade quando desbloqueado.</div>
+      <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="closeModal('modal-detail');abrirPrivacidadeAdega()">🔒 Quem pode ver minha adega</button>`:
       jaSigo?`<button class="btn btn-ghost" style="width:100%" onclick="closeModal('modal-detail');deixarDeSeguir(seguindo.findIndex(a=>a.user==='${user}'))">✓ Seguindo — deixar de seguir</button>`:
       `<button class="btn btn-gold" style="width:100%" onclick="closeModal('modal-detail');seguir('${escJS(user)}')">＋ Seguir${segMe?" de volta":""}</button>`}
   `;
@@ -2965,6 +3220,12 @@ initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();rende
   const convPend=localStorage.getItem("apo_convite");
   if(convPend&&perfil)usarConvite(convPend);
 })();
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+  navigator.serviceWorker.addEventListener("message",ev=>{
+    if(ev.data&&ev.data.ir==="comunidade"){go("comunidade");abaComunidade("notif")}
+  });
+}
 setInterval(sincronizarComunidade,60000);
 setInterval(garantirSessaoValida,10*60*1000);
 (function(){
