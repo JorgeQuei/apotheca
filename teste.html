@@ -274,7 +274,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 <body>
 <div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#b8860b;color:#fff;
   font:600 12px/1.5 -apple-system,sans-serif;text-align:center;padding:5px 10px;letter-spacing:.3px">
-  🧪 VERSÃO DE TESTE v0.39.1 — o app oficial continua em jorgequei.github.io/apotheca/
+  🧪 VERSÃO DE TESTE v0.39.2 — o app oficial continua em jorgequei.github.io/apotheca/
 </div>
 <div style="height:26px"></div>
 <div class="app">
@@ -561,7 +561,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.39.1"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.39.2"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://jorgequei.github.io/apotheca/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -886,15 +886,24 @@ async function aposLoginGoogle(){
       toast("🍷 Bem-vindo de volta, @"+r[0].usuario+"! Conta Google verificada.");
       return;
     }
-    /* 2) já existe perfil local (criado antes do login real)? vincula à conta Google */
+    /* 2) já existe perfil local (criado antes do login real)? vincula à conta Google.
+       Isso passa por uma função do servidor: a escrita direta é barrada pela
+       proteção que impede alguém de mexer no cadastro dos outros. */
     if(perfil){
-      try{
-        await sb("/usuarios?usuario=eq."+encodeURIComponent(perfil.user)+"&auth_id=is.null",{method:"PATCH",body:JSON.stringify({auth_id:sessao.uid})});
-        toast("🔗 Conta Google ("+sessao.email+") vinculada a @"+perfil.user+"!");
-      }catch(e){toast("Conta Google conectada — sincronizo o vínculo quando a nuvem responder.")}
-      persist();aplicarPerfilUI();
-      $("#login-screen").classList.remove("open");go("dashboard");
-      return;
+      const v=await vincularPerfil(perfil.user);
+      if(v&&v.ok){
+        perfil.user=v.usuario;
+        persist();aplicarPerfilUI();
+        $("#login-screen").classList.remove("open");go("dashboard");
+        toast("🔗 Conta Google ("+sessao.email+") vinculada a @"+v.usuario+"!");
+        sincronizarComunidade();
+        return;
+      }
+      if(v&&v.erro==="nome_ocupado"){
+        toast("O nome @"+perfil.user+" já pertence a outra conta Google — escolha outro. 🔑");
+      }else{
+        /* o nome local nunca chegou à nuvem: segue para o cadastro normal */
+      }
     }
   }catch(e){}
   /* 3) conta nova: falta só escolher o nome definitivo */
@@ -920,6 +929,26 @@ async function sb(caminho,opts){
 }
 /* rpc: chama as funções do servidor. Regras sensíveis (entrar em confraria,
    revelar convite, brindar) moram lá — o aparelho pede, o servidor decide. */
+/* ===== Vínculo entre a conta Google e o @usuário =====
+   Sem esse vínculo o servidor não sabe quem você é e recusa TODA escrita —
+   era a causa do "sua sessão expirou" em quem criou o nome antes de entrar
+   com o Google (caso típico de quem usou o APK e depois abriu no iPhone). */
+async function vincularPerfil(nomeUsuario){
+  if(!sessao||!sessao.uid)return {ok:false,erro:"sem_login"};
+  try{ return await rpc("vincular_perfil",{nome_usuario:nomeUsuario}); }
+  catch(e){ return {ok:false,erro:"offline"}; }
+}
+/* O servidor me reconhece? Se não, tenta consertar sozinho, sem incomodar o usuário. */
+async function garantirVinculo(){
+  if(!perfil||!sessao||!sessao.uid)return false;
+  try{
+    const quem=await rpc("meu_usuario",{});
+    if(quem){ if(quem!==perfil.user){perfil.user=quem;persist();aplicarPerfilUI()} return true }
+  }catch(e){ return false }
+  const v=await vincularPerfil(perfil.user);
+  if(v&&v.ok){perfil.user=v.usuario;persist();aplicarPerfilUI();return true}
+  return false;
+}
 async function rpc(nome,args){
   const r=await fetch(SB_URL+"/rpc/"+nome,{method:"POST",
     headers:{apikey:SB_KEY,Authorization:"Bearer "+tokenAtual(),"Content-Type":"application/json"},
@@ -984,6 +1013,7 @@ async function sincronizarComunidade(){
       COMENTARIOS=cs2.map(c=>({id:c.id,fid:c.feed_id,user:c.usuario,txt:c.texto,ts:new Date(c.criado).getTime()}));
     }catch(e){}
     nuvemOK=true;
+    if(sessao&&sessao.uid&&perfil)garantirVinculo().catch(()=>{});
     persist();
     aplicarPerfilUI();
     atualizarSinoNotif();
@@ -1416,9 +1446,13 @@ async function seguir(user){
   redesenharSocial();
   /* o erro 409 significa "já segue" — é sucesso, não falha.
      Antes qualquer erro virava "entre com o Google", o que confundia quem já estava logado. */
-  const r=await fetch(SB_URL+"/seguidores",{method:"POST",
+  const gravar=()=>fetch(SB_URL+"/seguidores",{method:"POST",
     headers:{apikey:SB_KEY,Authorization:"Bearer "+tokenAtual(),"Content-Type":"application/json"},
     body:JSON.stringify({seguidor:perfil.user,seguido:user})}).catch(()=>null);
+  let r=await gravar();
+  /* 401/403 aqui quase nunca e sessao vencida: e a conta Google sem vinculo
+     com o @usuario. Conserta e tenta de novo antes de incomodar a pessoa. */
+  if(r&&(r.status===401||r.status===403)&&await garantirVinculo())r=await gravar();
   if(r&&(r.ok||r.status===409)){
     persist();
     toast(meSegue(user)?`🤝 ${u?u.nome:user} também segue você — amigos próximos!`:`Você agora segue ${u?u.nome:user}. 🍷`);
@@ -1428,7 +1462,7 @@ async function seguir(user){
   REDE=REDE.filter(s=>!(s.de===perfil.user&&s.para===user));
   redesenharSocial();
   if(!r)toast("Sem conexão com a internet agora. 📡");
-  else if(r.status===401||r.status===403)toast("Sua sessão expirou — saia e entre de novo com o Google. 🔐");
+  else if(r.status===401||r.status===403)toast("Sua conta ainda não está verificada — toque em ☰ Sair e entre de novo com o Google. 🔐");
   else toast("Não consegui salvar agora (erro "+r.status+"). Tente de novo. 🍷");
 }
 async function deixarDeSeguirUser(user){
