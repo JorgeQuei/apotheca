@@ -335,6 +335,13 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
         <h3>⏳ Janela de consumo — atenção</h3>
         <div id="alerts"></div>
       </div>
+      <!-- Atalho da harmonização: no celular a barra de baixo só tem cinco lugares
+           e a lateral some, então este é o caminho principal para o módulo. Fica
+           logo abaixo da janela de consumo porque é ali que se decide o que abrir. -->
+      <div class="panel" style="margin-top:16px;cursor:pointer" onclick="go('harmonizar')">
+        <h3>🍽️ O que abrir hoje? <small>· harmonize um prato com as garrafas da SUA adega</small></h3>
+        <div id="harm-atalho" style="margin-top:8px"></div>
+      </div>
       <div class="panel" style="margin-top:16px">
         <h3>📜 Histórico de consumo <small>· suas últimas garrafas abertas</small></h3>
         <div id="dash-hist"></div>
@@ -532,7 +539,10 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 <div class="menu-bg" id="menu-bg" onclick="fecharMenu()"></div>
 <div class="menu-pop" id="menu-pop">
   <div id="menu-adegas"></div>
-  <div class="mi" onclick="fecharMenu();go('comunidade')">🌐 Comunidade</div>
+  <!-- Comunidade sai do menu de propósito: já tem lugar fixo na barra de baixo
+       (celular) e na barra lateral (computador). Harmonizar ocupa o lugar dela
+       porque não cabe em nenhuma das duas barras. -->
+  <div class="mi" onclick="fecharMenu();go('harmonizar')">🍽️ Harmonizar prato e vinho</div>
   <div class="mi" onclick="fecharMenu();abrirPerfil(perfil?perfil.user:null)">👤 Meu perfil</div>
   <div class="mi" id="mi-config" onclick="fecharMenu();abrirConfiguracoes()">⚙️ Configurações</div>
   <div class="mi" onclick="fecharMenu();go('historico')">📜 Histórico</div>
@@ -615,7 +625,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.46"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.47"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2651,6 +2661,11 @@ function renderDash(){
   const sobra=Math.max(0,urgentes.length-3)+Math.max(0,emGuarda.length-2);
   if(sobra)html+=`<div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="abrirTodasJanelas()">⏳ Ver todas as ${urgentes.length+emGuarda.length} garrafas →</button></div>`;
   $("#alerts").innerHTML=html||`<div class="empty">Tudo em ordem — nenhuma garrafa fora da janela ideal. 🥂</div>`;
+  /* prévia dos pratos no atalho da harmonização */
+  const ha=$("#harm-atalho");
+  if(ha)ha.innerHTML=(typeof PRATOS!=="undefined"?PRATOS:[]).slice(0,6).map(p=>
+    `<span style="display:inline-block;background:var(--cream);border-radius:99px;padding:5px 11px;margin:0 6px 6px 0;font-size:12.5px">${p.em} ${esc(p.nome)}</span>`).join("")
+    +`<div style="font-size:12px;color:var(--ink-2);margin-top:4px">e mais ${Math.max(0,(typeof PRATOS!=="undefined"?PRATOS.length:0)-6)} pratos — ou descreva o seu →</div>`;
   const dh=$("#dash-hist");
   if(typeof renderFeed==="function")renderFeed();
   if(dh)dh.innerHTML=histRowsHtml(3)+(historico.length>3?`<div style="text-align:center;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="abrirTodoHistorico()">📜 Ver as ${historico.length} garrafas abertas →</button></div>`:"");
