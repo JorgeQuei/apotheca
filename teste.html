@@ -534,14 +534,8 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   <div id="menu-adegas"></div>
   <div class="mi" onclick="fecharMenu();go('comunidade')">🌐 Comunidade</div>
   <div class="mi" onclick="fecharMenu();abrirPerfil(perfil?perfil.user:null)">👤 Meu perfil</div>
+  <div class="mi" id="mi-config" onclick="fecharMenu();abrirConfiguracoes()">⚙️ Configurações</div>
   <div class="mi" onclick="fecharMenu();go('historico')">📜 Histórico</div>
-  <div class="mi" onclick="fecharMenu();openAdegasManager()">✏️ Gerenciar adegas</div>
-  <div class="mi" id="mi-trava" onclick="fecharMenu();abrirConfigTrava()">🔐 Bloqueio do aplicativo</div>
-  <div class="mi" id="mi-privacidade" onclick="fecharMenu();abrirPrivacidadeAdega()">🔒 Quem vê minha adega</div>
-  <div class="mi" id="mi-avisos" onclick="fecharMenu();abrirConfigAvisos()">🔔 Avisos no celular</div>
-  <div class="mi" id="mi-som" onclick="alternarSom()">🔊 Bip dos avisos</div>
-  <div class="mi" onclick="fecharMenu();abrirConfigIA()">🔑 IA de visão (scanner)</div>
-  <div class="mi" onclick="fecharMenu();carregarDemo()">🎬 Carregar demonstração</div>
   <div class="mi" onclick="fecharMenu();abrirFeedback()">💬 Enviar feedback</div>
   <div class="mi hidden" id="mi-fundador" onclick="fecharMenu();abrirFeedbacksFundador()">📥 Feedbacks (fundador)</div>
   <div class="mi" onclick="fecharMenu();abrirAjuda()">❓ Ajuda e suporte</div>
@@ -621,7 +615,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.43"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.45"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1069,6 +1063,8 @@ async function sincronizarComunidade(){
     }catch(e){}
     /* v0.43: mensagens diretas — só chega o que é meu, o servidor filtra */
     try{await carregarConversas()}catch(e){}
+    /* v0.44: encontros de verdade — o servidor só devolve os meus */
+    try{await sincronizarEncontros()}catch(e){}
     /* Estatísticas da adega: cada um publica só os SEUS números agregados.
        O valor estimado e a lista de rótulos nunca saem do aparelho. */
     try{
@@ -1151,7 +1147,15 @@ let STATS={};        /* números REAIS da adega de cada um, publicados pelo pró
 let privacidadeAdega="amigos"; /* 'publica' | 'amigos' | 'privada' */
 const meSegue=u=>perfil&&REDE.some(s=>s.de===u&&s.para===perfil.user);
 const sigoEle=u=>seguindo.some(a=>a.user===u);
-const ehAmigoProximo=u=>sigoEle(u)&&meSegue(u);
+/* v0.44: 'seguindo' e REDE são duas fontes para o mesmo fato, e duas fontes
+   divergem cedo ou tarde. Para decidir quem é AMIGO PRÓXIMO — que libera a
+   conversa reservada e o convite de encontro — vale a rede sincronizada, que
+   é a mesma coisa que o servidor enxerga. Assim a tela nunca oferece um botão
+   que o banco vai recusar. Só quando a rede ainda não foi sincionizada
+   (protótipo sem login) é que 'seguindo' vale como prova do meu lado. */
+const sigoNaRede=u=>!!perfil&&REDE.some(s=>s.de===perfil.user&&s.para===u);
+const redeSincronizada=()=>!!perfil&&REDE.some(s=>s.de===perfil.user);
+const ehAmigoProximo=u=>meSegue(u)&&(redeSincronizada()?sigoNaRede(u):sigoEle(u));
 const meusSeguidores=()=>perfil?REDE.filter(s=>s.para===perfil.user).map(s=>s.de):[];
 const contaSeguidores=u=>REDE.filter(s=>s.para===u).length;
 const contaSeguindo=u=>REDE.filter(s=>s.de===u).length;
@@ -1161,7 +1165,8 @@ const FASES=[["Espumante","🥂 Recepção"],["Branco","🐟 Entradas e pratos l
 function ordemServico(ev){
   const todas=[];
   ev.amigos.forEach(a=>a.garrafas.forEach(g=>todas.push({...g,quem:a.nome})));
-  ev.minhas.forEach(id=>{const v=vinhos.find(x=>x.id===id);if(v)todas.push({nome:`${v.nome} ${safraTxt(v)}`,tipo:v.tipo,corpo:v.corpo,tanino:v.tanino,origem:v.regiao+", "+v.pais,quem:"Você"})});
+  (ev.minhas||[]).forEach(id=>{const v=vinhos.find(x=>x.id===id);if(v)todas.push({nome:`${v.nome} ${safraTxt(v)}`,tipo:v.tipo,corpo:v.corpo,tanino:v.tanino,origem:v.regiao+", "+v.pais,quem:"Você"})});
+  (ev.minhasN||[]).forEach(g=>todas.push({...g,quem:"Você"}));
   const fase=t=>FASES.findIndex(f=>f[0]===t);
   return todas.sort((a,b)=>fase(a.tipo)-fase(b.tipo)||(a.corpo+(a.tanino||0))-(b.corpo+(b.tanino||0)));
 }
@@ -1597,40 +1602,71 @@ function cartaoEncontro(ev){
   const ordem=ordemServico(ev);
   const conversa=(ev.chat||[]).length;
   return `<div class="pessoa" style="cursor:pointer" onclick="abrirEncontro(${ev.id})">
-    <span style="font-size:22px;flex:none">${ehPassado(ev)?"📜":"🥂"}</span>
+    <span style="font-size:22px;flex:none">${ev.cancelado?"❌":ehPassado(ev)?"📜":"🥂"}</span>
+    ${ehNuvem(ev)&&ev.status==="convidado"&&!ev.cancelado?'<span class="tag" style="flex:none;padding:1px 7px;font-size:10px">✉️ convite</span>':""}
     <div class="inf">
-      <b>${esc(ev.nome)}</b>
-      <small>📅 ${esc(ev.data)} · 📍 ${esc(ev.local)} · ${ev.amigos.length+1} participantes · ${ordem.length} garrafa${ordem.length===1?"":"s"}${conversa?" · 💬 "+conversa:""}</small>
+      <b>${esc(ev.nome)}${ev.cancelado?' <span class="tag" style="padding:1px 7px;font-size:10px">cancelado</span>':""}</b>
+      <small>📅 ${esc(ev.data)} · 📍 ${esc(ev.local)} · ${ev.amigos.length+1} participantes · ${ordem.length} garrafa${ordem.length===1?"":"s"}${conversa?" · 💬 "+conversa:""}${ehNuvem(ev)?"":" · 📱 só neste aparelho"}</small>
     </div>
     <span style="flex:none;color:var(--wine);font-weight:700;font-size:13px">abrir →</span>
   </div>`;
 }
 function renderEncontros(){
   renderConfraria();
-  const prox=eventos.filter(e=>!ehPassado(e));
-  const pass=eventos.filter(e=>ehPassado(e));
+  /* v0.44: puxa novidades do servidor sem travar a tela */
+  if(naNuvem()&&!renderEncontros.__ocupado){
+    renderEncontros.__ocupado=true;
+    setTimeout(()=>{sincronizarEncontros().finally(()=>{renderEncontros.__ocupado=false})},50);
+  }
+  /* cancelado deixa de ser "próximo": some da lista de cima, mas continua
+     visível embaixo, marcado — para ninguém aparecer no restaurante sem saber */
+  const prox=eventos.filter(e=>!ehPassado(e)&&!e.cancelado);
+  const pass=eventos.filter(e=>ehPassado(e)||e.cancelado);
+  const faxina=(quais,n)=>n>1?`<div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="abrirLimpezaEncontros('${quais}')">🗑️ Apagar vários</button></div>`:"";
   const elP=$("#eventos-proximos");
-  if(elP)elP.innerHTML=prox.map(cartaoEncontro).join("")||
-    '<div style="font-size:13px;color:var(--ink-2);padding:8px">Nenhum encontro marcado ainda — crie o primeiro acima. 🥂</div>';
+  if(elP)elP.innerHTML=(prox.map(cartaoEncontro).join("")||
+    '<div style="font-size:13px;color:var(--ink-2);padding:8px">Nenhum encontro marcado ainda — crie o primeiro acima. 🥂</div>')+faxina("proximos",prox.length);
   const elQ=$("#eventos-passados");
-  if(elQ)elQ.innerHTML=pass.map(cartaoEncontro).join("")||
-    '<div style="font-size:13px;color:var(--ink-2);padding:8px">Ainda não há encontros passados. Quando a data de um deles passar, ele vem para cá.</div>';
+  if(elQ)elQ.innerHTML=(pass.map(cartaoEncontro).join("")||
+    '<div style="font-size:13px;color:var(--ink-2);padding:8px">Ainda não há encontros passados. Quando a data de um deles passar, ele vem para cá.</div>')+faxina("passados",pass.length);
   if(encontroAberto!=null&&$("#modal-detail").classList.contains("open"))abrirEncontro(encontroAberto,true);
 }
 function abrirEncontro(id,semAbrir){
   const ev=eventos.find(e=>e.id===id);if(!ev)return;
   encontroAberto=id;
+  /* v0.44: encontro da nuvem busca conversa e garrafas de verdade */
+  if(ehNuvem(ev)&&naNuvem()&&!semAbrir)
+    carregarEncontro(ev).then(ok=>{if(ok&&encontroAberto===id)abrirEncontro(id,true)});
   const ordem=ordemServico(ev);
   const passado=ehPassado(ev);
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail');encontroAberto=null">✕</button>
     <h3 class="serif">${passado?"📜":"🥂"} ${esc(ev.nome)}</h3>
     <div class="sub">📅 ${esc(ev.data)} · 📍 ${esc(ev.local)} · ${ev.amigos.length+1} participantes · ${ordem.length} garrafa${ordem.length===1?"":"s"}</div>
+    ${ehNuvem(ev)?"":`<div class="explain-box" style="margin-top:10px;border-left-color:var(--gold)">
+        📱 Este encontro existe <b>só neste aparelho</b> — ninguém foi avisado.
+        ${naNuvem()?`<button class="btn btn-gold btn-sm" style="margin-top:8px" onclick="publicarEncontro(${ev.id})">📤 Publicar e convidar de verdade</button>`
+                   :"Entre com o Google para convidar de verdade."}
+      </div>`}
+    ${ehNuvem(ev)&&ev.status==="convidado"?`<div class="explain-box" style="margin-top:10px;border-left-color:var(--wine)">
+        ✉️ <b>${esc(nomeDe(ev.criador))}</b> convidou você para este encontro.
+        <div style="display:flex;gap:8px;margin-top:9px">
+          <button class="btn btn-primary btn-sm" onclick="responderConvite(${ev.sid},true)">Confirmar presença</button>
+          <button class="btn btn-ghost btn-sm" onclick="responderConvite(${ev.sid},false)">Não vou</button>
+        </div></div>`:""}
+    ${ev.cancelado?`<div class="explain-box" style="margin-top:10px;border-left-color:var(--ink-3)">
+        ❌ Este encontro foi <b>cancelado</b>${ev.criador?" por "+esc(nomeDe(ev.criador)):""}. A conversa fica guardada, mas ninguém escreve mais nem entra.
+      </div>`:""}
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      ${ehNuvem(ev)&&!passado&&!ev.cancelado&&(ev.papel==="dono"||ev.papel==="organizador")?`<button class="btn btn-ghost btn-sm" onclick="convidarMais(${ev.sid})">＋ Convidar mais</button>`:""}
+      ${ehNuvem(ev)&&!passado&&!ev.cancelado&&ev.papel!=="dono"?`<button class="btn btn-ghost btn-sm" onclick="sairDoEncontro(${ev.sid})">Sair do encontro</button>`:""}
+      ${acoesEncerrar(ev)}
+    </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px;margin-top:14px">
       ${ev.amigos.map((a,ai)=>`<div style="background:var(--cream);border-radius:10px;padding:12px 14px">
-        <b style="font-size:13.5px">👤 ${esc(a.nome)}</b>
+        <b style="font-size:13.5px">👤 ${esc(a.nome)}${ehNuvem(ev)?({confirmado:' <span class="tag auge" style="padding:1px 7px;font-size:10px">confirmou</span>',convidado:' <span class="tag" style="padding:1px 7px;font-size:10px">convidado</span>',recusado:' <span class="tag" style="padding:1px 7px;font-size:10px">não vai</span>'}[a.status]||""):""}</b>
         ${a.garrafas.map(g=>`<div style="font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:${CORES[g.tipo]}"></i>${esc(g.nome)} <span style="color:var(--ink-3)">· ${esc(g.origem)}</span></div>`).join("")||'<div style="font-size:12px;color:var(--ink-3);margin-top:6px">ainda não confirmou garrafas</div>'}
-        ${passado?"":`<div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
+        ${passado||ehNuvem(ev)?"":`<div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
           <input id="am-nome-${ev.id}-${ai}" placeholder="Vinho que ${esc(a.nome)} vai levar" style="flex:1 1 105px;min-width:0;font-size:11.5px;padding:6px 8px">
           <select id="am-tipo-${ev.id}-${ai}" style="font-size:11.5px;padding:6px 4px">${TIPOS.map(t=>`<option>${t}</option>`).join("")}</select>
           <button class="btn btn-gold btn-sm" style="padding:5px 9px;font-size:11.5px" onclick="addGarrafaAmigo(${ev.id},${ai})">＋</button>
@@ -1638,7 +1674,10 @@ function abrirEncontro(id,semAbrir){
       </div>`).join("")}
       <div style="background:#fbf3ea;border:1.5px dashed var(--gold);border-radius:10px;padding:12px 14px">
         <b style="font-size:13.5px">👤 Você</b>
-        ${ev.minhas.map(id2=>{const v=vinhos.find(x=>x.id===id2);return v?`<div style="font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:${CORES[v.tipo]}"></i>${esc(v.nome)} ${safraTxt(v)} ${passado?"":`<button class="btn btn-ghost btn-sm" style="padding:1px 7px;font-size:11px" onclick="tirarGarrafaEvento(${ev.id},${id2})">✕</button>`}</div>`:""}).join("")||'<div style="font-size:12px;color:var(--ink-3);margin-top:6px">você ainda não escolheu</div>'}
+        ${(ehNuvem(ev)
+          ?(ev.minhasN||[]).map(g=>`<div style="font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:${CORES[g.tipo]||"#999"}"></i>${esc(g.nome)}</div>`)
+          :(ev.minhas||[]).map(id2=>{const v=vinhos.find(x=>x.id===id2);return v?`<div style="font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:${CORES[v.tipo]}"></i>${esc(v.nome)} ${safraTxt(v)} ${passado?"":`<button class="btn btn-ghost btn-sm" style="padding:1px 7px;font-size:11px" onclick="tirarGarrafaEvento(${ev.id},${id2})">✕</button>`}</div>`:""})
+        ).join("")||'<div style="font-size:12px;color:var(--ink-3);margin-top:6px">você ainda não escolheu</div>'}
         ${passado||!vinhos.length?"":`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
           <select id="ev-sel-${ev.id}" style="flex:1 1 130px;min-width:0;max-width:100%;font-size:12px;padding:7px 8px">${vinhos.map(v=>`<option value="${v.id}">${adegaDe(v.adega).icone} ${esc(v.nome)} ${safraTxt(v)}</option>`).join("")}</select>
           <button class="btn btn-gold btn-sm" onclick="levarGarrafaEvento(${ev.id})">Levar</button>
@@ -1658,12 +1697,140 @@ function abrirEncontro(id,semAbrir){
         ${(ev.chat||[]).map(m=>`<div class="msg ${m.de==="Você"?"minha":"deles"}"><div class="quem">${m.de==="Você"?"Você":"👤 "+esc(m.de)}</div>${esc(m.txt)}<div class="hora">${esc(m.hora||"")}</div></div>`).join("")||'<div style="font-size:12.5px;color:var(--ink-2);text-align:center;padding:10px">Nenhuma mensagem ainda — puxe o assunto! 🥂</div>'}
       </div>
       <div class="chat-envio">
-        <input id="chat-in-${ev.id}" placeholder="Mensagem para o grupo…" onkeydown="if(event.key==='Enter')enviarMsg(${ev.id})">
-        <button class="btn btn-primary btn-sm" onclick="enviarMsg(${ev.id})">Enviar</button>
+        <input id="chat-in-${ev.id}" placeholder="${ehNuvem(ev)?"Mensagem para o grupo…":"Mensagem (só neste aparelho)…"}" onkeydown="if(event.key==='Enter')enviarNoEncontro(${ev.id})">
+        <button class="btn btn-primary btn-sm" onclick="enviarNoEncontro(${ev.id})">Enviar</button>
       </div>
     </div>`;
   if(!semAbrir)$("#modal-detail").classList.add("open");
   const el=$("#chat-msgs-"+ev.id);if(el)el.scrollTop=el.scrollHeight;
+}
+
+/* ===== Cancelar, apagar e limpar encontros (v0.45) =====
+   Faltava o caminho de volta. São três coisas diferentes de propósito:
+   CANCELAR avisa todo mundo e mantém o registro; APAGAR remove para todos;
+   REMOVER DA MINHA LISTA some só para quem pediu. Um encontro que
+   simplesmente desaparecesse deixaria alguém indo ao restaurante à toa. */
+function acoesEncerrar(ev){
+  const dono=!ehNuvem(ev)||ev.papel==="dono"||ev.criador===(perfil&&perfil.user);
+  const b=[];
+  if(!ehNuvem(ev)){
+    b.push(`<button class="btn btn-ghost btn-sm" onclick="apagarEncontro(${ev.id})">🗑️ Apagar</button>`);
+  }else{
+    if(dono&&!ev.cancelado&&!ehPassado(ev))
+      b.push(`<button class="btn btn-ghost btn-sm" onclick="cancelarEncontro(${ev.sid},true)">❌ Cancelar encontro</button>`);
+    if(dono&&ev.cancelado)
+      b.push(`<button class="btn btn-ghost btn-sm" onclick="cancelarEncontro(${ev.sid},false)">↩︎ Reativar</button>`);
+    if(dono)
+      b.push(`<button class="btn btn-ghost btn-sm" onclick="apagarEncontro(${ev.id})">🗑️ Apagar para todos</button>`);
+    else if(ev.cancelado||ehPassado(ev))
+      b.push(`<button class="btn btn-ghost btn-sm" onclick="removerDaMinhaLista(${ev.sid})">🗑️ Remover da minha lista</button>`);
+  }
+  return b.join("");
+}
+async function cancelarEncontro(sid,cancelar){
+  const ev=eventos.find(e=>e.sid===sid);if(!ev)return;
+  if(cancelar&&!confirm(`Cancelar "${ev.nome}"?\n\nOs convidados continuam vendo o encontro, marcado como cancelado — assim ninguém aparece no local sem saber. A conversa fica guardada e dá para reativar depois.`))return;
+  try{
+    const r=await rpc("cancelar_evento",{ev:sid,cancelar:!!cancelar});
+    if(!r||!r.ok){toast(r&&r.erro==="nao_e_dono"?"Só quem criou o encontro pode cancelar.":mensagemErroEncontro(r));return}
+    ev.cancelado=!!cancelar;persist();
+    await sincronizarEncontros();
+    if(encontroAberto===ev.id)abrirEncontro(ev.id,true);
+    renderEncontros();
+    toast(cancelar?"Encontro cancelado — os convidados foram avisados na lista deles. ❌":"Encontro reativado. 🥂");
+  }catch(e){toast("Sem conexão agora.")}
+}
+async function apagarEncontro(idLocal){
+  const ev=eventos.find(e=>e.id===idLocal);if(!ev)return;
+  const naNuvemEv=ehNuvem(ev);
+  const quantos=(ev.amigos||[]).length;
+  const aviso=naNuvemEv
+    ? `Apagar "${ev.nome}" de vez?\n\nEle some para você e para ${quantos===1?"o outro participante":"os outros "+quantos+" participantes"}, junto com a conversa e a lista de garrafas. Não dá para desfazer.\n\nSe a ideia é só avisar que não vai acontecer, prefira Cancelar.`
+    : `Apagar "${ev.nome}"?\n\nEste encontro existe só neste aparelho, então some apenas daqui.`;
+  if(!confirm(aviso))return;
+  if(naNuvemEv){
+    try{
+      const r=await rpc("apagar_evento",{ev:ev.sid});
+      if(!r||!r.ok){toast(r&&r.erro==="nao_e_dono"?"Só quem criou o encontro pode apagá-lo.":mensagemErroEncontro(r));return}
+    }catch(e){toast("Sem conexão agora.");return}
+  }
+  eventos=eventos.filter(e=>e.id!==idLocal);persist();
+  closeModal("modal-detail");encontroAberto=null;
+  if(naNuvemEv)await sincronizarEncontros();
+  renderEncontros();
+  toast("Encontro apagado.");
+}
+async function removerDaMinhaLista(sid){
+  const ev=eventos.find(e=>e.sid===sid);if(!ev)return;
+  if(!confirm(`Remover "${ev.nome}" da sua lista?\n\nEle continua existindo para os outros participantes — some só para você.`))return;
+  try{
+    const r=await rpc("remover_da_minha_lista",{ev:sid});
+    if(!r||!r.ok){toast(r&&r.erro==="dono_ativo"?"Você criou este encontro. Cancele-o antes, ou apague de vez.":mensagemErroEncontro(r));return}
+    eventos=eventos.filter(e=>e.sid!==sid);persist();
+    closeModal("modal-detail");encontroAberto=null;
+    await sincronizarEncontros();renderEncontros();
+    toast("Removido da sua lista.");
+  }catch(e){toast("Sem conexão agora.")}
+}
+
+/* ---- faxina: apagar vários de uma vez ---- */
+let limpezaSel=new Set();
+function abrirLimpezaEncontros(quais){
+  limpezaSel=new Set();
+  const lista=quais==="passados"
+    ? eventos.filter(e=>ehPassado(e)||e.cancelado)
+    : eventos.filter(e=>!ehPassado(e)&&!e.cancelado);
+  const titulo=quais==="passados"?"📜 Limpar eventos passados":"🥂 Limpar próximos encontros";
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">${titulo}</h3>
+    <div class="sub">Marque os que quer tirar. Os que você criou são apagados para todos; nos outros você só sai da lista.</div>
+    <div id="limpeza-lista" style="margin:12px 0">
+      ${lista.length?lista.map(e=>{
+        const meu=!ehNuvem(e)||e.papel==="dono"||e.criador===(perfil&&perfil.user);
+        return `<div class="pessoa" style="cursor:pointer" onclick="alternarLimpeza(${e.id})">
+          <span style="font-size:19px;flex:none" id="lmp-${e.id}">⬜</span>
+          <div class="inf"><b>${e.cancelado?"❌ ":ehPassado(e)?"📜 ":"🥂 "}${esc(e.nome)}</b>
+            <small>📅 ${esc(e.data)} · ${meu?"você criou — apaga para todos":"você sai da lista"}</small></div>
+        </div>`}).join("")
+      :'<div class="empty" style="padding:18px">Nada para limpar aqui. 🥂</div>'}
+    </div>
+    ${lista.length?`<button class="btn btn-primary" style="width:100%" onclick="confirmarLimpeza()">
+      <span id="lmp-conta">Nenhum selecionado</span></button>`:""}`;
+  $("#modal-detail").classList.add("open");
+}
+function alternarLimpeza(id){
+  limpezaSel.has(id)?limpezaSel.delete(id):limpezaSel.add(id);
+  const el=$("#lmp-"+id);if(el)el.textContent=limpezaSel.has(id)?"☑️":"⬜";
+  const c=$("#lmp-conta");
+  if(c)c.textContent=limpezaSel.size?`Apagar ${limpezaSel.size} encontro${limpezaSel.size===1?"":"s"}`:"Nenhum selecionado";
+}
+async function confirmarLimpeza(){
+  if(!limpezaSel.size){toast("Marque pelo menos um. ☑️");return}
+  const ids=[...limpezaSel];
+  const meus=ids.filter(id=>{const e=eventos.find(x=>x.id===id);
+    return e&&(!ehNuvem(e)||e.papel==="dono"||e.criador===(perfil&&perfil.user))});
+  if(!confirm(`Apagar ${ids.length} encontro${ids.length===1?"":"s"}?\n\n`+
+    (meus.length?`${meus.length} ${meus.length===1?"foi criado":"foram criados"} por você e ${meus.length===1?"some":"somem"} para todos os participantes.\n`:"")+
+    (ids.length-meus.length?`${ids.length-meus.length} ${ids.length-meus.length===1?"sai":"saem"} só da sua lista.\n`:"")+
+    `\nNão dá para desfazer.`))return;
+  let feitos=0;
+  for(const id of ids){
+    const e=eventos.find(x=>x.id===id);if(!e)continue;
+    const meu=!ehNuvem(e)||e.papel==="dono"||e.criador===(perfil&&perfil.user);
+    try{
+      if(ehNuvem(e)){
+        const r=await rpc(meu?"apagar_evento":"remover_da_minha_lista",{ev:e.sid});
+        if(!r||!r.ok)continue;
+      }
+      eventos=eventos.filter(x=>x.id!==id);feitos++;
+    }catch(err){}
+  }
+  limpezaSel=new Set();persist();
+  closeModal("modal-detail");
+  if(naNuvem())await sincronizarEncontros();
+  renderEncontros();
+  toast(feitos?`${feitos} encontro${feitos===1?"":"s"} apagado${feitos===1?"":"s"}.`:"Nada foi apagado.");
 }
 
 /* Pop-up: lista completa de quem eu sigo */
@@ -1690,13 +1857,13 @@ function abrirEscolherParticipantes(){
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
     <h3 class="serif">👥 Quem participa do encontro</h3>
-    <div class="sub">Toque para marcar quem você vai convidar.</div>
+    <div class="sub">Toque para marcar quem você vai convidar. Só aparecem <b>amigos próximos</b> 🤝 — quem você segue e que segue você de volta.</div>
     <div style="margin:12px 0">
-      ${seguindo.map((a,i)=>`<div class="pessoa" style="cursor:pointer" onclick="alternarParticipante(${i})">
+      ${seguindo.map((a,i)=>({a,i})).filter(x=>ehAmigoProximo(x.a.user)).map(({a,i})=>`<div class="pessoa" style="cursor:pointer" onclick="alternarParticipante(${i})">
         <span style="font-size:19px;flex:none" id="chk-part-${i}">${participantesSel.has(i)?"☑️":"⬜"}</span>
         <span>${avatarDe(a.user,32)}</span>
-        <div class="inf"><b>${esc(a.nome)}${ehAmigoProximo(a.user)?" 🤝":""}</b><small>@${esc(a.user)}</small></div>
-      </div>`).join("")}
+        <div class="inf"><b>${esc(a.nome)} 🤝</b><small>@${esc(a.user)}</small></div>
+      </div>`).join("")||'<div class="empty" style="padding:18px">Você ainda não tem amigos próximos.<br>Só dá para convidar quem você segue <b>e</b> que segue você de volta — é o que impede convite de desconhecido.</div>'}
     </div>
     <button class="btn btn-primary" style="width:100%" onclick="closeModal('modal-detail');renderResumoParticipantes()">Confirmar seleção</button>`;
   $("#modal-detail").classList.add("open");
@@ -1713,38 +1880,84 @@ function renderResumoParticipantes(){
     ?`<b>${nomes.length}</b> convidado${nomes.length===1?"":"s"}: ${esc(nomes.slice(0,3).join(", "))}${nomes.length>3?" e mais "+(nomes.length-3):""}`
     :"ninguém selecionado ainda";
 }
-function enviarMsg(evId){
+async function enviarNoEncontro(evId){
   const ev=eventos.find(e=>e.id===evId);if(!ev)return;
   const inp=$("#chat-in-"+evId);
   const txt=(inp.value||"").trim();
   if(!txt){toast("Escreva a mensagem primeiro. 💬");return}
   if(!ev.chat)ev.chat=[];
+  inp.value="";
   const agora=new Date();
-  ev.chat.push({de:"Você",txt,hora:String(agora.getHours()).padStart(2,"0")+":"+String(agora.getMinutes()).padStart(2,"0")});
-  persist();renderEncontros();
+  const local={de:"Você",txt,hora:String(agora.getHours()).padStart(2,"0")+":"+String(agora.getMinutes()).padStart(2,"0")};
+  ev.chat.push(local);persist();
+  if(encontroAberto===ev.id)abrirEncontro(ev.id,true);
+  if(ehNuvem(ev)&&naNuvem()){
+    try{
+      const r=await rpc("falar_no_encontro",{ev:ev.sid,texto:txt});
+      if(!r||!r.ok){ /* o servidor recusou: desfaz para não mentir na tela */
+        ev.chat=ev.chat.filter(m=>m!==local);persist();
+        if(encontroAberto===ev.id)abrirEncontro(ev.id,true);
+        toast(mensagemErroEncontro(r));
+      }
+    }catch(e){
+      ev.chat=ev.chat.filter(m=>m!==local);persist();
+      if(encontroAberto===ev.id)abrirEncontro(ev.id,true);
+      toast("Sem conexão — mensagem não enviada.");
+    }
+  }else{ renderEncontros() }
   const el=$("#chat-in-"+evId);if(el)el.focus();
 }
-function levarGarrafaEvento(evId){
+async function levarGarrafaEvento(evId){
   const ev=eventos.find(e=>e.id===evId);const id=+$("#ev-sel-"+evId).value;
-  if(ev.minhas.includes(id)){toast("Essa garrafa já está confirmada para o encontro. 🍷");return}
-  ev.minhas.push(id);persist();renderEncontros();
-  const v=vinhos.find(x=>x.id===id);
+  const v=vinhos.find(x=>x.id===id);if(!v)return;
+  if(ehNuvem(ev)){
+    if((ev.minhasN||[]).some(g=>g.nome.indexOf(v.nome)===0)){toast("Essa garrafa já está confirmada. 🍷");return}
+    try{
+      const r=await rpc("levar_garrafa",{ev:ev.sid,p_nome:v.nome+" "+safraTxt(v),p_tipo:v.tipo,p_origem:v.regiao+", "+v.pais});
+      if(!r||!r.ok){toast(mensagemErroEncontro(r));return}
+      await carregarEncontro(ev);
+      if(encontroAberto===ev.id)abrirEncontro(ev.id,true);
+      renderEncontros();
+    }catch(e){toast("Sem conexão agora.");return}
+  }else{
+    if(ev.minhas.includes(id)){toast("Essa garrafa já está confirmada para o encontro. 🍷");return}
+    ev.minhas.push(id);persist();renderEncontros();
+  }
   toast(`${v.nome} confirmado para ${ev.nome}! 🥂`);
 }
 function tirarGarrafaEvento(evId,id){
   const ev=eventos.find(e=>e.id===evId);
   ev.minhas=ev.minhas.filter(x=>x!==id);persist();renderEncontros();
 }
-function createEvento(){
+async function createEvento(){
   const nome=$("#e-nome").value.trim();
   if(!nome){toast("Dê um nome ao encontro. 🥂");return}
-  const selecionados=[...participantesSel].map(i=>seguindo[i]).filter(Boolean).map(a=>({nome:a.nome,garrafas:[]}));
-  eventos.unshift({id:NEXT_EV++,nome,data:$("#e-data").value||"a definir",local:$("#e-local").value||"a definir",criador:"Jorge",amigos:selecionados,minhas:[],chat:[]});
-  participantesSel=new Set();
-  persist();["e-nome","e-data","e-local"].forEach(i=>$("#"+i).value="");
+  const quando=$("#e-data").value||"a definir", onde=$("#e-local").value||"a definir";
+  const escolhidos=[...participantesSel].map(i=>seguindo[i]).filter(Boolean);
+  const limpar=()=>{participantesSel=new Set();["e-nome","e-data","e-local"].forEach(i=>$("#"+i).value="");renderResumoParticipantes()};
+
+  /* v0.44: com login, o encontro nasce no servidor e o convite chega de verdade */
+  if(naNuvem()){
+    const proximos=escolhidos.filter(a=>ehAmigoProximo(a.user));
+    const longe=escolhidos.filter(a=>!ehAmigoProximo(a.user));
+    const r=await criarEncontroNaNuvem(nome,quando,onde,proximos.map(a=>a.user));
+    if(!r||!r.ok){toast(mensagemErroEncontro(r));return}
+    limpar();
+    await sincronizarEncontros();
+    renderEncontros();window.scrollTo({top:0,behavior:"smooth"});
+    addAtividade(`criou o encontro <b>🥂 ${esc(nome)}</b>`);
+    toast(longe.length
+      ? `Encontro criado. ${proximos.length} convidado${proximos.length===1?"":"s"} — ${longe.length} ficou${longe.length===1?"":"ram"} de fora por não ser${longe.length===1?"":"em"} amigo${longe.length===1?"":"s"} próximo${longe.length===1?"":"s"}. 🤝`
+      : `Encontro "${nome}" criado — ${proximos.length?"convites enviados":"convide os amigos"}! 🥂`);
+    return;
+  }
+  /* sem login o protótipo continua funcionando, mas só neste aparelho */
+  eventos.unshift({id:NEXT_EV++,nome,data:quando,local:onde,criador:"Jorge",
+    amigos:escolhidos.map(a=>({user:a.user,nome:a.nome,garrafas:[]})),minhas:[],chat:[]});
+  limpar();persist();
   renderEncontros();window.scrollTo({top:0,behavior:"smooth"});
-  addAtividade(`criou o encontro <b>🥂 ${nome}</b>`);
-  toast(`Encontro "${nome}" criado — convide os amigos! 🥂`);
+  addAtividade(`criou o encontro <b>🥂 ${esc(nome)}</b>`);
+  toast(`Encontro "${nome}" criado neste aparelho. Entre com o Google para convidar de verdade. 🥂`);
 }
 
 /* Sementes de demonstração congeladas — usuário novo começa vazio; demo só sob demanda */
@@ -1811,25 +2024,80 @@ function status(v){
   return {k:"auge",txt:"No auge"};
 }
 
+/* ===================== CONFIGURAÇÕES (v0.45) =====================
+   Até a v0.44 os seis ajustes ficavam soltos no menu principal, que passava
+   de quinze linhas e obrigava a rolar. Agora vivem atrás da engrenagem,
+   agrupados por assunto e mostrando o estado atual de cada um — assim dá
+   para conferir tudo de relance, sem abrir um por um. */
+function linhaConfig(icone,titulo,estado,acao,detalhe){
+  return `<div class="pessoa" style="cursor:pointer" onclick="${acao}">
+    <span style="font-size:19px;flex:none">${icone}</span>
+    <div class="inf">
+      <b>${titulo}</b>
+      <small>${detalhe||""}</small>
+    </div>
+    <span style="flex:none;font-size:11px;background:var(--cream);padding:3px 9px;border-radius:99px;color:var(--ink-2)">${estado}</span>
+  </div>`;
+}
+function abrirConfiguracoes(){
+  const tv=travaLer().modo;
+  const permissao=(window.Apk&&Apk.notificar)?"granted":permissaoNotif();
+  const som=localStorage.getItem("apotheca_som")==="0";
+  const nAdegas=ADEGAS.length;
+  const temReal=vinhos.length>0&&!adegaDemo;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">⚙️ Configurações</h3>
+    <div class="sub">Tudo o que dá para ajustar, em um lugar só.</div>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SUA ADEGA</div>
+    ${linhaConfig("✏️","Gerenciar adegas",nAdegas+(nAdegas===1?" adega":" adegas"),
+      "closeModal('modal-detail');openAdegasManager()","Renomear, trocar o ícone ou excluir")}
+    ${linhaConfig("🔒","Quem vê minha adega",
+      privacidadeAdega==="publica"?"todos":privacidadeAdega==="privada"?"ninguém":"amigos",
+      "closeModal('modal-detail');abrirPrivacidadeAdega()",
+      "Seus números na comunidade — o valor e os rótulos nunca saem daqui")}
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SEGURANÇA</div>
+    ${linhaConfig("🔐","Bloqueio do aplicativo",
+      tv==="bio"?"digital ✓":tv==="pin"?"senha ✓":"desligado",
+      "closeModal('modal-detail');abrirConfigTrava()",
+      "Entrar por digital, rosto ou senha curta em vez de refazer o login")}
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">AVISOS</div>
+    ${linhaConfig("🔔","Avisos no celular",
+      permissao==="granted"?"ligados ✓":permissao==="denied"?"bloqueados":"ativar",
+      "closeModal('modal-detail');abrirConfigAvisos()",
+      "Comentário, brinde, mensagem e convite de encontro")}
+    ${linhaConfig("🔊","Bip dos avisos",som?"desligado":"ligado ✓",
+      "alternarSom();abrirConfiguracoes()","Som curto quando chega novidade")}
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SCANNER</div>
+    ${linhaConfig("🔑","IA de visão (scanner)",getIaKey()?"ativa ✓":"não configurada",
+      "closeModal('modal-detail');abrirConfigIA()",
+      "Lê o rótulo pela foto e preenche a ficha sozinha")}
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">DEMONSTRAÇÃO</div>
+    ${linhaConfig("🎬","Adega de demonstração",temReal?"cuidado":adegaDemo?"em uso":"disponível",
+      "closeModal('modal-detail');carregarDemo()",
+      temReal?"⚠️ Substitui a sua adega real por 153 garrafas de exemplo"
+             :"153 garrafas de exemplo para conhecer o aplicativo")}`;
+  $("#modal-detail").classList.add("open");
+}
+
 /* ================== MENU POP-UP ================== */
 function renderMenu(){
   const mf=$("#mi-fundador");
   if(mf)mf.classList.toggle("hidden",!((perfil&&perfil.user==="Jorge.Queiroz")||(sessao&&sessao.email==="wp7jorge@gmail.com")));
-  const mt=$("#mi-trava");
-  if(mt){const tv=travaLer().modo;
-    mt.innerHTML="🔐 Bloqueio do aplicativo"+(tv==="bio"?'<span class="cont">digital ✓</span>'
-      :tv==="pin"?'<span class="cont">senha ✓</span>':'<span class="cont">desligado</span>');}
-  const mp=$("#mi-privacidade");
-  if(mp)mp.innerHTML="🔒 Quem vê minha adega"+(privacidadeAdega==="publica"?'<span class="cont">todos</span>'
-    :privacidadeAdega==="privada"?'<span class="cont">ninguém</span>':'<span class="cont">amigos</span>');
-  const ma=$("#mi-avisos");
-  if(ma){
-    const p=(window.Apk&&Apk.notificar)?"granted":permissaoNotif();
-    ma.innerHTML="🔔 Avisos no celular"+(p==="granted"?'<span class="cont">ligados ✓</span>'
-      :p==="denied"?'<span class="cont">bloqueados</span>':'<span class="cont">ativar</span>');
+  /* v0.45: os seis ajustes moraram no menu até a v0.44 e o deixavam comprido.
+     Agora vivem atrás da engrenagem; aqui fica só um resumo do que está ligado. */
+  const mc=$("#mi-config");
+  if(mc){
+    const pend=[];
+    if(travaLer().modo==="nenhum")pend.push("sem tranca");
+    if(!getIaKey())pend.push("IA desligada");
+    mc.innerHTML="⚙️ Configurações"+(pend.length?`<span class="cont">${pend.length} a ajustar</span>`:'<span class="cont">tudo pronto ✓</span>');
   }
-  const ms=$("#mi-som");
-  if(ms)ms.innerHTML="🔊 Bip dos avisos"+(localStorage.getItem("apotheca_som")==="0"?'<span class="cont">desligado</span>':'<span class="cont">ligado ✓</span>');
   const tot=id=>vinhos.filter(v=>id==="todas"||v.adega===id).reduce((s,v)=>s+v.qtd,0);
   $("#menu-adegas").innerHTML=
     `<div class="mtit">MINHAS ADEGAS</div>`+
@@ -1989,6 +2257,15 @@ async function abrirFeedbacksFundador(){
   $("#modal-detail").classList.add("open");
 }
 function carregarDemo(){
+  /* v0.45: até aqui esta função ficava no menu principal a um toque de
+     distância e SUBSTITUÍA a adega de verdade sem perguntar nada. Quem já
+     tem coleção real precisa confirmar, lendo o que vai perder. */
+  if(vinhos.length&&!adegaDemo){
+    const n=vinhos.reduce((s2,v)=>s2+v.qtd,0);
+    if(!confirm(`Atenção: carregar a demonstração APAGA a sua adega deste aparelho\n`+
+      `(${n} garrafa${n===1?"":"s"} em ${vinhos.length} rótulo${vinhos.length===1?"":"s"}) e coloca 153 garrafas de exemplo no lugar.\n\n`+
+      `Seus seguidores e suas conversas não se perdem — só a coleção guardada aqui.\n\nQuer mesmo continuar?`))return;
+  }
   const d=JSON.parse(JSON.stringify(DEMO_SEED));
   vinhos=d.vinhos;historico=d.historico;eventos=d.eventos;seguindo=d.seguindo;ADEGAS=d.ADEGAS;adegaDemo=true;
   adegaAtiva="todas";
@@ -3070,6 +3347,160 @@ function renderRede(){
       ||'<div class="empty"><div class="big">🔍</div>Nenhum apreciador novo com esse filtro.</div>';
   }
 }
+/* ===================== ENCONTRO DE VERDADE (v0.44) =====================
+   Até a v0.43 o encontro vivia só neste aparelho: marcar participantes não
+   avisava ninguém e a conversa era enfeite. Agora o encontro é objeto do
+   servidor — quem é convidado recebe, responde, e a conversa é a mesma
+   para todos. Continua funcionando sem login, como protótipo, mas aí o
+   encontro é local e fica marcado como tal. */
+const ehNuvem=ev=>!!(ev&&ev.sid);
+const naNuvem=()=>!!(perfil&&sessao&&sessao.uid);
+let CONVITES=[];   /* convites pendentes, para o sino */
+
+/* servidor -> formato que a tela já sabe desenhar */
+function mapaEvento(e){
+  const eu=perfil?perfil.user:"";
+  const parts=(e.participantes||[]).filter(p=>p.usuario!==eu);
+  return {
+    id:1000000+Number(e.id), sid:Number(e.id), nuvem:true,
+    nome:e.nome, data:e.quando||"a definir", local:e.local||"a definir",
+    criador:e.criador, papel:e.meu_papel, status:e.meu_status,
+    cancelado:!!e.cancelado,
+    amigos:parts.map(p=>({user:p.usuario,nome:nomeDe(p.usuario),status:p.status,garrafas:[]})),
+    minhas:[], minhasN:[], chat:[]
+  };
+}
+async function sincronizarEncontros(){
+  if(!naNuvem())return;
+  try{
+    const lista=await rpc("meus_eventos",{});
+    if(!Array.isArray(lista))return;
+    const locais=eventos.filter(e=>!ehNuvem(e));
+    const daNuvem=lista.map(mapaEvento);
+    /* preserva o que já foi carregado em detalhe, para a tela não piscar */
+    daNuvem.forEach(n=>{
+      const velho=eventos.find(e=>e.sid===n.sid);
+      if(velho){n.chat=velho.chat||[];n.minhasN=velho.minhasN||[];
+        n.amigos.forEach(a=>{const v=(velho.amigos||[]).find(x=>x.user===a.user);if(v)a.garrafas=v.garrafas||[]})}
+    });
+    eventos=daNuvem.concat(locais);
+    CONVITES=daNuvem.filter(e=>e.status==="convidado");
+    persist();
+    if(viewAtual==="encontros")renderEncontros();
+    atualizarSinoNotif();
+  }catch(e){}
+}
+/* carrega conversa, garrafas e participantes de um encontro */
+async function carregarEncontro(ev){
+  if(!ehNuvem(ev)||!naNuvem())return false;
+  try{
+    const r=await rpc("abrir_evento",{ev:ev.sid});
+    if(!r||!r.ok)return false;
+    const eu=perfil.user;
+    ev.nome=r.evento.nome;ev.data=r.evento.quando||"a definir";
+    ev.local=r.evento.local||"a definir";ev.criador=r.evento.criador;
+    ev.cancelado=!!r.evento.cancelado;
+    ev.amigos=(r.participantes||[]).filter(p=>p.usuario!==eu)
+      .map(p=>({user:p.usuario,nome:nomeDe(p.usuario),status:p.status,garrafas:[]}));
+    const meu=(r.participantes||[]).find(p=>p.usuario===eu);
+    if(meu){ev.papel=meu.papel;ev.status=meu.status}
+    ev.minhasN=[];
+    (r.garrafas||[]).forEach(g=>{
+      const perf=PERFIL_TIPO[g.tipo]||{corpo:3,tanino:2};
+      const item={id:g.id,nome:g.nome,tipo:g.tipo||"Tinto",corpo:perf.corpo,tanino:perf.tanino,origem:g.origem||""};
+      if(g.usuario===eu)ev.minhasN.push(item);
+      else{const a=ev.amigos.find(x=>x.user===g.usuario);if(a)a.garrafas.push(item)}
+    });
+    ev.chat=(r.mensagens||[]).map(m=>({de:m.usuario===eu?"Você":nomeDe(m.usuario),
+      txt:m.texto,hora:horaCurta(new Date(m.criado).getTime())}));
+    persist();
+    return true;
+  }catch(e){return false}
+}
+
+/* ---------- criar ---------- */
+async function criarEncontroNaNuvem(nome,quando,local,convidados){
+  const r=await rpc("criar_evento",{p_nome:nome,p_quando:quando,p_local:local,p_convidados:convidados});
+  return r;
+}
+/* publica um encontro que nasceu só neste aparelho */
+async function publicarEncontro(idLocal){
+  const ev=eventos.find(e=>e.id===idLocal);
+  if(!ev||ehNuvem(ev))return;
+  if(!naNuvem()){toast("Entre com o Google para publicar o encontro. 🔐");return}
+  const convidados=(ev.amigos||[]).map(a=>a.user).filter(u=>u&&ehAmigoProximo(u));
+  const r=await criarEncontroNaNuvem(ev.nome,ev.data,ev.local,convidados);
+  if(!r||!r.ok){toast(mensagemErroEncontro(r));return}
+  eventos=eventos.filter(e=>e.id!==idLocal);
+  await sincronizarEncontros();
+  const novo=eventos.find(e=>e.sid===Number(r.id));
+  if(novo){
+    /* leva junto as garrafas que você já tinha escolhido */
+    for(const vid of (ev.minhas||[])){
+      const v=vinhos.find(x=>x.id===vid);
+      if(v)try{await rpc("levar_garrafa",{ev:novo.sid,p_nome:v.nome+" "+safraTxt(v),p_tipo:v.tipo,p_origem:v.regiao+", "+v.pais})}catch(e){}
+    }
+    await carregarEncontro(novo);
+  }
+  renderEncontros();
+  toast(r.convidados?`Encontro publicado — ${r.convidados} convite${r.convidados===1?"":"s"} enviado${r.convidados===1?"":"s"}. 🥂`
+                    :"Encontro publicado. 🥂");
+}
+const mensagemErroEncontro=r=>({sem_login:"Entre de novo com o Google. 🔐",
+  sem_nome:"Dê um nome ao encontro.",nao_organiza:"Só quem organiza pode convidar.",
+  nao_participa:"Você não participa deste encontro.",
+  nao_e_amigo_proximo:"Só dá para convidar amigos próximos — quem você segue e que segue você de volta. 🤝",
+  bloqueado:"Não é possível convidar esta pessoa.",
+  muitos_encontros:"Muitos encontros criados hoje — tente amanhã. ⏳",
+  vazio:"Escreva a mensagem primeiro."}[r&&r.erro]||"Não consegui agora.");
+
+/* ---------- convites ---------- */
+async function responderConvite(sid,aceita){
+  try{
+    const r=await rpc("responder_convite",{ev:sid,aceita:!!aceita});
+    if(r&&r.ok){
+      await sincronizarEncontros();
+      closeModal("modal-detail");encontroAberto=null;
+      toast(aceita?"Presença confirmada! 🥂":"Convite recusado.");
+    }else toast(mensagemErroEncontro(r));
+  }catch(e){toast("Sem conexão agora.")}
+}
+async function convidarMais(sid){
+  const ev=eventos.find(e=>e.sid===sid);if(!ev)return;
+  const jaTem=u=>(ev.amigos||[]).some(a=>a.user===u);
+  const disponiveis=seguindo.filter(a=>ehAmigoProximo(a.user)&&!jaTem(a.user));
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="abrirEncontro(${ev.id})">✕</button>
+    <h3 class="serif">＋ Convidar para ${esc(ev.nome)}</h3>
+    <div class="sub">Só aparecem amigos próximos — quem você segue e que segue você de volta. É a mesma regra da conversa reservada.</div>
+    <div style="margin-top:12px">
+      ${disponiveis.length?disponiveis.map(a=>`<div class="pessoa">
+        ${avatarDe(a.user,36)}
+        <div class="inf"><b>${esc(a.nome)} 🤝</b><small>@${esc(a.user)}</small></div>
+        <button class="btn btn-gold btn-sm" style="flex:none" onclick="convidarPessoa(${sid},'${escJS(a.user)}')">Convidar</button>
+      </div>`).join("")
+      :'<div class="empty" style="padding:18px">Todos os seus amigos próximos já estão neste encontro. 🥂</div>'}
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+async function convidarPessoa(sid,user){
+  try{
+    const r=await rpc("convidar_para_evento",{ev:sid,alvo:user});
+    if(r&&r.ok){await sincronizarEncontros();const ev=eventos.find(e=>e.sid===sid);
+      if(ev)await carregarEncontro(ev);
+      convidarMais(sid);toast(`${nomeDe(user)} foi convidado. 🥂`)}
+    else toast(mensagemErroEncontro(r));
+  }catch(e){toast("Sem conexão agora.")}
+}
+async function sairDoEncontro(sid){
+  if(!confirm("Sair deste encontro? Você deixa de ver a conversa do grupo."))return;
+  try{
+    const r=await rpc("sair_do_encontro",{ev:sid});
+    if(r&&r.ok){closeModal("modal-detail");encontroAberto=null;await sincronizarEncontros();toast("Você saiu do encontro.")}
+    else toast(r&&r.erro==="dono_nao_sai"?"Você criou este encontro — não dá para sair dele.":mensagemErroEncontro(r));
+  }catch(e){toast("Sem conexão agora.")}
+}
+
 /* ===================== MENSAGEM DIRETA (v0.43) =====================
    Regra central: só existe conversa entre AMIGOS PRÓXIMOS — quem eu sigo
    e que me segue de volta. Isso não é uma checagem de tela que dá para
@@ -3156,15 +3587,15 @@ function desenharConversa(user){
       ${lista.length?lista.map(balao).join(""):`<div class="empty" style="padding:18px">💬 Nenhuma mensagem ainda.<br>Diga um oi para ${esc(String(nome).split(" ")[0])}.</div>`}
     </div>
     ${pode?`<div style="display:flex;gap:8px;margin-top:12px">
-        <input id="conv-txt" maxlength="2000" placeholder="Escreva uma mensagem…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();enviarMsg()}">
-        <button class="btn btn-gold btn-sm" style="flex:none" onclick="enviarMsg()">Enviar</button>
+        <input id="conv-txt" maxlength="2000" placeholder="Escreva uma mensagem…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();enviarMensagemDireta()}">
+        <button class="btn btn-gold btn-sm" style="flex:none" onclick="enviarMensagemDireta()">Enviar</button>
       </div>`
       :`<div class="empty" style="margin-top:12px;padding:14px;font-size:12.5px">${bloqueei(user)?`Você bloqueou ${esc(nome)}. <button class="btn btn-ghost btn-sm" onclick="desbloquear('${escJS(user)}')">Desbloquear</button>`:`Vocês não são mais amigos próximos — a conversa fica guardada, mas só é possível escrever quando os dois se seguem.`}</div>`}`;
   const c=$("#conv-corpo");if(c)c.scrollTop=c.scrollHeight;
 }
 function fecharConversa(){conversaAberta=null;closeModal("modal-detail");renderRede()}
 
-async function enviarMsg(){
+async function enviarMensagemDireta(){
   const cx=$("#conv-txt");if(!cx)return;
   const txt=cx.value.trim(), user=conversaAberta;
   if(!txt||!user)return;
@@ -3495,6 +3926,12 @@ function notificacoes(){
   });
   COMENTARIOS.filter(c=>meusPosts.includes(c.fid)&&c.user!==eu).forEach(c=>
     n.push({ts:c.ts||0,em:"💬",txt:`<b>${esc(nomeDe(c.user))}</b> comentou: “${esc(c.txt)}”`,acao:"",user:c.user}));
+  /* v0.44: convite de encontro aparece no sino, com resposta ali mesmo */
+  (typeof CONVITES!=="undefined"?CONVITES:[]).forEach(ev=>
+    n.push({ts:Date.now(),em:"✉️",
+      txt:`<b>${esc(nomeDe(ev.criador))}</b> convidou você para <b>${esc(ev.nome)}</b>`,
+      acao:`<button class="btn btn-gold btn-sm" style="flex:none" onclick="abrirEncontro(${ev.id})">Ver convite</button>`,
+      user:ev.criador}));
   /* v0.43: mensagem direta não lida também avisa — mas nunca mostra o texto
      na notificação do sistema, para não expor conversa na tela de bloqueio */
   MSGS.filter(m=>souEu(m.para)&&!m.lida&&m.de!==eu).forEach(m=>
