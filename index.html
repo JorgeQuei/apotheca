@@ -238,6 +238,19 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 .toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--wine);color:#fdf3e7;padding:13px 22px;border-radius:12px;font-size:14px;z-index:120;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .3s,transform .3s,visibility .3s;box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:90vw;text-align:center}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible}
+/* Tarja de versão nova (v0.47). Fica acima da barra de baixo no celular e
+   solta no canto do computador; nunca cobre um botão de ação. */
+.tarja-versao{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:118;
+  display:flex;align-items:center;gap:12px;max-width:min(560px,94vw);
+  background:var(--wine);color:#fdf3e7;padding:11px 12px 11px 16px;border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:13.5px;line-height:1.45}
+.tarja-versao .txt{flex:1;min-width:0}
+.tarja-versao .txt b{color:#f6dfae}
+.tarja-versao .txt small{display:block;color:#e6cfa6;font-size:12px;margin-top:2px}
+.tarja-versao button{border:0;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
+.tarja-versao .agora{background:var(--gold);color:#3a2c10}
+.tarja-versao .depois{background:transparent;color:#e6cfa6;padding:8px 6px;font-weight:400}
+@media(min-width:900px){.tarja-versao{bottom:20px}}
 .hidden{display:none!important}
 .empty{color:var(--ink-2);text-align:center;padding:40px 20px;font-size:14px;line-height:1.6}
 .empty .big{font-size:40px;margin-bottom:10px}
@@ -622,10 +635,11 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 <div class="modal-bg" id="modal-consume"><div class="modal" id="modal-consume-body"></div></div>
 
 <div class="toast" id="toast"></div>
+<div class="tarja-versao hidden" id="tarja-versao"></div>
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.47"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.48"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -4385,6 +4399,101 @@ document.addEventListener("visibilitychange",()=>{
 });
 setInterval(sincronizarComunidade,60000);
 setInterval(garantirSessaoValida,10*60*1000);
+
+/* ===================== AVISO DE VERSÃO NOVA (v0.47) =====================
+   Problema que resolve: quem instalou o APK ficava preso à versão daquele
+   arquivo — o site atualiza, o celular não — e podia passar semanas relatando
+   defeito já corrigido. Quem usa pelo navegador se atualiza sozinho em até dez
+   minutos (o servidor manda cache-control: max-age=600), mas também não tinha
+   como saber que havia novidade.
+
+   Como funciona: o site publica um versao.json ao lado do index.html. O
+   aplicativo o consulta alguns segundos depois de abrir — nunca durante o
+   arranque, para não atrasar a primeira tela — e só se anuncia se a versão de
+   lá for MAIOR que a daqui. Falhou a consulta (sem internet, site fora do ar,
+   arquivo ausente)? Não acontece nada: o aplicativo segue igual. */
+const VERSAO_URL = SITE_URL + "versao.json";
+const VERSAO_DISPENSADA = "apotheca_versao_dispensada";
+let versaoNova = null;
+
+/* Comparação parte a parte, como número inteiro — nunca como texto nem como
+   decimal. "0.5" > "0.47" seria falso na comparação de texto ("4" < "5" salva
+   por sorte, mas "0.10" < "0.9" quebraria), e como decimal 0.5 < 0.47 é
+   simplesmente errado quando 0.5 vem DEPOIS de 0.47 na nossa numeração.
+   Aqui 0.47 vira [0,47], 0.50 vira [0,50] e 1.0 vira [1,0]: sempre certo. */
+function versaoMaior(a, b){
+  const pa = String(a||"").split(".").map(n => parseInt(n,10) || 0);
+  const pb = String(b||"").split(".").map(n => parseInt(n,10) || 0);
+  for(let i = 0; i < Math.max(pa.length, pb.length); i++){
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if(x > y) return true;
+    if(x < y) return false;
+  }
+  return false;
+}
+
+function noApk(){ return typeof window !== "undefined" && !!window.Apk }
+
+async function conferirVersaoNova(){
+  try{
+    const r = await fetch(VERSAO_URL + "?cb=" + Date.now(), {cache:"no-store"});
+    if(!r.ok) return;
+    const d = await r.json();
+    if(!d || !d.versao || !versaoMaior(d.versao, APP_VERSION)) return;
+    let dispensada = "";
+    try{ dispensada = localStorage.getItem(VERSAO_DISPENSADA) || "" }catch(e){}
+    if(dispensada === d.versao) return;   /* já disse "agora não" para ESTA versão */
+    versaoNova = d;
+    mostrarTarjaVersao(d);
+  }catch(e){ /* silêncio de propósito: aviso de versão jamais atrapalha o uso */ }
+}
+
+function mostrarTarjaVersao(d){
+  const t = $("#tarja-versao");
+  if(!t) return;
+  /* No APK o arquivo é embutido: atualizar significa BAIXAR e instalar por cima.
+     No navegador basta recarregar furando a cópia guardada. Dois textos, porque
+     prometer "toque para atualizar" a quem precisa reinstalar seria mentira. */
+  const dentroDoApk = noApk();
+  const temArquivo = !!d.apk;
+  /* Caso chato mas real: estamos no APK e o arquivo novo ainda não foi
+     publicado. Botão que leva a lugar nenhum é pior do que nenhum botão —
+     então aqui a tarja só informa, e diz o que fazer. */
+  const semCaminho = dentroDoApk && !temArquivo;
+  const acao = dentroDoApk ? "Baixar" : "Atualizar";
+  t.innerHTML =
+    `<div class="txt"><b>Versão ${esc(d.versao)} disponível</b>` +
+    (d.novidades ? `<small>${esc(d.novidades)}</small>` : "") +
+    (semCaminho ? `<small>Peça o arquivo novo a quem lhe enviou o aplicativo.</small>` : "") +
+    `</div>` +
+    (semCaminho ? "" : `<button class="agora" onclick="atualizarAgora()">${acao}</button>`) +
+    `<button class="depois" onclick="dispensarVersao()">${semCaminho ? "ok" : "agora não"}</button>`;
+  t.classList.remove("hidden");
+}
+
+function atualizarAgora(){
+  const d = versaoNova;
+  if(!d) return;
+  if(noApk() && d.apk){
+    /* o WebView não instala nada: manda o Android abrir o navegador de verdade */
+    try{ Apk.abrirNavegador(d.apk) }catch(e){ location.href = d.apk }
+    return;
+  }
+  try{
+    const u = new URL(location.href);      /* preserva ?convite=... e o resto */
+    u.searchParams.set("fresh", d.versao); /* URL diferente = busca obrigatória no servidor */
+    location.replace(u.toString());
+  }catch(e){ location.reload() }
+}
+
+function dispensarVersao(){
+  try{ if(versaoNova) localStorage.setItem(VERSAO_DISPENSADA, versaoNova.versao) }catch(e){}
+  const t = $("#tarja-versao");
+  if(t) t.classList.add("hidden");
+}
+
+setTimeout(conferirVersaoNova, 5000);          /* depois que a primeira tela já apareceu */
+setInterval(conferirVersaoNova, 6*60*60*1000); /* e de seis em seis horas, para quem deixa aberto */
 (function(){
   const ok=PERSISTE;
   const vb=$("#ver-badge");if(vb)vb.textContent="v"+APP_VERSION;
