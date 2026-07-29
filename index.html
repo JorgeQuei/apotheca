@@ -124,9 +124,11 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 /* Horizontal bars (países) */
 .hbars{display:flex;flex-direction:column;gap:9px}
 .hbar{display:grid;grid-template-columns:96px 1fr 34px;align-items:center;gap:10px;font-size:12.5px}
+.hbar.pct{grid-template-columns:104px 1fr 28px 34px;gap:8px}
+.hbar .pc{font-size:11px;color:var(--ink-3);text-align:right;font-variant-numeric:tabular-nums}
 .hbar .name{color:var(--ink);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hbar .track{background:transparent;height:16px;position:relative}
-.hbar .fill{height:16px;border-radius:0 4px 4px 0;background:var(--wine-3);min-width:3px}
+.hbar .track{display:block;background:transparent;height:16px;position:relative}
+.hbar .fill{display:block;height:16px;border-radius:0 4px 4px 0;background:var(--wine-3);min-width:3px}
 .hbar .num{color:var(--ink-2);font-variant-numeric:tabular-nums}
 
 /* Alerts */
@@ -246,6 +248,10 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   font-size:14px;font-weight:600;color:var(--ink-2);cursor:pointer;white-space:nowrap;font-family:inherit;display:flex;gap:6px;align-items:center}
 .stab.active{color:var(--wine);border-bottom-color:var(--wine)}
 .seg{display:inline-flex;background:var(--cream);border-radius:99px;padding:3px;gap:2px;margin-bottom:12px;flex-wrap:wrap}
+/* v0.43: com 4 abas a linha estourava no celular — vira faixa deslizante em vez de quebrar */
+.seg.rolar{display:flex;flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.seg.rolar::-webkit-scrollbar{display:none}
+.seg.rolar .seg-b{white-space:nowrap;flex:none;padding:7px 13px}
 .seg-b{background:none;border:none;border-radius:99px;padding:7px 15px;font-size:13px;font-weight:600;
   color:var(--ink-2);cursor:pointer;font-family:inherit}
 .seg-b.active{background:var(--card);color:var(--wine);box-shadow:0 1px 3px rgba(0,0,0,.1)}
@@ -484,9 +490,10 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
       </div>
 
       <div id="ctab-rede" class="hidden">
-        <div class="seg">
+        <div class="seg rolar">
           <button class="seg-b active" id="rd-seguindo" onclick="setAbaRede('seguindo')">Seguindo</button>
           <button class="seg-b" id="rd-seguidores" onclick="setAbaRede('seguidores')">Seguidores</button>
+          <button class="seg-b" id="rd-conversas" onclick="setAbaRede('conversas')">💬 Conversas</button>
           <button class="seg-b" id="rd-descobrir" onclick="setAbaRede('descobrir')">🔍 Descobrir</button>
         </div>
         <div id="rede-busca" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
@@ -614,7 +621,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.41"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.43"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1060,6 +1067,8 @@ async function sincronizarComunidade(){
       const ps=await sb("/confraria_posts?select=*&order=id.desc&limit=300");
       MURAL=ps.map(p=>({id:p.id,cf:p.confraria_id,user:p.usuario,txt:p.texto,ts:new Date(p.criado).getTime()}));
     }catch(e){}
+    /* v0.43: mensagens diretas — só chega o que é meu, o servidor filtra */
+    try{await carregarConversas()}catch(e){}
     /* Estatísticas da adega: cada um publica só os SEUS números agregados.
        O valor estimado e a lista de rótulos nunca saem do aparelho. */
     try{
@@ -1752,11 +1761,15 @@ function limparAdegaLocal(){
    Salva a adega no armazenamento do navegador do aparelho (quando disponível).
    Se o navegador não permitir (ex.: visualização dentro de outros apps),
    o protótipo segue funcionando normalmente, apenas sem memória entre sessões. */
+/* mensagens diretas (v0.43) — declaradas aqui porque restore() roda antes do módulo */
+let MSGS=[];               /* {id,de,para,texto,ts,lida} */
+let BLOQUEADOS=[];         /* @usuários que EU bloqueei */
+let conversaAberta=null;
 const STORE_KEY="apotheca_dados_v1";
 let PERSISTE=false;
 function persist(){
   try{
-    localStorage.setItem(STORE_KEY,JSON.stringify({dono:perfil?perfil.user:null,adegaDemo,vinhos,ADEGAS,historico,eventos,seguindo,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,MURAL,meusBrindes,NEXT_ID,NEXT_EV}));
+    localStorage.setItem(STORE_KEY,JSON.stringify({dono:perfil?perfil.user:null,adegaDemo,vinhos,ADEGAS,historico,eventos,seguindo,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,MURAL,meusBrindes,NEXT_ID,NEXT_EV,MSGS,BLOQUEADOS}));
     PERSISTE=true;
   }catch(e){PERSISTE=false}
 }
@@ -1772,7 +1785,7 @@ function persist(){
       /* migração v0.38: expurga as confrarias-demo antigas do cache e normaliza o tipo */
       if(Array.isArray(s.CONFRARIAS)&&s.CONFRARIAS.length)CONFRARIAS=s.CONFRARIAS.filter(c=>!DEMO_CONFRARIAS.includes(c.id)).map(c=>({...c,tipo:c.tipo||(c.aberta?"aberta":"moderada"),brasao:c.brasao||"🏛️",moderadores:c.moderadores||[],pendentes:c.pendentes||[],quemConvida:c.quemConvida||"diretoria"}));
       minhasConfrarias=minhasConfrarias.filter(m=>!DEMO_CONFRARIAS.includes(m.id));
-      MURAL=s.MURAL||[];meusBrindes=s.meusBrindes||[];seguindo=(seguindo||[]).filter(a=>a&&a.user);NEXT_ID=s.NEXT_ID||NEXT_ID;NEXT_EV=s.NEXT_EV||NEXT_EV;
+      MURAL=s.MURAL||[];meusBrindes=s.meusBrindes||[];MSGS=Array.isArray(s.MSGS)?s.MSGS:[];BLOQUEADOS=Array.isArray(s.BLOQUEADOS)?s.BLOQUEADOS:[];seguindo=(seguindo||[]).filter(a=>a&&a.user);NEXT_ID=s.NEXT_ID||NEXT_ID;NEXT_EV=s.NEXT_EV||NEXT_EV;
     }
     localStorage.setItem("__apo_t","1");localStorage.removeItem("__apo_t");PERSISTE=true;
   }catch(e){PERSISTE=false}
@@ -2128,6 +2141,42 @@ window.addEventListener("hashchange",()=>{
 if(!location.hash){try{history.replaceState(null,"","#dashboard")}catch(e){}}
 
 /* ================== DASHBOARD ================== */
+/* ===== Pop-ups da tela inicial (v0.42) — mesmo desenho da tela de Encontros ===== */
+const linhaAlerta=x=>`<div class="alert-row" onclick="closeModal('modal-detail');openDetail(${x.v.id})"><span class="tag ${x.s.k}">${x.s.txt}</span><span><b>${esc(x.v.nome)} ${safraTxt(x.v)}</b> · ${esc(x.v.vinicola)} ${adegaAtiva==="todas"?adegaDe(x.v.adega).icone:""} — ${x.v.qtd} gf. ${x.s.k==="passando"?"já passou da janela ideal ("+x.v.jan[1]+")":"janela encerra em "+x.v.jan[1]}</span></div>`;
+const linhaGuarda=x=>`<div class="alert-row" onclick="closeModal('modal-detail');openDetail(${x.v.id})"><span class="tag guardar">Guardar</span><span><b>${esc(x.v.nome)} ${safraTxt(x.v)}</b> — atinge o auge a partir de ${x.v.jan[0]}</span></div>`;
+
+function abrirTodosPaises(){
+  const lista=window.__paises||[];
+  const max=lista.length?lista[0][1]:1;
+  const tot=lista.reduce((s,x)=>s+x[1],0)||1;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🌍 Garrafas por país</h3>
+    <div class="sub">${lista.length} países · ${tot} garrafas na ${adegaAtiva==="todas"?"sua coleção":"adega selecionada"}</div>
+    <div class="hbars" style="margin-top:14px">
+      ${lista.map(([p,n])=>`<div class="hbar pct" title="${esc(p)}: ${n} garrafas"><span class="name">${esc(p)}</span><span class="track"><span class="fill" style="width:${n/max*100}%"></span></span><span class="num">${n}</span><span class="pc">${Math.round(n/tot*100)}%</span></div>`).join("")}
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+function abrirTodasJanelas(){
+  const u=window.__urgentes||[], g=window.__emGuarda||[];
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">⏳ Janela de consumo</h3>
+    <div class="sub">Toque em qualquer garrafa para abrir a ficha completa.</div>
+    ${u.length?`<div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:14px 0 6px">MERECEM ATENÇÃO (${u.length})</div>${u.map(linhaAlerta).join("")}`:""}
+    ${g.length?`<div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:14px 0 6px">AINDA GUARDANDO (${g.length})</div>${g.map(linhaGuarda).join("")}`:""}
+    ${!u.length&&!g.length?'<div class="empty">Tudo em ordem — nenhuma garrafa fora da janela ideal. 🥂</div>':""}`;
+  $("#modal-detail").classList.add("open");
+}
+function abrirTodoHistorico(){
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">📜 Histórico de consumo</h3>
+    <div class="sub">${historico.length} garrafa${historico.length===1?"":"s"} aberta${historico.length===1?"":"s"}${historico.length?" · média "+(historico.reduce((s,h)=>s+h.estrelas,0)/historico.length).toFixed(1)+" ★":""}</div>
+    <div style="margin-top:14px">${histRowsHtml()}</div>`;
+  $("#modal-detail").classList.add("open");
+}
 function renderDash(){
   const VS=vinhosAtivos();
   const a=adegaDe(adegaAtiva);
@@ -2158,19 +2207,24 @@ function renderDash(){
   const porPais={};VS.forEach(v=>porPais[v.pais]=(porPais[v.pais]||0)+v.qtd);
   const lista=Object.entries(porPais).sort((a,b)=>b[1]-a[1]);
   const max=lista.length?lista[0][1]:1;
-  if(!vazia)$("#chart-paises").innerHTML=lista.map(([p,n])=>
-    `<div class="hbar" title="${p}: ${n} garrafas"><span class="name">${p}</span><span class="track"><span class="fill" style="width:${n/max*100}%"></span></span><span class="num">${n}</span></div>`).join("");
+  const barraPais=([p,n])=>`<div class="hbar" title="${esc(p)}: ${n} garrafas"><span class="name">${esc(p)}</span><span class="track"><span class="fill" style="width:${n/max*100}%"></span></span><span class="num">${n}</span></div>`;
+  const TOPO=6; /* tela enxuta: o mapa completo abre em pop-up */
+  if(!vazia)$("#chart-paises").innerHTML=lista.slice(0,TOPO).map(barraPais).join("")
+    +(lista.length>TOPO?`<div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="abrirTodosPaises()">🌍 Ver todos os ${lista.length} países →</button></div>`:"");
+  window.__paises=lista;
 
   /* alertas de janela */
   const urgentes=VS.map(v=>({v,s:status(v)})).filter(x=>x.s.k==="logo"||x.s.k==="passando");
   const emGuarda=VS.map(v=>({v,s:status(v)})).filter(x=>x.s.k==="guardar");
-  let html=urgentes.slice(0,5).map(x=>`<div class="alert-row" onclick="openDetail(${x.v.id})"><span class="tag ${x.s.k}">${x.s.txt}</span><span><b>${x.v.nome} ${safraTxt(x.v)}</b> · ${x.v.vinicola} ${adegaAtiva==="todas"?adegaDe(x.v.adega).icone:""} — ${x.v.qtd} gf. ${x.s.k==="passando"?"já passou da janela ideal ("+x.v.jan[1]+")":"janela encerra em "+x.v.jan[1]}</span></div>`).join("");
-  if(urgentes.length>5)html+=`<div class="alert-row" style="cursor:default"><span class="tag logo">+${urgentes.length-5}</span><span>outros rótulos também merecem atenção — veja na Coleção.</span></div>`;
-  html+=emGuarda.slice(0,2).map(x=>`<div class="alert-row" onclick="openDetail(${x.v.id})"><span class="tag guardar">Guardar</span><span><b>${x.v.nome} ${safraTxt(x.v)}</b> — atinge o auge a partir de ${x.v.jan[0]}</span></div>`).join("");
+  window.__urgentes=urgentes;window.__emGuarda=emGuarda;
+  let html=urgentes.slice(0,3).map(linhaAlerta).join("");
+  html+=emGuarda.slice(0,2).map(linhaGuarda).join("");
+  const sobra=Math.max(0,urgentes.length-3)+Math.max(0,emGuarda.length-2);
+  if(sobra)html+=`<div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="abrirTodasJanelas()">⏳ Ver todas as ${urgentes.length+emGuarda.length} garrafas →</button></div>`;
   $("#alerts").innerHTML=html||`<div class="empty">Tudo em ordem — nenhuma garrafa fora da janela ideal. 🥂</div>`;
   const dh=$("#dash-hist");
   if(typeof renderFeed==="function")renderFeed();
-  if(dh)dh.innerHTML=histRowsHtml(5)+(historico.length>5?`<div style="text-align:center;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="go('historico')">Ver histórico completo (${historico.length}) →</button></div>`:"");
+  if(dh)dh.innerHTML=histRowsHtml(3)+(historico.length>3?`<div style="text-align:center;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="abrirTodoHistorico()">📜 Ver as ${historico.length} garrafas abertas →</button></div>`:"");
 }
 
 /* ================== COLEÇÃO ================== */
@@ -2959,8 +3013,9 @@ function renderComunidade(){
 }
 function setAbaRede(a){
   abaRede=a;
-  ["seguindo","seguidores","descobrir"].forEach(x=>$("#rd-"+x).classList.toggle("active",x===a));
+  ["seguindo","seguidores","conversas","descobrir"].forEach(x=>$("#rd-"+x).classList.toggle("active",x===a));
   $("#rede-busca").classList.toggle("hidden",a!=="descobrir");
+  if(a==="conversas")carregarConversas();
   renderRede();
 }
 /* ---------- Minha rede ---------- */
@@ -2976,11 +3031,15 @@ function pessoaHtml(user,acao){
     ${acao}
   </div>`;
 }
-const btnDeixar=u=>`<button class="btn btn-ghost btn-sm" style="flex:none" title="Tocar para deixar de seguir" onclick="deixarDeSeguirUser('${escJS(u)}')">Seguindo ✓</button>`;
+/* Só amigo próximo ganha o botão de conversa — é a regra do banco refletida na tela */
+const btnFalar=u=>ehAmigoProximo(u)?`<button class="btn btn-ghost btn-sm" style="flex:none;padding:6px 10px" title="Conversar com ${esc(nomeDe(u))}" onclick="event.stopPropagation();abrirConversa('${escJS(u)}')">💬${naoLidasCom(u)?`<span class="badge-n" style="margin-left:4px">${naoLidasCom(u)}</span>`:""}</button>`:"";
+const btnDeixar=u=>btnFalar(u)+`<button class="btn btn-ghost btn-sm" style="flex:none" title="Tocar para deixar de seguir" onclick="deixarDeSeguirUser('${escJS(u)}')">Seguindo ✓</button>`;
 const btnSeguir=(u,volta)=>`<button class="btn btn-gold btn-sm" style="flex:none" onclick="seguir('${escJS(u)}')">＋ Seguir${volta?" de volta":""}</button>`;
 function renderRede(){
   const el=$("#rede-lista");if(!el)return;
   if(!perfil){el.innerHTML='<div class="empty">Entre com sua conta para montar sua rede.</div>';return}
+  /* os três contadores ficam sempre certos, mesmo com outra aba aberta */
+  atualizarAbasRede();
   const sel=$("#rd-cidade");
   if(sel&&!sel.dataset.pronto){
     const cidades=[...new Set(USUARIOS_APP.map(u=>u.cidade).filter(Boolean))].sort();
@@ -2989,12 +3048,12 @@ function renderRede(){
   }
   if(abaRede==="seguindo"){
     const lista=seguindo.map(a=>a.user);
-    $("#rd-seguindo").textContent=`Seguindo (${lista.length})`;
     el.innerHTML=lista.map(u=>pessoaHtml(u,btnDeixar(u))).join("")||
       '<div class="empty"><div class="big">👥</div>Você ainda não segue ninguém.<br>Toque em <b>🔍 Descobrir</b> para encontrar apreciadores da sua cidade.</div>';
+  }else if(abaRede==="conversas"){
+    renderConversas(el);
   }else if(abaRede==="seguidores"){
     const lista=meusSeguidores();
-    $("#rd-seguidores").textContent=`Seguidores (${lista.length})`;
     el.innerHTML=lista.map(u=>pessoaHtml(u,sigoEle(u)?btnDeixar(u):btnSeguir(u,true))).join("")||
       '<div class="empty"><div class="big">🙋</div>Ninguém te segue ainda.<br>Convide seus amigos de confraria — quando eles entrarem, aparecem aqui.</div>';
   }else{
@@ -3011,6 +3070,198 @@ function renderRede(){
       ||'<div class="empty"><div class="big">🔍</div>Nenhum apreciador novo com esse filtro.</div>';
   }
 }
+/* ===================== MENSAGEM DIRETA (v0.43) =====================
+   Regra central: só existe conversa entre AMIGOS PRÓXIMOS — quem eu sigo
+   e que me segue de volta. Isso não é uma checagem de tela que dá para
+   contornar: o banco recusa a gravação de quem não cumpre a condição.
+   Um desconhecido é incapaz de escrever, mesmo forjando a requisição.
+   Aqui na tela a regra só é ESPELHADA, para o botão não aparecer à toa. */
+/* MSGS, BLOQUEADOS e conversaAberta são declarados junto da persistência,
+   lá em cima — a restauração do armazenamento roda antes deste trecho. */
+
+const souEu=u=>!!perfil&&u===perfil.user;
+const outroLado=m=>souEu(m.de)?m.para:m.de;
+const bloqueei=u=>BLOQUEADOS.indexOf(u)>=0;
+const msgsCom=u=>MSGS.filter(m=>(m.de===u&&souEu(m.para))||(m.para===u&&souEu(m.de)))
+                     .sort((a,b)=>a.ts-b.ts);
+const naoLidasCom=u=>MSGS.filter(m=>m.de===u&&souEu(m.para)&&!m.lida).length;
+const naoLidasMsg=()=>MSGS.filter(m=>souEu(m.para)&&!m.lida).length;
+const podeFalarCom=u=>!!perfil&&u!==perfil.user&&ehAmigoProximo(u)&&!bloqueei(u);
+const horaCurta=ts=>{const d=new Date(ts),hoje=new Date();
+  return d.toDateString()===hoje.toDateString()
+    ?String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")
+    :d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});};
+
+/* ---------- nuvem ---------- */
+async function carregarConversas(){
+  if(!perfil||!sessao||!sessao.uid)return;
+  try{
+    const linhas=await rpc("minhas_conversas",{});
+    if(!Array.isArray(linhas))return;
+    /* a caixa de entrada traz só o resumo; o conteúdo vem ao abrir a conversa */
+    linhas.forEach(c=>{
+      const ts=new Date(c.ultima).getTime();
+      if(MSGS.some(m=>outroLado(m)===c.outro&&Math.abs(m.ts-ts)<1500))return;
+      MSGS.push({id:"r"+c.outro+ts,de:c.ultimo_de,
+        para:c.ultimo_de===c.outro?perfil.user:c.outro,
+        texto:c.previa,ts,lida:!(c.nao_lidas>0)});
+    });
+    persist();renderRede();atualizarSinoNotif();
+  }catch(e){}
+}
+async function abrirConversa(user){
+  conversaAberta=user;
+  desenharConversa(user);
+  $("#modal-detail").classList.add("open");
+  if(perfil&&sessao&&sessao.uid){
+    try{
+      const r=await rpc("ler_conversa",{outro:user,marcar:true});
+      if(r&&r.ok){
+        MSGS=MSGS.filter(m=>outroLado(m)!==user)
+          .concat((r.mensagens||[]).map(m=>({id:m.id,de:m.de,
+            para:m.de===user?perfil.user:user,texto:m.texto,
+            ts:new Date(m.criado).getTime(),lida:true})));
+        if(r.bloqueei&&!bloqueei(user))BLOQUEADOS.push(user);
+        persist();
+        if(conversaAberta===user)desenharConversa(user);
+        renderRede();atualizarSinoNotif();
+      }
+    }catch(e){}
+  }else{
+    MSGS.forEach(m=>{if(m.de===user&&souEu(m.para))m.lida=true});
+    persist();renderRede();atualizarSinoNotif();
+  }
+}
+function desenharConversa(user){
+  const lista=msgsCom(user), nome=nomeDe(user), pode=podeFalarCom(user);
+  const balao=m=>{
+    const meu=souEu(m.de);
+    return `<div style="display:flex;justify-content:${meu?"flex-end":"flex-start"};margin:6px 0">
+      <div style="max-width:78%;padding:8px 12px;border-radius:${meu?"14px 14px 4px 14px":"14px 14px 14px 4px"};background:${meu?"var(--wine-3)":"#f1e9df"};color:${meu?"#fff":"var(--ink)"};font-size:13.5px;line-height:1.45">
+        ${esc(m.texto)}
+        <div style="font-size:10px;opacity:.7;margin-top:3px;text-align:right">${horaCurta(m.ts)}</div>
+      </div></div>`;
+  };
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="fecharConversa()">✕</button>
+    <div style="display:flex;align-items:center;gap:10px;padding-right:34px">
+      ${avatarDe(user,40)}
+      <div style="flex:1;min-width:0">
+        <h3 class="serif" style="font-size:19px;margin:0">${esc(nome)}</h3>
+        <div class="sub" style="margin:0">@${esc(user)} · ${bloqueei(user)?"🚫 bloqueado":ehAmigoProximo(user)?"🤝 amigo próximo":"conversa encerrada"}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="flex:none" onclick="menuConversa('${escJS(user)}')" title="Bloquear ou denunciar">⋯</button>
+    </div>
+    <div id="conv-corpo" style="margin-top:12px;max-height:46vh;overflow:auto;padding:4px 2px">
+      ${lista.length?lista.map(balao).join(""):`<div class="empty" style="padding:18px">💬 Nenhuma mensagem ainda.<br>Diga um oi para ${esc(String(nome).split(" ")[0])}.</div>`}
+    </div>
+    ${pode?`<div style="display:flex;gap:8px;margin-top:12px">
+        <input id="conv-txt" maxlength="2000" placeholder="Escreva uma mensagem…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();enviarMsg()}">
+        <button class="btn btn-gold btn-sm" style="flex:none" onclick="enviarMsg()">Enviar</button>
+      </div>`
+      :`<div class="empty" style="margin-top:12px;padding:14px;font-size:12.5px">${bloqueei(user)?`Você bloqueou ${esc(nome)}. <button class="btn btn-ghost btn-sm" onclick="desbloquear('${escJS(user)}')">Desbloquear</button>`:`Vocês não são mais amigos próximos — a conversa fica guardada, mas só é possível escrever quando os dois se seguem.`}</div>`}`;
+  const c=$("#conv-corpo");if(c)c.scrollTop=c.scrollHeight;
+}
+function fecharConversa(){conversaAberta=null;closeModal("modal-detail");renderRede()}
+
+async function enviarMsg(){
+  const cx=$("#conv-txt");if(!cx)return;
+  const txt=cx.value.trim(), user=conversaAberta;
+  if(!txt||!user)return;
+  if(!podeFalarCom(user)){toast("Só é possível conversar com amigos próximos. 🤝");return}
+  cx.value="";
+  const local={id:"l"+Date.now(),de:perfil.user,para:user,texto:txt,ts:Date.now(),lida:true};
+  MSGS.push(local);persist();desenharConversa(user);
+  if(!sessao||!sessao.uid)return;
+  try{
+    let r=await rpc("enviar_mensagem",{destino:user,texto:txt});
+    if(r&&!r.ok&&r.erro==="sem_login"&&await garantirVinculo())r=await rpc("enviar_mensagem",{destino:user,texto:txt});
+    if(r&&r.ok){local.id=r.id;persist();return}
+    /* o servidor recusou — desfaz na tela para não mentir para o usuário */
+    MSGS=MSGS.filter(m=>m!==local);persist();desenharConversa(user);
+    toast({nao_e_amigo_proximo:"Vocês precisam se seguir mutuamente para conversar. 🤝",
+      bloqueado:"Não é possível enviar mensagem para esta pessoa.",
+      muitas_mensagens:"Muitas mensagens seguidas — espere um pouco. ⏳",
+      sem_login:"Entre de novo com o Google para enviar mensagens. 🔐",
+      vazio:"Escreva alguma coisa antes de enviar."}[r&&r.erro]||"Não consegui enviar agora.");
+  }catch(e){
+    MSGS=MSGS.filter(m=>m!==local);persist();desenharConversa(user);
+    toast("Sem conexão — mensagem não enviada.");
+  }
+}
+
+function atualizarAbasRede(){
+  const a=$("#rd-seguindo"),b=$("#rd-seguidores"),c=$("#rd-conversas");
+  if(a)a.textContent=`Seguindo (${seguindo.length})`;
+  if(b)b.textContent=`Seguidores (${meusSeguidores().length})`;
+  const nl=naoLidasMsg();
+  if(c)c.innerHTML="💬 Conversas"+(nl?` <span class="badge-n">${nl}</span>`:"");
+}
+/* ---------- caixa de entrada ---------- */
+function renderConversas(el){
+  const proximos=[...new Set(REDE.filter(s=>souEu(s.de)).map(s=>s.para))].filter(ehAmigoProximo);
+  const comConversa=[...new Set(MSGS.map(outroLado))].filter(Boolean);
+  const todos=[...new Set(comConversa.concat(proximos))];
+  if(!todos.length){
+    el.innerHTML='<div class="empty"><div class="big">💬</div>Você ainda não tem amigos próximos.<br>Conversa só existe entre quem se segue <b>mutuamente</b> — é o que mantém o Apotheca livre de mensagem de desconhecido.</div>';
+    return;
+  }
+  todos.sort((a,b)=>{const ua=msgsCom(a),ub=msgsCom(b);
+    return (ub.length?ub[ub.length-1].ts:0)-(ua.length?ua[ua.length-1].ts:0)});
+  el.innerHTML=todos.map(u=>{
+    const l=msgsCom(u), ult=l[l.length-1], n=naoLidasCom(u), uu=USUARIOS_APP.find(x=>x.user===u);
+    return `<div class="pessoa" style="cursor:pointer" onclick="abrirConversa('${escJS(u)}')">
+      ${avatarDe(u,38)}
+      <div class="inf">
+        <b>${esc(uu?uu.nome:u)}${bloqueei(u)?' <span class="tag" style="font-size:10px;padding:1px 6px">bloqueado</span>':""}</b>
+        <small>${ult?(souEu(ult.de)?"Você: ":"")+esc(ult.texto).slice(0,54)+(ult.texto.length>54?"…":""):"Nenhuma mensagem ainda"}</small>
+      </div>
+      ${n?`<span class="badge-n" style="flex:none">${n}</span>`:`<span style="flex:none;font-size:11px;color:var(--ink-3)">${ult?horaCurta(ult.ts):""}</span>`}
+    </div>`;
+  }).join("");
+}
+
+/* ---------- bloquear e denunciar (exigidos pelas lojas) ---------- */
+function menuConversa(user){
+  const nome=nomeDe(user);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="abrirConversa('${escJS(user)}')">✕</button>
+    <h3 class="serif">⋯ ${esc(nome)}</h3>
+    <div class="sub">O que você quer fazer?</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+      <button class="btn btn-ghost" onclick="abrirPerfil('${escJS(user)}')">👤 Ver o perfil</button>
+      ${bloqueei(user)
+        ?`<button class="btn btn-ghost" onclick="desbloquear('${escJS(user)}')">🔓 Desbloquear</button>`
+        :`<button class="btn btn-ghost" onclick="bloquear('${escJS(user)}')">🚫 Bloquear</button>`}
+      <button class="btn btn-ghost" onclick="denunciar('${escJS(user)}')">⚠️ Denunciar comportamento</button>
+      <button class="btn btn-ghost" onclick="abrirConversa('${escJS(user)}')">↩︎ Voltar à conversa</button>
+    </div>`;
+}
+async function bloquear(user){
+  if(!confirm(`Bloquear ${nomeDe(user)}?\n\nVocês deixam de se seguir e nenhum dos dois poderá escrever ao outro. As mensagens antigas continuam guardadas com você.`))return;
+  if(!bloqueei(user))BLOQUEADOS.push(user);
+  /* espelha na tela o que o servidor faz: o bloqueio desfaz o seguir dos dois lados */
+  REDE=REDE.filter(s=>!((s.de===perfil.user&&s.para===user)||(s.de===user&&s.para===perfil.user)));
+  seguindo=seguindo.filter(a=>a.user!==user);
+  persist();
+  if(sessao&&sessao.uid){try{await rpc("bloquear_usuario",{alvo:user,motivo:""})}catch(e){}}
+  closeModal("modal-detail");conversaAberta=null;renderRede();
+  toast(`${nomeDe(user)} foi bloqueado. 🚫`);
+}
+async function desbloquear(user){
+  BLOQUEADOS=BLOQUEADOS.filter(u=>u!==user);persist();
+  if(sessao&&sessao.uid){try{await rpc("desbloquear_usuario",{alvo:user})}catch(e){}}
+  closeModal("modal-detail");conversaAberta=null;renderRede();
+  toast(`${nomeDe(user)} foi desbloqueado. Para voltar a conversar, sigam-se de novo.`);
+}
+async function denunciar(user){
+  const motivo=prompt(`Denunciar ${nomeDe(user)}\n\nO que aconteceu? (a denúncia é analisada e o outro lado não é avisado)`);
+  if(motivo===null)return;
+  if(sessao&&sessao.uid){try{await rpc("denunciar_usuario",{alvo:user,motivo:motivo||"",contexto:"mensagem"})}catch(e){}}
+  closeModal("modal-detail");conversaAberta=null;
+  toast("Denúncia registrada. Obrigado por avisar. ⚠️");
+}
+
 /* ===================== BLOQUEIO DO APLICATIVO (v0.41) =====================
    Serve para quem não quer refazer o login do Google toda vez: a sessão
    continua guardada e a entrada é liberada com digital/rosto ou uma senha
@@ -3244,6 +3495,12 @@ function notificacoes(){
   });
   COMENTARIOS.filter(c=>meusPosts.includes(c.fid)&&c.user!==eu).forEach(c=>
     n.push({ts:c.ts||0,em:"💬",txt:`<b>${esc(nomeDe(c.user))}</b> comentou: “${esc(c.txt)}”`,acao:"",user:c.user}));
+  /* v0.43: mensagem direta não lida também avisa — mas nunca mostra o texto
+     na notificação do sistema, para não expor conversa na tela de bloqueio */
+  MSGS.filter(m=>souEu(m.para)&&!m.lida&&m.de!==eu).forEach(m=>
+    n.push({ts:m.ts||0,em:"💬",txt:`<b>${esc(nomeDe(m.de))}</b> mandou uma mensagem`,
+      acao:`<button class="btn btn-gold btn-sm" style="flex:none" onclick="abrirConversa('${escJS(m.de)}')">Abrir</button>`,
+      user:m.de}));
   CONFRARIAS.filter(c=>ehDiretoria(c)).forEach(c=>(c.pendentes||[]).forEach(p=>
     n.push({ts:Date.now(),em:"⏳",txt:`<b>${esc(nomeDe(p))}</b> pediu vaga na confraria <b>${esc(c.nome)}</b>`,
       acao:`<button class="btn btn-primary btn-sm" style="flex:none" onclick="abrirGestaoConfraria('${escJS(c.id)}')">Ver pedido</button>`,user:p})));
@@ -3368,7 +3625,7 @@ function abrirConfigAvisos(){
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
     <h3 class="serif">🔔 Avisos no celular</h3>
-    <div class="sub">Para você saber na hora quando comentarem sua garrafa, brindarem ou começarem a te seguir.</div>
+    <div class="sub">Para você saber na hora quando comentarem sua garrafa, brindarem, começarem a te seguir ou mandarem uma mensagem.</div>
     <div class="explain-box" style="margin:12px 0">
       Situação agora: <b>${p==="granted"?"ligados ✅":p==="denied"?"bloqueados pelo aparelho ⛔":"ainda não ativados"}</b>
       ${noApk?" · aplicativo Android":iOS?" · iPhone":""}
