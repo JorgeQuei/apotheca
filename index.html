@@ -615,7 +615,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.45"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.46"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2024,6 +2024,154 @@ function status(v){
   return {k:"auge",txt:"No auge"};
 }
 
+/* ===================== MINHA CONTA E MEUS DADOS (v0.46) =====================
+   Duas obrigações que faltavam. A Google Play exige caminho de exclusão
+   dentro do aplicativo (e uma página pública, que fica no site). A LGPD dá
+   ao titular o direito de eliminação e o de levar os próprios dados embora.
+
+   Detalhe que importa: a sua adega nunca subiu para o servidor, então a
+   exportação junta as duas metades — o que está no servidor e o que está
+   só aqui — senão o arquivo seria incompleto justo na parte mais sua. */
+
+function abrirMinhaConta(){
+  const eu=perfil?perfil.user:null;
+  const garrafas=vinhos.reduce((s,v)=>s+v.qtd,0);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="abrirConfiguracoes()">✕</button>
+    <h3 class="serif">🔑 Minha conta</h3>
+    <div class="sub">${eu?"@"+esc(eu):"não conectada"}${sessao&&sessao.email?" · "+esc(sessao.email):""}</div>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SEUS DADOS</div>
+    <div class="explain-box" style="margin-bottom:10px">
+      A sua adega — os <b>${fmt(garrafas)} garrafas</b>, os preços e o valor estimado —
+      nunca saiu deste aparelho. Para a comunidade vão apenas totais, e só se você permitir.
+      A exportação abaixo junta as duas partes num arquivo só.
+    </div>
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="baixarMeusDados()">
+      📦 Baixar meus dados (arquivo JSON)
+    </button>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">ENCERRAR</div>
+    <div class="explain-box" style="margin-bottom:10px;border-left-color:var(--wine)">
+      Apagar a conta remove <b>para sempre</b> o seu perfil, a sua rede, as suas conversas
+      reservadas, os encontros que você criou e os seus números na comunidade — inclusive o
+      e-mail do login. Encontros criados por outras pessoas continuam existindo; você apenas
+      sai deles. Denúncias que você fez ficam guardadas sem o seu nome, porque servem para
+      proteger quem fica.
+      <br><br>A sua adega neste aparelho <b>não</b> é apagada por aqui — ela é sua e continua no celular.
+    </div>
+    <button class="btn btn-ghost" style="width:100%;color:var(--wine)" onclick="abrirApagarConta()">
+      🗑️ Apagar minha conta
+    </button>
+    <div style="font-size:11.5px;color:var(--ink-3);text-align:center;margin-top:10px">
+      Também dá para pedir a exclusão sem o aplicativo, em
+      <a href="${SITE_URL}excluir-conta.html" target="_blank" rel="noopener" style="color:var(--wine-3)">apotheca.app.br/excluir-conta.html</a>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+
+async function baixarMeusDados(){
+  toast("Preparando o arquivo… 📦");
+  const local={
+    origem:"aparelho (nunca foi enviado ao servidor)",
+    adega:vinhos, adegas:ADEGAS, historico:historico,
+    encontros_locais:eventos.filter(e=>!ehNuvem(e)),
+    conversas_neste_aparelho:MSGS, bloqueados:BLOQUEADOS
+  };
+  let servidor={aviso:"sem login: nada foi enviado ao servidor"};
+  if(naNuvem()){
+    try{ const r=await rpc("meus_dados",{}); if(r&&r.ok)servidor=r; else servidor={erro:(r&&r.erro)||"nao_consegui"} }
+    catch(e){ servidor={erro:"sem conexão"} }
+  }
+  const pacote={
+    aplicativo:"Apotheca", versao:APP_VERSION,
+    gerado_em:new Date().toISOString(),
+    conta:perfil?perfil.user:null,
+    no_servidor:servidor,
+    neste_aparelho:local
+  };
+  const txt=JSON.stringify(pacote,null,1);
+  const nome="apotheca-meus-dados-"+(perfil?perfil.user:"conta")+"-"+new Date().toISOString().slice(0,10)+".json";
+  try{
+    const b=new Blob([txt],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(b); a.download=nome;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+    toast("Arquivo gerado — confira os downloads. 📦");
+  }catch(e){
+    /* alguns navegadores dentro de aplicativos bloqueiam download: mostramos na tela */
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="abrirMinhaConta()">✕</button>
+      <h3 class="serif">📦 Meus dados</h3>
+      <div class="sub">O aparelho não permitiu baixar o arquivo. Copie o conteúdo abaixo.</div>
+      <textarea readonly style="width:100%;height:44vh;font-size:11px;margin-top:12px">${esc(txt)}</textarea>`;
+    $("#modal-detail").classList.add("open");
+  }
+}
+
+function abrirApagarConta(){
+  const eu=perfil?perfil.user:"";
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="abrirMinhaConta()">✕</button>
+    <h3 class="serif">🗑️ Apagar minha conta</h3>
+    <div class="sub">Isto não tem volta. Leia antes de confirmar.</div>
+    <div class="explain-box" style="margin:12px 0;border-left-color:var(--wine)">
+      <b>Some para sempre:</b> perfil, cidade, e-mail do login, quem você segue e quem segue você,
+      conversas reservadas (dos dois lados), suas atividades, brindes e comentários,
+      seus números na comunidade, encontros que você criou (com a conversa deles)
+      e as garrafas que você registrou em encontros.
+      <br><br>
+      <b>Fica:</b> encontros criados por outras pessoas (você só sai deles) e as denúncias
+      que você fez, sem o seu nome.
+      <br><br>
+      <b>Não é afetada:</b> a sua adega guardada neste celular.
+    </div>
+    <div style="margin-bottom:8px;font-size:13px">Para confirmar, digite <b>${esc(eu)}</b>:</div>
+    <input id="conf-apagar" placeholder="${esc(eu)}" autocomplete="off" style="width:100%;margin-bottom:10px">
+    <button class="btn btn-primary" style="width:100%;background:var(--wine)" onclick="confirmarApagarConta()">
+      Apagar minha conta definitivamente
+    </button>
+    <button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="abrirMinhaConta()">Cancelar</button>`;
+  $("#modal-detail").classList.add("open");
+}
+
+async function confirmarApagarConta(){
+  const eu=perfil?perfil.user:"";
+  const dig=($("#conf-apagar")&&$("#conf-apagar").value||"").trim();
+  if(dig!==eu){toast("Digite exatamente o seu @usuário para confirmar.");return}
+  if(!naNuvem()){
+    /* sem login não há conta no servidor: limpamos o que existe aqui */
+    if(!confirm("Você não está conectado, então não há conta no servidor para apagar.\n\nQuer limpar o perfil guardado neste aparelho?"))return;
+    perfil=null;persist();location.reload();return;
+  }
+  toast("Apagando…");
+  try{
+    const r=await rpc("apagar_minha_conta",{confirmacao:eu});
+    if(!r||!r.ok){
+      toast(r&&r.erro==="confirmacao_errada"?"Confirmação não confere.":"Não consegui apagar agora — tente de novo.");
+      return;
+    }
+    const n=r.apagados||{};
+    /* limpa o rastro local da conta, sem tocar na adega */
+    try{
+      localStorage.removeItem("apotheca_sessao");
+      localStorage.removeItem(TRAVA_KEY);
+      localStorage.removeItem("apotheca_notif_visto");
+      localStorage.removeItem("apotheca_notif_avisado");
+    }catch(e){}
+    MSGS=[];BLOQUEADOS=[];REDE=[];seguindo=[];CONVITES=[];
+    eventos=eventos.filter(e=>!ehNuvem(e));
+    perfil=null;sessao=null;persist();
+    alert("Conta apagada.\n\n"+
+      `Removidos: ${n.lacos_de_rede||0} laços de rede, ${n.mensagens||0} mensagens, `+
+      `${n.encontros_criados||0} encontro(s) criado(s) e ${n.atividades||0} atividade(s).`+
+      (r.parcial?"\n\nAtenção: o registro de login não pôde ser removido automaticamente. Avise pelo site para concluirmos.":"")+
+      "\n\nA sua adega continua guardada neste aparelho.");
+    location.reload();
+  }catch(e){ toast("Sem conexão — nada foi apagado.") }
+}
+
 /* ===================== CONFIGURAÇÕES (v0.45) =====================
    Até a v0.44 os seis ajustes ficavam soltos no menu principal, que passava
    de quinze linhas e obrigava a rolar. Agora vivem atrás da engrenagem,
@@ -2049,6 +2197,10 @@ function abrirConfiguracoes(){
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
     <h3 class="serif">⚙️ Configurações</h3>
     <div class="sub">Tudo o que dá para ajustar, em um lugar só.</div>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SUA CONTA</div>
+    ${linhaConfig("🔑","Minha conta e meus dados",perfil?"@"+esc(perfil.user):"sem login",
+      "abrirMinhaConta()","Baixar tudo o que é seu ou apagar a conta")}
 
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SUA ADEGA</div>
     ${linhaConfig("✏️","Gerenciar adegas",nAdegas+(nAdegas===1?" adega":" adegas"),
