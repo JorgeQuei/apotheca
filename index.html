@@ -247,10 +247,27 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 .tarja-versao .txt{flex:1;min-width:0}
 .tarja-versao .txt b{color:#f6dfae}
 .tarja-versao .txt small{display:block;color:#e6cfa6;font-size:12px;margin-top:2px}
+.tarja-versao .txt small.garantia{color:#bfe3c0;font-size:11.5px;margin-top:3px}
 .tarja-versao button{border:0;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
 .tarja-versao .agora{background:var(--gold);color:#3a2c10}
 .tarja-versao .depois{background:transparent;color:#e6cfa6;padding:8px 6px;font-weight:400}
 @media(min-width:900px){.tarja-versao{bottom:20px}}
+/* Módulo "O que abrir hoje?" na tela Minha Adega (v0.49) */
+.chip-prato{display:inline-block;background:var(--cream);border:1px solid transparent;border-radius:99px;
+  padding:6px 12px;margin:0 6px 6px 0;font-size:12.5px;font-family:inherit;color:var(--ink);cursor:pointer;
+  transition:background .15s,border-color .15s}
+.chip-prato:hover{border-color:var(--wine-3)}
+.chip-prato.sel{background:var(--wine);color:#fdf3e7;border-color:var(--wine)}
+.chip-prato.mais{background:transparent;color:var(--wine);font-weight:600}
+.harm-linha{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.harm-linha .med{font-size:19px;line-height:1.2}
+/* Faixa de "você está na demonstração" (v0.49) */
+.faixa-demo{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px;
+  background:#fbf3ea;border:1px solid var(--gold);border-left-width:4px;border-radius:0 10px 10px 0;
+  padding:11px 14px;font-size:13px;color:var(--ink-2);line-height:1.45}
+.faixa-demo b{color:var(--ink)}
+.faixa-demo .sair{margin-left:auto;background:var(--wine);color:#fdf3e7;border:0;border-radius:9px;
+  padding:7px 12px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap}
 .hidden{display:none!important}
 .empty{color:var(--ink-2);text-align:center;padding:40px 20px;font-size:14px;line-height:1.6}
 .empty .big{font-size:40px;margin-bottom:10px}
@@ -327,6 +344,9 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
         </div>
       </div>
       <div class="topbar"><div><h2>Minha Adega</h2><p id="dash-sub">Visão geral da sua coleção — atualizada em tempo real.</p></div></div>
+      <!-- v0.49: aviso permanente enquanto a vitrine estiver carregada. Sem ele,
+           a pessoa só descobre a limitação ao esbarrar nela. -->
+      <div id="faixa-demo" class="faixa-demo hidden"></div>
       <div class="kpis">
         <div class="kpi hero"><div class="lbl">Garrafas na adega</div><div class="val" id="kpi-garrafas">—</div><div class="sub" id="kpi-rotulos">—</div></div>
         <div class="kpi"><div class="lbl">Valor estimado</div><div class="val" id="kpi-valor">—</div><div class="sub">soma dos preços de aquisição</div></div>
@@ -351,19 +371,21 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
       <!-- Atalho da harmonização: no celular a barra de baixo só tem cinco lugares
            e a lateral some, então este é o caminho principal para o módulo. Fica
            logo abaixo da janela de consumo porque é ali que se decide o que abrir. -->
-      <div class="panel" style="margin-top:16px;cursor:pointer" onclick="go('harmonizar')">
-        <h3>🍽️ O que abrir hoje? <small>· harmonize um prato com as garrafas da SUA adega</small></h3>
-        <div id="harm-atalho" style="margin-top:8px"></div>
+      <!-- v0.49: deixou de ser vitrine e virou módulo. Toca no prato e a resposta
+           sai aqui mesmo, sem trocar de tela — porque a pergunta "o que abro hoje?"
+           nasce justamente olhando a adega. -->
+      <div class="panel" style="margin-top:16px">
+        <h3>🍽️ O que abrir hoje? <small>· escolha um prato e veja a melhor garrafa da SUA adega</small></h3>
+        <div id="harm-pratos" style="margin-top:8px"></div>
+        <div id="harm-resumo" style="margin-top:10px"></div>
       </div>
       <div class="panel" style="margin-top:16px">
         <h3>📜 Histórico de consumo <small>· suas últimas garrafas abertas</small></h3>
         <div id="dash-hist"></div>
       </div>
-      <div class="panel" style="margin-top:16px">
-        <h3>🌐 Comunidade <small>· agora mesmo no Apotheca</small></h3>
-        <div id="dash-feed"></div>
-        <div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="go('comunidade')">Ver toda a atividade →</button></div>
-      </div>
+      <!-- v0.49: o painel de Comunidade saiu daqui. Minha Adega fala das SUAS
+           garrafas; a Comunidade já tem lugar fixo na barra de baixo (celular) e
+           na barra lateral (computador), com o contador de novidades. -->
     </section>
 
     <!-- ===== COLEÇÃO ===== -->
@@ -639,7 +661,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.48"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.49"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1932,7 +1954,15 @@ async function enviarNoEncontro(evId){
   const el=$("#chat-in-"+evId);if(el)el.focus();
 }
 async function levarGarrafaEvento(evId){
-  const ev=eventos.find(e=>e.id===evId);const id=+$("#ev-sel-"+evId).value;
+  /* v0.49: garrafa de demonstração não entra em encontro de gente de verdade.
+     O bloqueio é a PRIMEIRA linha, antes de ler qualquer campo da tela: assim
+     vale mesmo que esta função venha a ser chamada de outro lugar. E é
+     explícito, não silencioso como no feed, porque a pessoa tocou num botão
+     esperando um resultado — merece saber por que não aconteceu e como
+     resolver. */
+  if(demoBloqueia("levar uma garrafa a um encontro"))return;
+  const ev=eventos.find(e=>e.id===evId);const sel=$("#ev-sel-"+evId);if(!ev||!sel)return;
+  const id=+sel.value;
   const v=vinhos.find(x=>x.id===id);if(!v)return;
   if(ehNuvem(ev)){
     if((ev.minhasN||[]).some(g=>g.nome.indexOf(v.nome)===0)){toast("Essa garrafa já está confirmada. 🍷");return}
@@ -2229,6 +2259,11 @@ function abrirConfiguracoes(){
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SUA ADEGA</div>
     ${linhaConfig("✏️","Gerenciar adegas",nAdegas+(nAdegas===1?" adega":" adegas"),
       "closeModal('modal-detail');openAdegasManager()","Renomear, trocar o ícone ou excluir")}
+    ${linhaConfig("🧹","Zerar minha adega",
+      adegaDemo?"demonstração":vinhos.length?vinhos.length+(vinhos.length===1?" rótulo":" rótulos"):"já está vazia",
+      "closeModal('modal-detail');abrirZerarAdega()",
+      adegaDemo?"Sair da demonstração e começar a sua adega de verdade"
+               :"Apagar as garrafas deste aparelho e recomeçar do zero")}
     ${linhaConfig("🔒","Quem vê minha adega",
       privacidadeAdega==="publica"?"todos":privacidadeAdega==="privada"?"ninguém":"amigos",
       "closeModal('modal-detail');abrirPrivacidadeAdega()",
@@ -2449,6 +2484,173 @@ function carregarDemo(){
   toast("🎬 Adega de demonstração carregada — 153 garrafas para explorar!");
   go("dashboard");
 }
+/* ============ A DEMONSTRAÇÃO NÃO TOCA NO QUE É REAL (v0.49) ============
+   A vitrine existe para aprender o aplicativo. O risco que ela criava: alguém
+   com 153 garrafas de mentira entrar num encontro ou numa confraria de verdade
+   e anunciar um Barolo que não tem — seja por brincadeira, seja sem perceber
+   que a adega não é dele. Quem está do outro lado não tem como saber.
+
+   A regra passa a ser uma só: **nada que venha da demonstração aparece para
+   outra pessoa.** Três camadas, em pontos de estrangulamento, nunca espalhadas:
+
+     1. publicarMinhasStats  — os números da adega nunca subiram (desde a v0.40);
+     2. addAtividade         — nenhuma atividade entra no feed da comunidade;
+     3. demoBloqueia()       — as ações em que a pessoa clica e espera resultado.
+
+   O que continua liberado, de propósito: seguir gente, conversar, aceitar
+   convite, falar no bate-papo do encontro. Nada disso afirma um fato falso
+   sobre uma coleção — é interação honesta, e é justamente o que alguém precisa
+   experimentar para decidir se quer o aplicativo. Travar tudo transformaria a
+   demonstração numa sala vazia. */
+function demoBloqueia(oQue){
+  if(!adegaDemo)return false;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🎬 Isto é a adega de demonstração</h3>
+    <div class="sub">Ela serve para conhecer o aplicativo — não para ${esc(oQue)}.</div>
+    <div class="explain-box" style="margin-top:12px">
+      As 153 garrafas da demonstração não são suas. Levá-las para um encontro ou
+      para a comunidade mostraria às outras pessoas uma coleção que não existe, e
+      elas não teriam como perceber.
+    </div>
+    <div class="explain-box">
+      Enquanto a demonstração estiver carregada, o Apotheca também não publica as
+      suas atividades no feed nem os números da sua adega. <b>Seguir pessoas,
+      conversar e participar dos encontros continua tudo liberado.</b>
+    </div>
+    <div class="explain-box">
+      Para valer de verdade: saia da demonstração e cadastre os seus vinhos.
+      A primeira garrafa leva menos de um minuto — dá para ler o rótulo pela foto.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="closeModal('modal-detail');abrirZerarAdega()">🧹 Sair da demonstração</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Continuar explorando</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+  return true;
+}
+
+/* ============ ZERAR A ADEGA (v0.49) ============
+   Faltava o caminho de volta: dava para ENTRAR na demonstração desde sempre,
+   mas não para sair dela; e quem cadastrou tudo errado no começo, ou vendeu a
+   coleção, não tinha como recomeçar.
+
+   Os dois casos têm peso diferente e por isso têm tratamento diferente:
+
+   • Demonstração — nada ali é do usuário, nem as garrafas nem o consumo. Some
+     tudo de uma vez, com uma confirmação simples. Guardar "histórico" de um
+     consumo que nunca aconteceu só sujaria a adega verdadeira que vem depois.
+
+   • Adega real — é trabalho de meses e não volta. Exige digitar ZERAR, mostra
+     exatamente o que se perde, oferece baixar os dados antes, e deixa o
+     histórico de consumo como ESCOLHA: as garrafas já bebidas são memória do
+     que a pessoa provou, não estoque atual. */
+function abrirZerarAdega(){
+  const gf = vinhos.reduce((s,v)=>s+v.qtd,0);
+  const hist = historico.length;
+
+  if(adegaDemo){
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="closeModal('modal-detail')">✕</button>
+      <h3 class="serif">🧹 Sair da demonstração</h3>
+      <div class="sub">Você está com a adega de exemplo carregada.</div>
+      <div class="explain-box" style="margin-top:12px">
+        Vão embora as <b>${gf} garrafas</b> de exemplo, os <b>${vinhos.length} rótulos</b>
+        e também o <b>consumo de exemplo</b> (${hist} registro${hist===1?"":"s"}).
+        Nada disso é seu — o consumo dali nunca aconteceu, e mantê-lo só sujaria
+        a sua adega de verdade.
+      </div>
+      <div class="explain-box">Suas adegas (${ADEGAS.length}), seus seguidores, suas conversas e seus encontros <b>não são afetados</b>.</div>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="zerarAdega(true)">🧹 Zerar e começar do zero</button>
+        <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+      </div>`;
+    $("#modal-detail").classList.add("open");
+    return;
+  }
+
+  if(!vinhos.length){
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="closeModal('modal-detail')">✕</button>
+      <h3 class="serif">🧹 Zerar minha adega</h3>
+      <div class="explain-box" style="margin-top:12px">A sua adega já está vazia — não há nada para apagar.</div>
+      <div style="margin-top:14px"><button class="btn btn-ghost" onclick="closeModal('modal-detail')">Fechar</button></div>`;
+    $("#modal-detail").classList.add("open");
+    return;
+  }
+
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🧹 Zerar minha adega</h3>
+    <div class="sub">Isto apaga a sua coleção deste aparelho. Não há como desfazer.</div>
+    <div class="explain-box" style="margin-top:12px">
+      Some para sempre: <b>${gf} garrafa${gf===1?"":"s"}</b> em <b>${vinhos.length} rótulo${vinhos.length===1?"":"s"}</b>,
+      com preços, safras e anotações.
+    </div>
+    <div class="explain-box">
+      <b>Não são afetados:</b> as suas adegas (${ADEGAS.length}), seus seguidores, suas conversas e seus encontros.
+    </div>
+    <div class="explain-box">
+      📦 Antes de apagar, vale <b onclick="baixarMeusDados()" style="color:var(--wine-3);cursor:pointer;text-decoration:underline">baixar os seus dados</b> —
+      o arquivo inclui a adega inteira e nunca mais será possível recuperá-la daqui.
+    </div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">E O HISTÓRICO DE CONSUMO?</div>
+    <div class="explain-box">
+      Você tem <b>${hist} garrafa${hist===1?"":"s"} já aberta${hist===1?"":"s"}</b> registrada${hist===1?"":"s"}, com nota e data.
+      Isso é memória do que você provou, não estoque — por isso a escolha é sua.
+    </div>
+    <label style="display:flex;gap:9px;align-items:flex-start;margin:10px 2px;font-size:13.5px;cursor:pointer">
+      <input type="checkbox" id="zerar-hist" style="margin-top:3px">
+      <span>Apagar também o histórico de consumo (as ${hist} garrafa${hist===1?"":"s"} já aberta${hist===1?"":"s"})</span>
+    </label>
+    <div style="margin-top:12px">
+      <div style="font-size:13px;color:var(--ink-2);margin-bottom:6px">Para confirmar, digite <b>ZERAR</b>:</div>
+      <input id="conf-zerar" placeholder="ZERAR" autocomplete="off" style="width:100%">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="confirmarZerarAdega()">🧹 Zerar minha adega</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+
+function confirmarZerarAdega(){
+  const campo = $("#conf-zerar");
+  const digitado = (campo?campo.value:"").trim().toUpperCase();
+  if(digitado !== "ZERAR"){
+    toast("Digite ZERAR para confirmar. 🧹");
+    if(campo)campo.focus();
+    return;
+  }
+  const comHistorico = !!($("#zerar-hist") && $("#zerar-hist").checked);
+  zerarAdega(comHistorico);
+}
+
+function zerarAdega(comHistorico){
+  const eraDemo = adegaDemo;
+  const gf = vinhos.reduce((s,v)=>s+v.qtd,0);
+  const hist = historico.length;
+
+  vinhos = [];
+  /* na demonstração o consumo também é de mentira: vai junto, sempre */
+  if(eraDemo || comHistorico) historico = [];
+  adegaDemo = false;          /* a adega passa a ser do usuário, ainda que vazia */
+  adegaAtiva = "todas";
+  pratoResumo = null;
+
+  persist();
+  try{ refreshAdegaSelect(); renderAdegaBar() }catch(e){}
+  renderDash(); renderColecao(); renderHist();
+  closeModal("modal-detail");
+  go("dashboard");
+
+  toast(eraDemo
+    ? `🧹 Demonstração encerrada — a adega é sua agora. Toque em ＋ para o primeiro vinho.`
+    : (comHistorico
+        ? `🧹 Adega zerada: ${gf} garrafa${gf===1?"":"s"} e ${hist} registro${hist===1?"":"s"} de consumo apagados.`
+        : `🧹 Adega zerada: ${gf} garrafa${gf===1?"":"s"} apagada${gf===1?"":"s"}. O histórico de consumo foi mantido.`));
+}
+
 function sairSessao(){
   if(sessao){ /* encerra a sessão Google de verdade (melhor esforço) */
     try{fetch(SB_BASE+"/auth/v1/logout",{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+sessao.access_token}}).catch(()=>{})}catch(e){}
@@ -2676,13 +2878,88 @@ function renderDash(){
   if(sobra)html+=`<div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="abrirTodasJanelas()">⏳ Ver todas as ${urgentes.length+emGuarda.length} garrafas →</button></div>`;
   $("#alerts").innerHTML=html||`<div class="empty">Tudo em ordem — nenhuma garrafa fora da janela ideal. 🥂</div>`;
   /* prévia dos pratos no atalho da harmonização */
-  const ha=$("#harm-atalho");
-  if(ha)ha.innerHTML=(typeof PRATOS!=="undefined"?PRATOS:[]).slice(0,6).map(p=>
-    `<span style="display:inline-block;background:var(--cream);border-radius:99px;padding:5px 11px;margin:0 6px 6px 0;font-size:12.5px">${p.em} ${esc(p.nome)}</span>`).join("")
-    +`<div style="font-size:12px;color:var(--ink-2);margin-top:4px">e mais ${Math.max(0,(typeof PRATOS!=="undefined"?PRATOS.length:0)-6)} pratos — ou descreva o seu →</div>`;
+  const fd=$("#faixa-demo");
+  if(fd){
+    fd.classList.toggle("hidden",!adegaDemo);
+    if(adegaDemo)fd.innerHTML=
+      `<div style="flex:1;min-width:190px">🎬 <b>Adega de demonstração.</b> Estas garrafas são de exemplo, para você conhecer o aplicativo. `+
+      `Elas não vão para encontros nem aparecem para outras pessoas.</div>`+
+      `<button class="sair" onclick="abrirZerarAdega()">Começar a minha adega</button>`;
+  }
+  renderHarmResumo();
   const dh=$("#dash-hist");
   if(typeof renderFeed==="function")renderFeed();
   if(dh)dh.innerHTML=histRowsHtml(3)+(historico.length>3?`<div style="text-align:center;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="abrirTodoHistorico()">📜 Ver as ${historico.length} garrafas abertas →</button></div>`:"");
+}
+
+/* ============ HARMONIZAR NA TELA MINHA ADEGA (v0.49) ============
+   Substituiu o painel de Comunidade que ficava aqui. O raciocínio: a tela
+   Minha Adega deve falar exclusivamente das garrafas do próprio usuário, e
+   Comunidade já tem lugar fixo em duas barras. Além disso, "o que eu abro
+   hoje?" é uma pergunta que nasce olhando a adega — obrigar a trocar de tela
+   para responder era atrito puro.
+
+   Usa o MESMO motor da tela cheia (scoreWine), então as duas nunca divergem. */
+let pratoResumo = null;
+
+function pratosDoResumo(){ return (typeof PRATOS!=="undefined"?PRATOS:[]).slice(0,8) }
+
+function harmonizarNoResumo(id){
+  pratoResumo = (pratoResumo===id ? null : id);   /* tocar de novo fecha */
+  renderHarmResumo();
+}
+
+function verNaTelaCheia(id){
+  go("harmonizar");
+  setTimeout(()=>{ try{ harmonizar(id) }catch(e){} }, 60);
+}
+
+function renderHarmResumo(){
+  const box = $("#harm-pratos");
+  if(!box) return;
+  const lista = pratosDoResumo();
+  const resto = Math.max(0,(typeof PRATOS!=="undefined"?PRATOS.length:0) - lista.length);
+  box.innerHTML =
+    lista.map(p=>`<button class="chip-prato${pratoResumo===p.id?" sel":""}" onclick="harmonizarNoResumo('${p.id}')">${p.em} ${esc(p.nome)}</button>`).join("") +
+    `<button class="chip-prato mais" onclick="go('harmonizar')">+${resto} pratos · ou descreva o seu →</button>`;
+
+  const r = $("#harm-resumo");
+  if(!r) return;
+
+  const adega = (typeof vinhosAtivos==="function" ? vinhosAtivos() : []);
+  if(!adega.length){
+    r.innerHTML = `<div style="font-size:13px;color:var(--ink-2);padding:8px 2px">A sua adega está vazia — assim que houver garrafas aqui, o Apotheca diz qual delas combina com cada prato.</div>`;
+    return;
+  }
+  if(!pratoResumo){
+    const gf = adega.reduce((s,v)=>s+v.qtd,0);
+    r.innerHTML = `<div style="font-size:13px;color:var(--ink-2);padding:8px 2px">Toque num prato: o Apotheca percorre as <b>${gf}</b> garrafas da sua adega e diz qual abrir — e por quê.</div>`;
+    return;
+  }
+
+  const p = PRATOS.find(x=>x.id===pratoResumo);
+  if(!p){ pratoResumo=null; r.innerHTML=""; return }
+
+  const rank = adega.map(v=>({v,...scoreWine(v,p)})).sort((a,b)=>b.pts-a.pts).slice(0,2);
+  const medalhas = ["🥇","🥈"];
+  r.innerHTML = `
+    <div class="explain-box" style="margin-bottom:8px"><b>${p.em} ${esc(p.nome)}</b> — ${p.ctx}</div>
+    ${rank.map((x,i)=>`
+      <div class="harm-linha">
+        <div class="med">${medalhas[i]}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap">
+            <b class="serif" style="font-size:15px">${esc(x.v.nome)} ${safraTxt(x.v)}</b>
+            <span class="match">${Math.min(99,Math.round(x.pts/110*100))}% match</span>
+          </div>
+          <div style="font-size:12px;color:var(--ink-2)">${esc(x.v.vinicola)} · ${esc(x.v.pais)} — <b>${x.v.qtd} gf. em ${adegaDe(x.v.adega).icone} ${esc(adegaDe(x.v.adega).nome)}</b></div>
+          <ul class="why" style="margin:5px 0 0">${x.why.slice(0,2).map(w=>`<li>${w}</li>`).join("")||"<li>Boa opção geral da sua adega para este prato.</li>"}</ul>
+          ${i===0?`<div class="pair-actions" style="margin-top:7px">
+            <button class="btn btn-primary btn-sm" onclick="openConsume(${x.v.id},'${p.nome.replace(/'/g,"")}')">🍷 Abrir esta garrafa</button>
+            <button class="btn btn-ghost btn-sm" onclick="verNaTelaCheia('${p.id}')">Ver as outras sugestões →</button>
+          </div>`:""}
+        </div>
+      </div>`).join("")}`;
 }
 
 /* ================== COLEÇÃO ================== */
@@ -3359,6 +3636,14 @@ function tempoRel(ts){
   return "há "+Math.round(h/24)+" d";
 }
 function addAtividade(txt,est){
+  /* v0.49: a demonstração NÃO escreve na comunidade.
+     O feed é o registro público do que pessoas reais andam bebendo. Uma
+     garrafa da vitrine entrando ali seria informação falsa apresentada como
+     verdadeira — e quem lê não tem como distinguir. O bloqueio fica aqui, no
+     único ponto por onde tudo passa, e não em cada chamada: assim qualquer
+     atividade nova que eu criar amanhã já nasce protegida, sem depender de eu
+     lembrar. Os números da adega já eram barrados em publicarMinhasStats. */
+  if(adegaDemo)return;
   const item={id:NEXT_FEED++,user:perfil?perfil.user:"voce",txt,est:est||0,ts:Date.now(),brindes:0,meu:false};
   feed.unshift(item);
   if(feed.length>60)feed.length=60;
@@ -3449,6 +3734,9 @@ function renderFeed(){
         ?'<div class="empty"><div class="big">🍷</div>Nada por aqui ainda.<br>Vá em <b>Minha rede → Descobrir</b> e siga apreciadores para ver o que eles andam abrindo.</div>'
         :'<div class="empty"><div class="big">🍷</div>Nenhuma atividade na comunidade ainda.</div>');
   }
+  /* v0.49: o resumo do feed na tela Minha Adega deixou de existir — aquela tela
+     é só sobre as garrafas do próprio usuário. O guard fica porque o elemento
+     pode voltar, e porque renderFeed é chamada de vários lugares. */
   const dz=$("#dash-feed");
   if(dz)dz.innerHTML=feed.slice(0,3).map(f=>feedItemHtml(f,true)).join("")||'<div style="font-size:13px;color:var(--ink-2);padding:6px">Sem atividades ainda.</div>';
 }
@@ -4461,10 +4749,18 @@ function mostrarTarjaVersao(d){
      então aqui a tarja só informa, e diz o que fazer. */
   const semCaminho = dentroDoApk && !temArquivo;
   const acao = dentroDoApk ? "Baixar" : "Atualizar";
+  /* v0.49: a garantia é fixa e aparece SEMPRE, não depende do texto da versão.
+     Motivo: o resumo do que mudou fala de funções, e função nova pode ter nome
+     assustador ("zerar a adega"). Sem esta linha, quem tem coleção de verdade lê
+     a tarja como ameaça e prefere ficar na versão velha — exatamente o oposto do
+     que o aviso existe para fazer. Atualizar nunca mexe na adega: no navegador é
+     só recarregar a página, e no Android instala por cima com a mesma
+     assinatura, que é o que preserva os dados do aparelho. */
   t.innerHTML =
     `<div class="txt"><b>Versão ${esc(d.versao)} disponível</b>` +
     (d.novidades ? `<small>${esc(d.novidades)}</small>` : "") +
     (semCaminho ? `<small>Peça o arquivo novo a quem lhe enviou o aplicativo.</small>` : "") +
+    `<small class="garantia">🔒 Sua adega não é alterada.</small>` +
     `</div>` +
     (semCaminho ? "" : `<button class="agora" onclick="atualizarAgora()">${acao}</button>`) +
     `<button class="depois" onclick="dispensarVersao()">${semCaminho ? "ok" : "agora não"}</button>`;
