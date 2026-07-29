@@ -411,14 +411,20 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
       <div class="pair-results" id="pair-results"></div>
     </section>
 
-    <!-- ===== ENCONTROS ===== -->
+    <!-- ===== ENCONTROS (v0.41: tela enxuta, detalhe em pop-up) ===== -->
     <section id="view-encontros" class="hidden">
-      <div class="topbar"><div><h2>Encontros & Confrarias</h2><p>Crie o evento, convide os amigos e veja as garrafas que cada um vai levar — com a ordem certa de serviço.</p></div></div>
+      <div class="topbar"><div><h2>Encontros &amp; Confrarias</h2><p>Crie o evento, convide os amigos e veja as garrafas que cada um vai levar — com a ordem certa de serviço.</p></div></div>
+
+      <!-- 1) Quem você segue -->
       <div class="panel" style="margin-bottom:16px">
         <h3>👥 Quem você segue <small>· são estes que você pode convidar para os encontros</small></h3>
         <div id="confraria-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
-        <button class="btn btn-ghost btn-sm" onclick="go('comunidade');abaComunidade('rede');setAbaRede('descobrir')">🔍 Encontrar mais apreciadores</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="go('comunidade');abaComunidade('rede');setAbaRede('descobrir')">🔍 Encontrar mais apreciadores</button>
+        </div>
       </div>
+
+      <!-- 2) Confrarias -->
       <div class="panel" style="margin-bottom:16px">
         <h3>🏛️ Confrarias <small>· clubes com identidade própria: abertos, moderados ou privados por convite</small></h3>
         <div id="confrarias-pub"></div>
@@ -427,8 +433,9 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
           <button class="btn btn-gold btn-sm" onclick="abrirEntrarComCodigo()">🎟️ Entrar com convite</button>
         </div>
       </div>
-      <div id="eventos-list"></div>
-      <div class="panel" style="margin-top:16px">
+
+      <!-- 3) Criar novo encontro -->
+      <div class="panel" style="margin-bottom:16px">
         <h3>➕ Criar novo encontro</h3>
         <div class="formgrid">
           <div class="field"><label>Nome do encontro</label><input id="e-nome" placeholder="Ex.: Almoço no Fasano"></div>
@@ -437,9 +444,25 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
         </div>
         <div style="margin-top:12px">
           <label style="font-size:12px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px">Quem participa deste encontro?</label>
-          <div id="e-amigos" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+            <button class="btn btn-ghost btn-sm" onclick="abrirEscolherParticipantes()">👥 Escolher participantes</button>
+            <span id="e-resumo-part" style="font-size:13px;color:var(--ink-2)">ninguém selecionado ainda</span>
+          </div>
+          <div id="e-amigos" class="hidden"></div>
         </div>
         <div style="margin-top:14px"><button class="btn btn-primary" onclick="createEvento()">Criar encontro</button></div>
+      </div>
+
+      <!-- 4) Próximos encontros -->
+      <div class="panel" style="margin-bottom:16px">
+        <h3>🥂 Próximos encontros <small>· toque para ver as garrafas e a ordem de serviço</small></h3>
+        <div id="eventos-proximos"></div>
+      </div>
+
+      <!-- 5) Eventos passados -->
+      <div class="panel" style="margin-bottom:16px">
+        <h3>📜 Eventos passados <small>· a memória das noites que já aconteceram</small></h3>
+        <div id="eventos-passados"></div>
       </div>
     </section>
 
@@ -506,6 +529,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   <div class="mi" onclick="fecharMenu();abrirPerfil(perfil?perfil.user:null)">👤 Meu perfil</div>
   <div class="mi" onclick="fecharMenu();go('historico')">📜 Histórico</div>
   <div class="mi" onclick="fecharMenu();openAdegasManager()">✏️ Gerenciar adegas</div>
+  <div class="mi" id="mi-trava" onclick="fecharMenu();abrirConfigTrava()">🔐 Bloqueio do aplicativo</div>
   <div class="mi" id="mi-privacidade" onclick="fecharMenu();abrirPrivacidadeAdega()">🔒 Quem vê minha adega</div>
   <div class="mi" id="mi-avisos" onclick="fecharMenu();abrirConfigAvisos()">🔔 Avisos no celular</div>
   <div class="mi" id="mi-som" onclick="alternarSom()">🔊 Bip dos avisos</div>
@@ -516,6 +540,33 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   <div class="mi" onclick="fecharMenu();abrirAjuda()">❓ Ajuda e suporte</div>
   <div class="mi" onclick="fecharMenu();abrirSobre()">ℹ️ Sobre o Apotheca</div>
   <div class="mi sair" onclick="fecharMenu();sairSessao()">🚪 Sair da sessão</div>
+</div>
+
+<!-- Tela de bloqueio (opcional, escolhida pelo usuário) -->
+<div class="login-screen" id="trava-screen">
+  <div style="text-align:center;max-width:320px;width:92%">
+    <div style="font-size:52px;margin-bottom:6px">🍷</div>
+    <h1 class="serif" style="font-size:32px;color:#f3e3c9;margin:0 0 4px">Apotheca</h1>
+    <div style="color:#e6cfa6;font-size:14px;margin-bottom:4px">Sua adega está trancada</div>
+    <div id="trava-nome" style="color:#c9a882;font-size:13px;margin-bottom:22px"></div>
+
+    <div id="trava-bio-area">
+      <div style="font-size:44px;margin-bottom:10px">👆</div>
+      <button class="btn" style="background:#fff;color:#333;min-width:230px" onclick="destravarBio()">Desbloquear com digital ou rosto</button>
+    </div>
+
+    <div id="trava-pin-area" class="hidden">
+      <input id="trava-pin" type="tel" inputmode="numeric" maxlength="4" placeholder="••••"
+        style="font-size:30px;letter-spacing:16px;text-align:center;padding:12px;width:200px;border-radius:12px;border:none"
+        onkeydown="if(event.key==='Enter')destravarPin()">
+      <div style="margin-top:14px"><button class="btn" style="background:#fff;color:#333;min-width:200px" onclick="destravarPin()">Entrar</button></div>
+    </div>
+
+    <div id="trava-erro" style="color:#ffb3b3;font-size:13px;margin-top:14px;min-height:18px"></div>
+    <div style="margin-top:20px">
+      <button class="btn btn-ghost" style="color:#c9a882;border-color:#7a5a48;font-size:12.5px" onclick="sairPelaTrava()">Entrar com outra conta</button>
+    </div>
+  </div>
 </div>
 
 <!-- Onboarding: login + escolha do nome definitivo -->
@@ -563,7 +614,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.40"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.41"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1115,12 +1166,12 @@ function dicaCobertura(ordem){
 }
 function renderConfraria(){
   /* chips de quem eu sigo (🤝 = segue de volta). A busca de gente mora na Comunidade. */
-  $("#confraria-chips").innerHTML=seguindo.map((a,i)=>
+  const MOSTRA=6; /* a tela fica enxuta: o resto abre em pop-up */
+  $("#confraria-chips").innerHTML=seguindo.slice(0,MOSTRA).map(a=>
     `<span class="adega-chip" style="cursor:pointer" onclick="abrirPerfil('${escJS(a.user)}')">${ehAmigoProximo(a.user)?"🤝":"👤"} ${esc(a.nome)}${a.cidade?` <span class="n">${esc(a.cidade)}</span>`:""}</span>`).join("")
+    +(seguindo.length>MOSTRA?`<span class="adega-chip" style="cursor:pointer;border-style:dashed" onclick="abrirTodosSeguidos()">+${seguindo.length-MOSTRA} · ver todos</span>`:"")
     ||'<span style="font-size:13px;color:var(--ink-2)">Você ainda não segue ninguém — use o botão abaixo para encontrar apreciadores.</span>';
-  $("#e-amigos").innerHTML=seguindo.map((a,i)=>
-    `<label class="adega-chip" style="user-select:none"><input type="checkbox" class="e-amigo-chk" value="${i}" style="accent-color:var(--wine);padding:0;margin:0"> ${ehAmigoProximo(a.user)?"🤝 ":""}${esc(a.nome)}</label>`).join("")
-    ||'<span style="font-size:13px;color:var(--ink-2)">Siga apreciadores para poder convidá-los.</span>';
+  renderResumoParticipantes&&renderResumoParticipantes();
   renderConfrariasPub();
 }
 const TIPO_LABEL={aberta:"aberta",moderada:"requer aprovação",privada:"privada · por convite"};
@@ -1520,64 +1571,138 @@ function addGarrafaAmigo(evId,ai){
   persist();renderEncontros();
   toast(`${nome} confirmado por ${ev.amigos[ai].nome}! 🥂`);
 }
+/* ===== Encontros: tela enxuta, detalhe em pop-up (v0.41) ===== */
+let encontroAberto=null;
+
+/* "08/08/2026" -> data; texto livre ("a definir") conta como futuro */
+function dataDoEncontro(ev){
+  const m=String(ev.data||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(!m)return null;
+  return new Date(+m[3],+m[2]-1,+m[1],23,59,59);
+}
+function ehPassado(ev){
+  const d=dataDoEncontro(ev);
+  return d?d.getTime()<Date.now():false;
+}
+function cartaoEncontro(ev){
+  const ordem=ordemServico(ev);
+  const conversa=(ev.chat||[]).length;
+  return `<div class="pessoa" style="cursor:pointer" onclick="abrirEncontro(${ev.id})">
+    <span style="font-size:22px;flex:none">${ehPassado(ev)?"📜":"🥂"}</span>
+    <div class="inf">
+      <b>${esc(ev.nome)}</b>
+      <small>📅 ${esc(ev.data)} · 📍 ${esc(ev.local)} · ${ev.amigos.length+1} participantes · ${ordem.length} garrafa${ordem.length===1?"":"s"}${conversa?" · 💬 "+conversa:""}</small>
+    </div>
+    <span style="flex:none;color:var(--wine);font-weight:700;font-size:13px">abrir →</span>
+  </div>`;
+}
 function renderEncontros(){
   renderConfraria();
-  $("#eventos-list").innerHTML=eventos.map(ev=>{
-    const ordem=ordemServico(ev);
-    const totG=ordem.length;
-    return `<div class="panel" style="margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
-        <div><h3 style="font-size:18px" class="serif">🥂 ${ev.nome}</h3>
-        <div style="font-size:13px;color:var(--ink-2);margin-top:2px">📅 ${ev.data} · 📍 ${ev.local} · ${ev.amigos.length+1} participantes · ${totG} garrafas confirmadas</div></div>
+  const prox=eventos.filter(e=>!ehPassado(e));
+  const pass=eventos.filter(e=>ehPassado(e));
+  const elP=$("#eventos-proximos");
+  if(elP)elP.innerHTML=prox.map(cartaoEncontro).join("")||
+    '<div style="font-size:13px;color:var(--ink-2);padding:8px">Nenhum encontro marcado ainda — crie o primeiro acima. 🥂</div>';
+  const elQ=$("#eventos-passados");
+  if(elQ)elQ.innerHTML=pass.map(cartaoEncontro).join("")||
+    '<div style="font-size:13px;color:var(--ink-2);padding:8px">Ainda não há encontros passados. Quando a data de um deles passar, ele vem para cá.</div>';
+  if(encontroAberto!=null&&$("#modal-detail").classList.contains("open"))abrirEncontro(encontroAberto,true);
+}
+function abrirEncontro(id,semAbrir){
+  const ev=eventos.find(e=>e.id===id);if(!ev)return;
+  encontroAberto=id;
+  const ordem=ordemServico(ev);
+  const passado=ehPassado(ev);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail');encontroAberto=null">✕</button>
+    <h3 class="serif">${passado?"📜":"🥂"} ${esc(ev.nome)}</h3>
+    <div class="sub">📅 ${esc(ev.data)} · 📍 ${esc(ev.local)} · ${ev.amigos.length+1} participantes · ${ordem.length} garrafa${ordem.length===1?"":"s"}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px;margin-top:14px">
+      ${ev.amigos.map((a,ai)=>`<div style="background:var(--cream);border-radius:10px;padding:12px 14px">
+        <b style="font-size:13.5px">👤 ${esc(a.nome)}</b>
+        ${a.garrafas.map(g=>`<div style="font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:${CORES[g.tipo]}"></i>${esc(g.nome)} <span style="color:var(--ink-3)">· ${esc(g.origem)}</span></div>`).join("")||'<div style="font-size:12px;color:var(--ink-3);margin-top:6px">ainda não confirmou garrafas</div>'}
+        ${passado?"":`<div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
+          <input id="am-nome-${ev.id}-${ai}" placeholder="Vinho que ${esc(a.nome)} vai levar" style="flex:1 1 105px;min-width:0;font-size:11.5px;padding:6px 8px">
+          <select id="am-tipo-${ev.id}-${ai}" style="font-size:11.5px;padding:6px 4px">${TIPOS.map(t=>`<option>${t}</option>`).join("")}</select>
+          <button class="btn btn-gold btn-sm" style="padding:5px 9px;font-size:11.5px" onclick="addGarrafaAmigo(${ev.id},${ai})">＋</button>
+        </div>`}
+      </div>`).join("")}
+      <div style="background:#fbf3ea;border:1.5px dashed var(--gold);border-radius:10px;padding:12px 14px">
+        <b style="font-size:13.5px">👤 Você</b>
+        ${ev.minhas.map(id2=>{const v=vinhos.find(x=>x.id===id2);return v?`<div style="font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:${CORES[v.tipo]}"></i>${esc(v.nome)} ${safraTxt(v)} ${passado?"":`<button class="btn btn-ghost btn-sm" style="padding:1px 7px;font-size:11px" onclick="tirarGarrafaEvento(${ev.id},${id2})">✕</button>`}</div>`:""}).join("")||'<div style="font-size:12px;color:var(--ink-3);margin-top:6px">você ainda não escolheu</div>'}
+        ${passado||!vinhos.length?"":`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+          <select id="ev-sel-${ev.id}" style="flex:1 1 130px;min-width:0;max-width:100%;font-size:12px;padding:7px 8px">${vinhos.map(v=>`<option value="${v.id}">${adegaDe(v.adega).icone} ${esc(v.nome)} ${safraTxt(v)}</option>`).join("")}</select>
+          <button class="btn btn-gold btn-sm" onclick="levarGarrafaEvento(${ev.id})">Levar</button>
+        </div>`}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:14px">
-        ${ev.amigos.map((a,ai)=>`<div style="background:var(--cream);border-radius:10px;padding:12px 14px">
-          <b style="font-size:13.5px">👤 ${a.nome}</b>
-          ${a.garrafas.map(g=>`<div style="font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:${CORES[g.tipo]}"></i>${g.nome} <span style="color:var(--ink-3)">· ${g.origem}</span></div>`).join("")||'<div style="font-size:12px;color:var(--ink-3);margin-top:6px">ainda não confirmou garrafas</div>'}
-          <div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
-            <input id="am-nome-${ev.id}-${ai}" placeholder="Vinho que ${a.nome} vai levar" style="flex:1 1 110px;min-width:0;font-size:11.5px;padding:6px 8px">
-            <select id="am-tipo-${ev.id}-${ai}" style="font-size:11.5px;padding:6px 4px">${TIPOS.map(t=>`<option>${t}</option>`).join("")}</select>
-            <button class="btn btn-gold btn-sm" style="padding:5px 9px;font-size:11.5px" onclick="addGarrafaAmigo(${ev.id},${ai})">＋</button>
-          </div>
-        </div>`).join("")}
-        <div style="background:#fbf3ea;border:1.5px dashed var(--gold);border-radius:10px;padding:12px 14px">
-          <b style="font-size:13.5px">👤 Você (Jorge)</b>
-          ${ev.minhas.map(id=>{const v=vinhos.find(x=>x.id===id);return v?`<div style="font-size:12.5px;margin-top:6px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:${CORES[v.tipo]}"></i>${v.nome} ${safraTxt(v)} <button class="btn btn-ghost btn-sm" style="padding:1px 7px;font-size:11px" onclick="tirarGarrafaEvento(${ev.id},${id})">✕</button></div>`:""}).join("")||'<div style="font-size:12px;color:var(--ink-3);margin-top:6px">você ainda não escolheu</div>'}
-          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-            <select id="ev-sel-${ev.id}" style="flex:1 1 140px;min-width:0;max-width:100%;font-size:12px;padding:7px 8px">${vinhos.map(v=>`<option value="${v.id}">${adegaDe(v.adega).icone} ${v.nome} ${safraTxt(v)}</option>`).join("")}</select>
-            <button class="btn btn-gold btn-sm" onclick="levarGarrafaEvento(${ev.id})">Levar</button>
-          </div>
-        </div>
+    </div>
+    <h3 style="margin-top:18px;font-size:16px">🍷 Ordem de serviço sugerida</h3>
+    ${(function(){let html="",faseAtual="";ordem.forEach((g,i)=>{
+      const f=FASES.find(x=>x[0]===g.tipo);
+      if(f&&f[1]!==faseAtual){faseAtual=f[1];html+=`<div style="font-size:11.5px;font-weight:700;color:var(--wine);text-transform:uppercase;letter-spacing:.8px;margin:12px 0 6px">${faseAtual}</div>`}
+      html+=`<div class="hist-row" style="padding:9px 14px;margin-bottom:6px"><span style="font-weight:800;color:var(--gold);width:26px">${i+1}º</span><div class="info"><h4 style="font-size:13.5px">${esc(g.nome)}</h4><p>${esc(g.origem)} · leva: <b>${esc(g.quem)}</b></p></div><i class="dot" style="background:${CORES[g.tipo]}"></i></div>`;
+    });return html||'<div class="empty">Sem garrafas ainda.</div>'})()}
+    <div class="explain-box" style="margin-top:10px">${dicaCobertura(ordem)}</div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">💬 CONVERSA DO ENCONTRO (${(ev.chat||[]).length})</div>
+    <div class="chat-box">
+      <div class="chat-msgs" id="chat-msgs-${ev.id}">
+        ${(ev.chat||[]).map(m=>`<div class="msg ${m.de==="Você"?"minha":"deles"}"><div class="quem">${m.de==="Você"?"Você":"👤 "+esc(m.de)}</div>${esc(m.txt)}<div class="hora">${esc(m.hora||"")}</div></div>`).join("")||'<div style="font-size:12.5px;color:var(--ink-2);text-align:center;padding:10px">Nenhuma mensagem ainda — puxe o assunto! 🥂</div>'}
       </div>
-      <h3 style="margin-top:18px">🍷 Ordem de serviço sugerida</h3>
-      ${(function(){let html="",faseAtual="";ordem.forEach((g,i)=>{
-        const f=FASES.find(x=>x[0]===g.tipo);
-        if(f&&f[1]!==faseAtual){faseAtual=f[1];html+=`<div style="font-size:11.5px;font-weight:700;color:var(--wine);text-transform:uppercase;letter-spacing:.8px;margin:12px 0 6px">${faseAtual}</div>`}
-        html+=`<div class="hist-row" style="padding:9px 14px;margin-bottom:6px"><span style="font-weight:800;color:var(--gold);width:26px">${i+1}º</span><div class="info"><h4 style="font-size:13.5px">${g.nome}</h4><p>${g.origem} · leva: <b>${g.quem}</b></p></div><i class="dot" style="background:${CORES[g.tipo]}"></i></div>`;
-      });return html||'<div class="empty">Sem garrafas ainda.</div>'})()}
-      <div class="explain-box" style="margin-top:10px">${dicaCobertura(ordem)}</div>
-      <div style="margin-top:12px">
-        <button class="btn btn-ghost btn-sm" onclick="toggleChat(${ev.id})">💬 ${chatsAbertos.has(ev.id)?"Ocultar conversa":"Conversa do encontro"} (${(ev.chat||[]).length})</button>
-        ${chatsAbertos.has(ev.id)?`
-        <div class="chat-box">
-          <div class="chat-msgs" id="chat-msgs-${ev.id}">
-            ${(ev.chat||[]).map(m=>`<div class="msg ${m.de==="Você"?"minha":"deles"}"><div class="quem">${m.de==="Você"?"Você":"👤 "+esc(m.de)}</div>${esc(m.txt)}<div class="hora">${m.hora||""}</div></div>`).join("")||'<div style="font-size:12.5px;color:var(--ink-2);text-align:center;padding:10px">Nenhuma mensagem ainda — puxe o assunto! 🥂</div>'}
-          </div>
-          <div class="chat-envio">
-            <input id="chat-in-${ev.id}" placeholder="Mensagem para o grupo…" onkeydown="if(event.key==='Enter')enviarMsg(${ev.id})">
-            <button class="btn btn-primary btn-sm" onclick="enviarMsg(${ev.id})">Enviar</button>
-          </div>
-          <div style="font-size:11px;color:var(--ink-3);margin-top:7px;text-align:center">No aplicativo final, cada participante conversa do próprio celular, com notificações.</div>
-        </div>`:""}
+      <div class="chat-envio">
+        <input id="chat-in-${ev.id}" placeholder="Mensagem para o grupo…" onkeydown="if(event.key==='Enter')enviarMsg(${ev.id})">
+        <button class="btn btn-primary btn-sm" onclick="enviarMsg(${ev.id})">Enviar</button>
       </div>
     </div>`;
-  }).join("");
-  chatsAbertos.forEach(id=>{const el=$("#chat-msgs-"+id);if(el)el.scrollTop=el.scrollHeight});
+  if(!semAbrir)$("#modal-detail").classList.add("open");
+  const el=$("#chat-msgs-"+ev.id);if(el)el.scrollTop=el.scrollHeight;
 }
-let chatsAbertos=new Set();
-function toggleChat(id){
-  chatsAbertos.has(id)?chatsAbertos.delete(id):chatsAbertos.add(id);
-  renderEncontros();
+
+/* Pop-up: lista completa de quem eu sigo */
+function abrirTodosSeguidos(){
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">👥 Quem você segue</h3>
+    <div class="sub">${seguindo.length} pessoa${seguindo.length===1?"":"s"} · 🤝 marca quem segue você de volta</div>
+    <div style="margin-top:12px">
+      ${seguindo.map(a=>`<div class="pessoa" style="cursor:pointer" onclick="closeModal('modal-detail');abrirPerfil('${escJS(a.user)}')">
+        <span>${avatarDe(a.user,36)}</span>
+        <div class="inf"><b>${esc(a.nome)}${ehAmigoProximo(a.user)?' <span class="tag auge" style="padding:1px 7px;font-size:10px">🤝 amigo próximo</span>':""}</b>
+        <small>@${esc(a.user)}${a.cidade?" · 📍 "+esc(a.cidade):""}</small></div>
+      </div>`).join("")||'<div class="empty"><div class="big">👥</div>Você ainda não segue ninguém.</div>'}
+    </div>
+    <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="closeModal('modal-detail');go('comunidade');abaComunidade('rede');setAbaRede('descobrir')">🔍 Encontrar mais apreciadores</button>`;
+  $("#modal-detail").classList.add("open");
+}
+
+/* Pop-up: escolher quem participa do novo encontro */
+let participantesSel=new Set();
+function abrirEscolherParticipantes(){
+  if(!seguindo.length){toast("Siga apreciadores para poder convidá-los. 👥");return}
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">👥 Quem participa do encontro</h3>
+    <div class="sub">Toque para marcar quem você vai convidar.</div>
+    <div style="margin:12px 0">
+      ${seguindo.map((a,i)=>`<div class="pessoa" style="cursor:pointer" onclick="alternarParticipante(${i})">
+        <span style="font-size:19px;flex:none" id="chk-part-${i}">${participantesSel.has(i)?"☑️":"⬜"}</span>
+        <span>${avatarDe(a.user,32)}</span>
+        <div class="inf"><b>${esc(a.nome)}${ehAmigoProximo(a.user)?" 🤝":""}</b><small>@${esc(a.user)}</small></div>
+      </div>`).join("")}
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="closeModal('modal-detail');renderResumoParticipantes()">Confirmar seleção</button>`;
+  $("#modal-detail").classList.add("open");
+}
+function alternarParticipante(i){
+  participantesSel.has(i)?participantesSel.delete(i):participantesSel.add(i);
+  const el=$("#chk-part-"+i);if(el)el.textContent=participantesSel.has(i)?"☑️":"⬜";
+  renderResumoParticipantes();
+}
+function renderResumoParticipantes(){
+  const el=$("#e-resumo-part");if(!el)return;
+  const nomes=[...participantesSel].map(i=>seguindo[i]&&seguindo[i].nome).filter(Boolean);
+  el.innerHTML=nomes.length
+    ?`<b>${nomes.length}</b> convidado${nomes.length===1?"":"s"}: ${esc(nomes.slice(0,3).join(", "))}${nomes.length>3?" e mais "+(nomes.length-3):""}`
+    :"ninguém selecionado ainda";
 }
 function enviarMsg(evId){
   const ev=eventos.find(e=>e.id===evId);if(!ev)return;
@@ -1604,8 +1729,9 @@ function tirarGarrafaEvento(evId,id){
 function createEvento(){
   const nome=$("#e-nome").value.trim();
   if(!nome){toast("Dê um nome ao encontro. 🥂");return}
-  const selecionados=[...document.querySelectorAll(".e-amigo-chk:checked")].map(c=>({nome:seguindo[+c.value].nome,garrafas:[]}));
+  const selecionados=[...participantesSel].map(i=>seguindo[i]).filter(Boolean).map(a=>({nome:a.nome,garrafas:[]}));
   eventos.unshift({id:NEXT_EV++,nome,data:$("#e-data").value||"a definir",local:$("#e-local").value||"a definir",criador:"Jorge",amigos:selecionados,minhas:[],chat:[]});
+  participantesSel=new Set();
   persist();["e-nome","e-data","e-local"].forEach(i=>$("#"+i).value="");
   renderEncontros();window.scrollTo({top:0,behavior:"smooth"});
   addAtividade(`criou o encontro <b>🥂 ${nome}</b>`);
@@ -1676,6 +1802,10 @@ function status(v){
 function renderMenu(){
   const mf=$("#mi-fundador");
   if(mf)mf.classList.toggle("hidden",!((perfil&&perfil.user==="Jorge.Queiroz")||(sessao&&sessao.email==="wp7jorge@gmail.com")));
+  const mt=$("#mi-trava");
+  if(mt){const tv=travaLer().modo;
+    mt.innerHTML="🔐 Bloqueio do aplicativo"+(tv==="bio"?'<span class="cont">digital ✓</span>'
+      :tv==="pin"?'<span class="cont">senha ✓</span>':'<span class="cont">desligado</span>');}
   const mp=$("#mi-privacidade");
   if(mp)mp.innerHTML="🔒 Quem vê minha adega"+(privacidadeAdega==="publica"?'<span class="cont">todos</span>'
     :privacidadeAdega==="privada"?'<span class="cont">ninguém</span>':'<span class="cont">amigos</span>');
@@ -2881,6 +3011,169 @@ function renderRede(){
       ||'<div class="empty"><div class="big">🔍</div>Nenhum apreciador novo com esse filtro.</div>';
   }
 }
+/* ===================== BLOQUEIO DO APLICATIVO (v0.41) =====================
+   Serve para quem não quer refazer o login do Google toda vez: a sessão
+   continua guardada e a entrada é liberada com digital/rosto ou uma senha
+   curta. É OPCIONAL — o padrão é NÃO ter bloqueio nenhum.
+   Aviso honesto: é uma tranca de conveniência no próprio aparelho, não
+   substitui a segurança do servidor, que continua exigindo o login Google. */
+const TRAVA_KEY="apotheca_trava";      /* {modo:'nenhum'|'bio'|'pin', cred?, pin?} */
+const travaLer=()=>{try{return JSON.parse(localStorage.getItem(TRAVA_KEY))||{modo:"nenhum"}}catch(e){return {modo:"nenhum"}}};
+const travaGravar=t=>{try{localStorage.setItem(TRAVA_KEY,JSON.stringify(t))}catch(e){}};
+const temBiometria=()=>!!(window.PublicKeyCredential&&navigator.credentials&&location.protocol==="https:");
+
+/* guarda o PIN embaralhado, nunca em texto puro */
+async function embaralharPin(pin){
+  try{
+    const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("apotheca:"+pin));
+    return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
+  }catch(e){return "x"+pin}
+}
+async function biometriaDisponivel(){
+  if(!temBiometria())return false;
+  try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}catch(e){return false}
+}
+function b64url(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
+function deB64url(s){s=s.replace(/-/g,"+").replace(/_/g,"/");return Uint8Array.from(atob(s),c=>c.charCodeAt(0))}
+
+async function registrarBiometria(){
+  const desafio=crypto.getRandomValues(new Uint8Array(32));
+  const id=crypto.getRandomValues(new Uint8Array(16));
+  const cred=await navigator.credentials.create({publicKey:{
+    challenge:desafio,
+    rp:{name:"Apotheca"},
+    user:{id,name:(perfil&&perfil.user)||"apotheca",displayName:(perfil&&perfil.user)||"Apotheca"},
+    pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"preferred"},
+    timeout:60000, attestation:"none"
+  }});
+  if(!cred)throw new Error("sem credencial");
+  return b64url(cred.rawId);
+}
+async function conferirBiometria(credId){
+  const desafio=crypto.getRandomValues(new Uint8Array(32));
+  const r=await navigator.credentials.get({publicKey:{
+    challenge:desafio,
+    allowCredentials:credId?[{type:"public-key",id:deB64url(credId)}]:[],
+    userVerification:"required", timeout:60000
+  }});
+  return !!r;
+}
+
+/* ---- tela de bloqueio ---- */
+function mostrarTrava(){
+  const t=travaLer();
+  if(t.modo==="nenhum"||!perfil)return false;
+  const el=$("#trava-screen");if(!el)return false;
+  $("#trava-nome").textContent="@"+perfil.user;
+  $("#trava-pin-area").classList.toggle("hidden",t.modo!=="pin");
+  $("#trava-bio-area").classList.toggle("hidden",t.modo!=="bio");
+  $("#trava-erro").textContent="";
+  el.classList.add("open");
+  if(t.modo==="bio")setTimeout(()=>destravarBio(),350);
+  else setTimeout(()=>{const i=$("#trava-pin");if(i)i.focus()},350);
+  return true;
+}
+function fecharTrava(){
+  const el=$("#trava-screen");if(el)el.classList.remove("open");
+  const i=$("#trava-pin");if(i)i.value="";
+}
+async function destravarBio(){
+  const t=travaLer();
+  $("#trava-erro").textContent="";
+  try{
+    if(await conferirBiometria(t.cred)){fecharTrava();toast("Bem-vindo de volta! 🍷")}
+    else $("#trava-erro").textContent="Não reconheci — toque para tentar de novo.";
+  }catch(e){
+    $("#trava-erro").textContent="Não consegui ler agora. Toque em tentar de novo.";
+  }
+}
+async function destravarPin(){
+  const v=($("#trava-pin").value||"").trim();
+  if(v.length<4){$("#trava-erro").textContent="Digite os 4 dígitos.";return}
+  const t=travaLer();
+  if(await embaralharPin(v)===t.pin){fecharTrava();toast("Bem-vindo de volta! 🍷")}
+  else{$("#trava-erro").textContent="Senha incorreta.";$("#trava-pin").value=""}
+}
+function sairPelaTrava(){
+  fecharTrava();
+  travaGravar({modo:"nenhum"});
+  sairSessao();
+}
+
+/* ---- configuração ---- */
+function abrirConfigTrava(){
+  const t=travaLer();
+  const op=(v,em,tit,txt)=>`<div class="mi" style="border:1px solid ${v===t.modo?"var(--wine)":"var(--line)"};
+      border-radius:12px;margin-bottom:8px;align-items:flex-start" onclick="escolherTrava('${v}')">
+      <span style="font-size:20px">${em}</span>
+      <div class="inf"><b>${tit} ${v===t.modo?"✓":""}</b><small style="display:block;color:var(--ink-2);font-size:12px">${txt}</small></div></div>`;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🔒 Bloqueio do aplicativo</h3>
+    <div class="sub">Para reentrar rápido, sem refazer o login do Google.</div>
+    <div style="margin:12px 0">
+      ${op("nenhum","🔓","Sem bloqueio","O app abre direto, como sempre foi. É o padrão.")}
+      ${op("bio","👆","Digital ou rosto","Usa a biometria do próprio aparelho para liberar a entrada.")}
+      ${op("pin","🔢","Senha de 4 dígitos","Um código curto, para aparelhos sem biometria.")}
+    </div>
+    <div class="explain-box">
+      Sua sessão do Google continua guardada nos três casos — o bloqueio só decide
+      se alguém precisa se identificar para abrir o app neste aparelho. Ele não
+      substitui a segurança do servidor, que continua exigindo a conta Google
+      para qualquer alteração.
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+async function escolherTrava(modo){
+  if(modo==="nenhum"){
+    travaGravar({modo:"nenhum"});closeModal("modal-detail");
+    toast("🔓 Bloqueio desligado — o app abre direto.");renderMenu&&renderMenu();return;
+  }
+  if(modo==="bio"){
+    if(!await biometriaDisponivel()){
+      toast("Este aparelho/navegador não oferece digital ou rosto — use a senha de 4 dígitos. 🔢");
+      return;
+    }
+    try{
+      const cred=await registrarBiometria();
+      travaGravar({modo:"bio",cred});closeModal("modal-detail");
+      toast("👆 Pronto! Na próxima abertura, o app pede sua digital ou rosto.");
+      renderMenu&&renderMenu();
+    }catch(e){toast("Não consegui registrar a biometria agora. 🔐")}
+    return;
+  }
+  /* PIN */
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🔢 Senha de 4 dígitos</h3>
+    <div class="sub">Escolha um código para reentrar neste aparelho.</div>
+    <div class="field" style="margin:14px 0">
+      <label>Nova senha</label>
+      <input id="pin-novo" type="tel" inputmode="numeric" maxlength="4" placeholder="••••"
+        style="font-size:26px;letter-spacing:14px;text-align:center;padding:12px">
+    </div>
+    <div class="field" style="margin-bottom:14px">
+      <label>Repita para confirmar</label>
+      <input id="pin-conf" type="tel" inputmode="numeric" maxlength="4" placeholder="••••"
+        style="font-size:26px;letter-spacing:14px;text-align:center;padding:12px"
+        onkeydown="if(event.key==='Enter')salvarPin()">
+    </div>
+    <div id="pin-erro" style="color:var(--danger);font-size:13px;margin-bottom:10px"></div>
+    <button class="btn btn-primary" style="width:100%" onclick="salvarPin()">Ativar bloqueio</button>`;
+  setTimeout(()=>{const i=$("#pin-novo");if(i)i.focus()},200);
+}
+async function salvarPin(){
+  const a=($("#pin-novo").value||"").trim(), b=($("#pin-conf").value||"").trim();
+  const err=$("#pin-erro");
+  if(!/^\d{4}$/.test(a)){err.textContent="A senha precisa ter exatamente 4 números.";return}
+  if(a!==b){err.textContent="As duas senhas não são iguais.";return}
+  travaGravar({modo:"pin",pin:await embaralharPin(a)});
+  closeModal("modal-detail");
+  toast("🔢 Bloqueio ativado — o app vai pedir esta senha ao abrir.");
+  renderMenu&&renderMenu();
+}
+
 /* ---------- Estatísticas da adega (números reais, com privacidade) ---------- */
 async function publicarMinhasStats(){
   if(!perfil||!sessao||!sessao.uid)return;
@@ -3211,6 +3504,7 @@ initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();rende
     const pc=new URLSearchParams(location.search).get("convite");
     if(pc)localStorage.setItem("apo_convite",pc.toUpperCase());
   }catch(e){}
+  if(perfil)mostrarTrava();
   await sincronizarComunidade();
   const convPend=localStorage.getItem("apo_convite");
   if(convPend&&perfil)usarConvite(convPend);
@@ -3221,6 +3515,13 @@ if("serviceWorker" in navigator){
     if(ev.data&&ev.data.ir==="comunidade"){go("comunidade");abaComunidade("notif")}
   });
 }
+/* voltou de segundo plano depois de 2 minutos parado: pede identificação de novo */
+let saiuEm=0;
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){saiuEm=Date.now();return}
+  if(saiuEm&&Date.now()-saiuEm>120000&&perfil)mostrarTrava();
+  saiuEm=0;
+});
 setInterval(sincronizarComunidade,60000);
 setInterval(garantirSessaoValida,10*60*1000);
 (function(){
