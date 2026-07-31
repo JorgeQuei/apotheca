@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Apotheca (teste) — Sua adega, inteligente</title>
+<title>Apotheca — Sua adega, inteligente (teste)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#5c1a2e">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -238,6 +238,67 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 .toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--wine);color:#fdf3e7;padding:13px 22px;border-radius:12px;font-size:14px;z-index:120;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .3s,transform .3s,visibility .3s;box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:90vw;text-align:center}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible}
+/* Tarja de versão nova (v0.47). Fica acima da barra de baixo no celular e
+   solta no canto do computador; nunca cobre um botão de ação. */
+.tarja-versao{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:118;
+  display:flex;align-items:center;gap:12px;max-width:min(560px,94vw);
+  background:var(--wine);color:#fdf3e7;padding:11px 12px 11px 16px;border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:13.5px;line-height:1.45}
+.tarja-versao .txt{flex:1;min-width:0}
+.tarja-versao .txt b{color:#f6dfae}
+.tarja-versao .txt small{display:block;color:#e6cfa6;font-size:12px;margin-top:2px}
+.tarja-versao .txt small.garantia{color:#bfe3c0;font-size:11.5px;margin-top:3px}
+.tarja-versao button{border:0;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
+.tarja-versao .agora{background:var(--gold);color:#3a2c10}
+.tarja-versao .depois{background:transparent;color:#e6cfa6;padding:8px 6px;font-weight:400}
+@media(min-width:900px){.tarja-versao{bottom:20px}}
+/* Módulo "O que abrir hoje?" na tela Minha Adega (v0.49) */
+.chip-prato{display:inline-block;background:var(--cream);border:1px solid transparent;border-radius:99px;
+  padding:6px 12px;margin:0 6px 6px 0;font-size:12.5px;font-family:inherit;color:var(--ink);cursor:pointer;
+  transition:background .15s,border-color .15s}
+.chip-prato:hover{border-color:var(--wine-3)}
+.chip-prato.sel{background:var(--wine);color:#fdf3e7;border-color:var(--wine)}
+.chip-prato.mais{background:transparent;color:var(--wine);font-weight:600}
+.harm-linha{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.harm-linha .med{font-size:19px;line-height:1.2}
+/* Faixa de "você está na demonstração" (v0.49) */
+.faixa-demo{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px;
+  background:#fbf3ea;border:1px solid var(--gold);border-left-width:4px;border-radius:0 10px 10px 0;
+  padding:11px 14px;font-size:13px;color:var(--ink-2);line-height:1.45}
+.faixa-demo b{color:var(--ink)}
+.faixa-demo .sair{margin-left:auto;background:var(--wine);color:#fdf3e7;border:0;border-radius:9px;
+  padding:7px 12px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap}
+/* ===== Mapa da Adega (v0.50) — a adega desenhada, garrafa por garrafa ===== */
+.mapa-scroll{overflow-x:auto;padding:4px 0 8px;-webkit-overflow-scrolling:touch}
+.mapa-grade{display:grid;gap:4px;width:max-content}
+.mapa-cel{width:32px;height:32px;border-radius:7px;border:1.5px solid var(--line);background:var(--cream);
+  cursor:pointer;padding:0;font-size:10px;color:var(--ink-3);font-family:inherit;position:relative;transition:transform .1s}
+.mapa-cel:active{transform:scale(.92)}
+.mapa-cel.ocupada{border-color:rgba(0,0,0,.12);color:#fff;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.mapa-cel.destaque{outline:3px solid var(--gold);outline-offset:1px;animation:pulsar 1.1s ease-in-out infinite}
+.mapa-cel.propria{outline:2.5px solid var(--wine);outline-offset:1px}
+@keyframes pulsar{0%,100%{outline-color:var(--gold)}50%{outline-color:transparent}}
+.mapa-rot{width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:700;color:var(--ink-3)}
+.mapa-legenda{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--ink-2)}
+.mapa-legenda i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.mapa-info{background:var(--cream);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13px}
+/* Módulo "Mapa das Adegas" na primeira tela (v0.51) */
+.mapa-adega-linha{display:flex;gap:12px;align-items:center;padding:11px 2px;border-top:1px solid var(--line);cursor:pointer}
+.mapa-adega-linha:first-child{border-top:0}
+.mapa-adega-linha:hover b{color:var(--wine)}
+.mini-mapa{display:grid;gap:2px;flex:none;max-width:44vw;overflow:hidden}
+.mini-mapa i{width:10px;height:10px;border-radius:2.5px;background:var(--cream);border:1px solid var(--line)}
+.mini-mapa i.oc{border-color:transparent}
+/* v0.52: garrafas ainda fora do mapa + foto da adega real como fundo */
+.mapa-pend{background:#fbf3ea;border-left:4px solid var(--gold);border-radius:0 10px 10px 0;padding:10px 12px;margin-top:10px;font-size:13px}
+.chip-pend{display:inline-flex;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--gold);border-radius:99px;
+  padding:5px 12px;margin:6px 6px 0 0;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--ink)}
+.chip-pend:active{transform:scale(.96)}
+.mapa-grade.com-foto{background-size:cover;background-position:center;border-radius:12px;padding:8px}
+.mapa-grade.com-foto .mapa-cel{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.55)}
+.mapa-grade.com-foto .mapa-cel.ocupada{border-color:rgba(255,255,255,.85);box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.mapa-grade.com-foto .mapa-rot{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.85)}
 .hidden{display:none!important}
 .empty{color:var(--ink-2);text-align:center;padding:40px 20px;font-size:14px;line-height:1.6}
 .empty .big{font-size:40px;margin-bottom:10px}
@@ -314,6 +375,9 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
         </div>
       </div>
       <div class="topbar"><div><h2>Minha Adega</h2><p id="dash-sub">Visão geral da sua coleção — atualizada em tempo real.</p></div></div>
+      <!-- v0.49: aviso permanente enquanto a vitrine estiver carregada. Sem ele,
+           a pessoa só descobre a limitação ao esbarrar nela. -->
+      <div id="faixa-demo" class="faixa-demo hidden"></div>
       <div class="kpis">
         <div class="kpi hero"><div class="lbl">Garrafas na adega</div><div class="val" id="kpi-garrafas">—</div><div class="sub" id="kpi-rotulos">—</div></div>
         <div class="kpi"><div class="lbl">Valor estimado</div><div class="val" id="kpi-valor">—</div><div class="sub">soma dos preços de aquisição</div></div>
@@ -331,19 +395,36 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
           <div class="hbars" id="chart-paises"></div>
         </div>
       </div>
+      <!-- v0.51: Mapa das Adegas na primeira tela, pedido do Jorge. Até aqui o
+           mapa só era alcançável pelo menu ☰ e pela ficha do vinho — invisível
+           para quem não sabia que existia. Cada adega aparece pelo NOME que o
+           usuário lhe deu, com uma miniatura viva do próprio mapa. -->
+      <div class="panel" style="margin-top:16px">
+        <h3>🗺️ Mapa das Adegas <small>· toque numa adega e veja cada garrafa no seu lugar</small></h3>
+        <div id="mapa-adegas-resumo" style="margin-top:6px"></div>
+      </div>
       <div class="panel" style="margin-top:16px">
         <h3>⏳ Janela de consumo — atenção</h3>
         <div id="alerts"></div>
+      </div>
+      <!-- Atalho da harmonização: no celular a barra de baixo só tem cinco lugares
+           e a lateral some, então este é o caminho principal para o módulo. Fica
+           logo abaixo da janela de consumo porque é ali que se decide o que abrir. -->
+      <!-- v0.49: deixou de ser vitrine e virou módulo. Toca no prato e a resposta
+           sai aqui mesmo, sem trocar de tela — porque a pergunta "o que abro hoje?"
+           nasce justamente olhando a adega. -->
+      <div class="panel" style="margin-top:16px">
+        <h3>🍽️ O que abrir hoje? <small>· escolha um prato e veja a melhor garrafa da SUA adega</small></h3>
+        <div id="harm-pratos" style="margin-top:8px"></div>
+        <div id="harm-resumo" style="margin-top:10px"></div>
       </div>
       <div class="panel" style="margin-top:16px">
         <h3>📜 Histórico de consumo <small>· suas últimas garrafas abertas</small></h3>
         <div id="dash-hist"></div>
       </div>
-      <div class="panel" style="margin-top:16px">
-        <h3>🌐 Comunidade <small>· agora mesmo no Apotheca</small></h3>
-        <div id="dash-feed"></div>
-        <div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="go('comunidade')">Ver toda a atividade →</button></div>
-      </div>
+      <!-- v0.49: o painel de Comunidade saiu daqui. Minha Adega fala das SUAS
+           garrafas; a Comunidade já tem lugar fixo na barra de baixo (celular) e
+           na barra lateral (computador), com o contador de novidades. -->
     </section>
 
     <!-- ===== COLEÇÃO ===== -->
@@ -421,14 +502,11 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
     <section id="view-encontros" class="hidden">
       <div class="topbar"><div><h2>Encontros &amp; Confrarias</h2><p>Crie o evento, convide os amigos e veja as garrafas que cada um vai levar — com a ordem certa de serviço.</p></div></div>
 
-      <!-- 1) Quem você segue -->
-      <div class="panel" style="margin-bottom:16px">
-        <h3>👥 Quem você segue <small>· são estes que você pode convidar para os encontros</small></h3>
-        <div id="confraria-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="go('comunidade');abaComunidade('rede');setAbaRede('descobrir')">🔍 Encontrar mais apreciadores</button>
-        </div>
-      </div>
+      <!-- v0.50: o painel "Quem você segue" saiu daqui. Era uma versão empobrecida
+           da Comunidade → Minha rede → Seguindo (que é completa, com busca e perfis)
+           e ocupava a posição nobre da tela, empurrando para baixo o que a pessoa
+           veio fazer: criar encontro e ver os próximos. A escolha de convidados já
+           acontece dentro de "Criar novo encontro". -->
 
       <!-- 2) Confrarias -->
       <div class="panel" style="margin-bottom:16px">
@@ -532,7 +610,11 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 <div class="menu-bg" id="menu-bg" onclick="fecharMenu()"></div>
 <div class="menu-pop" id="menu-pop">
   <div id="menu-adegas"></div>
-  <div class="mi" onclick="fecharMenu();go('comunidade')">🌐 Comunidade</div>
+  <!-- Comunidade sai do menu de propósito: já tem lugar fixo na barra de baixo
+       (celular) e na barra lateral (computador). Harmonizar ocupa o lugar dela
+       porque não cabe em nenhuma das duas barras. -->
+  <div class="mi" onclick="fecharMenu();go('harmonizar')">🍽️ Harmonizar prato e vinho</div>
+  <div class="mi" onclick="fecharMenu();abrirMapaEscolha()">🗺️ Mapa da adega</div>
   <div class="mi" onclick="fecharMenu();abrirPerfil(perfil?perfil.user:null)">👤 Meu perfil</div>
   <div class="mi" id="mi-config" onclick="fecharMenu();abrirConfiguracoes()">⚙️ Configurações</div>
   <div class="mi" onclick="fecharMenu();go('historico')">📜 Histórico</div>
@@ -612,10 +694,11 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 <div class="modal-bg" id="modal-consume"><div class="modal" id="modal-consume-body"></div></div>
 
 <div class="toast" id="toast"></div>
+<div class="tarja-versao hidden" id="tarja-versao"></div>
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.46"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.52"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1179,12 +1262,17 @@ function dicaCobertura(ordem){
   return "✅ Lineup completo: o encontro tem vinhos para todas as fases, da recepção à sobremesa.";
 }
 function renderConfraria(){
-  /* chips de quem eu sigo (🤝 = segue de volta). A busca de gente mora na Comunidade. */
-  const MOSTRA=6; /* a tela fica enxuta: o resto abre em pop-up */
-  $("#confraria-chips").innerHTML=seguindo.slice(0,MOSTRA).map(a=>
-    `<span class="adega-chip" style="cursor:pointer" onclick="abrirPerfil('${escJS(a.user)}')">${ehAmigoProximo(a.user)?"🤝":"👤"} ${esc(a.nome)}${a.cidade?` <span class="n">${esc(a.cidade)}</span>`:""}</span>`).join("")
-    +(seguindo.length>MOSTRA?`<span class="adega-chip" style="cursor:pointer;border-style:dashed" onclick="abrirTodosSeguidos()">+${seguindo.length-MOSTRA} · ver todos</span>`:"")
-    ||'<span style="font-size:13px;color:var(--ink-2)">Você ainda não segue ninguém — use o botão abaixo para encontrar apreciadores.</span>';
+  /* v0.50: os chips de "quem você segue" saíram da tela de Encontros — a lista
+     completa mora na Comunidade → Minha rede. O guard fica porque esta função é
+     chamada de vários lugares e o elemento pode não existir. */
+  const cc=$("#confraria-chips");
+  if(cc){
+    const MOSTRA=6;
+    cc.innerHTML=seguindo.slice(0,MOSTRA).map(a=>
+      `<span class="adega-chip" style="cursor:pointer" onclick="abrirPerfil('${escJS(a.user)}')">${ehAmigoProximo(a.user)?"🤝":"👤"} ${esc(a.nome)}${a.cidade?` <span class="n">${esc(a.cidade)}</span>`:""}</span>`).join("")
+      +(seguindo.length>MOSTRA?`<span class="adega-chip" style="cursor:pointer;border-style:dashed" onclick="abrirTodosSeguidos()">+${seguindo.length-MOSTRA} · ver todos</span>`:"")
+      ||'<span style="font-size:13px;color:var(--ink-2)">Você ainda não segue ninguém.</span>';
+  }
   renderResumoParticipantes&&renderResumoParticipantes();
   renderConfrariasPub();
 }
@@ -1908,7 +1996,15 @@ async function enviarNoEncontro(evId){
   const el=$("#chat-in-"+evId);if(el)el.focus();
 }
 async function levarGarrafaEvento(evId){
-  const ev=eventos.find(e=>e.id===evId);const id=+$("#ev-sel-"+evId).value;
+  /* v0.49: garrafa de demonstração não entra em encontro de gente de verdade.
+     O bloqueio é a PRIMEIRA linha, antes de ler qualquer campo da tela: assim
+     vale mesmo que esta função venha a ser chamada de outro lugar. E é
+     explícito, não silencioso como no feed, porque a pessoa tocou num botão
+     esperando um resultado — merece saber por que não aconteceu e como
+     resolver. */
+  if(demoBloqueia("levar uma garrafa a um encontro"))return;
+  const ev=eventos.find(e=>e.id===evId);const sel=$("#ev-sel-"+evId);if(!ev||!sel)return;
+  const id=+sel.value;
   const v=vinhos.find(x=>x.id===id);if(!v)return;
   if(ehNuvem(ev)){
     if((ev.minhasN||[]).some(g=>g.nome.indexOf(v.nome)===0)){toast("Essa garrafa já está confirmada. 🍷");return}
@@ -2003,6 +2099,15 @@ function persist(){
     localStorage.setItem("__apo_t","1");localStorage.removeItem("__apo_t");PERSISTE=true;
   }catch(e){PERSISTE=false}
 })();
+/* v0.52: quem chega à vitrine (demonstração) pela primeira vez já encontra o
+   mapa povoado — as garrafas distribuídas pelas prateleiras, como numa adega
+   de verdade. Só roda quando NADA foi posicionado ainda: nunca mexe em mapa
+   que o usuário (ou uma sessão anterior) já organizou. */
+setTimeout(()=>{  /* adiado: as constantes do mapa são declaradas mais abaixo */
+  if(adegaDemo&&!ADEGAS.some(a=>a.grade)&&!vinhos.some(v=>v.pos&&v.pos.length)){
+    try{distribuirDemoNoMapa();persist();renderMapaAdegasResumo()}catch(e){}
+  }
+},0);
 function resetDemo(){
   try{localStorage.removeItem(STORE_KEY)}catch(e){}
   location.reload();
@@ -2201,10 +2306,21 @@ function abrirConfiguracoes(){
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SUA CONTA</div>
     ${linhaConfig("🔑","Minha conta e meus dados",perfil?"@"+esc(perfil.user):"sem login",
       "abrirMinhaConta()","Baixar tudo o que é seu ou apagar a conta")}
+    ${linhaConfig("📜","Política de privacidade","ler",
+      "abrirPolitica()","O que existe, onde fica e quem manda: você")}
 
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SUA ADEGA</div>
     ${linhaConfig("✏️","Gerenciar adegas",nAdegas+(nAdegas===1?" adega":" adegas"),
       "closeModal('modal-detail');openAdegasManager()","Renomear, trocar o ícone ou excluir")}
+    ${linhaConfig("🗺️","Mapa da adega",
+      (n=>n?n+" com mapa":"nenhum ainda")(ADEGAS.filter(a=>a.grade).length),
+      "closeModal('modal-detail');abrirMapaEscolha()",
+      "Cada garrafa no seu lugar físico — prateleira e casa")}
+    ${linhaConfig("🧹","Zerar minha adega",
+      adegaDemo?"demonstração":vinhos.length?vinhos.length+(vinhos.length===1?" rótulo":" rótulos"):"já está vazia",
+      "closeModal('modal-detail');abrirZerarAdega()",
+      adegaDemo?"Sair da demonstração e começar a sua adega de verdade"
+               :"Apagar as garrafas deste aparelho e recomeçar do zero")}
     ${linhaConfig("🔒","Quem vê minha adega",
       privacidadeAdega==="publica"?"todos":privacidadeAdega==="privada"?"ninguém":"amigos",
       "closeModal('modal-detail');abrirPrivacidadeAdega()",
@@ -2274,6 +2390,13 @@ function abrirAjuda(){
     </div>`;
   $("#modal-detail").classList.add("open");
 }
+/* v0.52: a política de privacidade a um toque, dentro do app.
+   No APK, window.open não abre o navegador — usa a ponte Apk.abrirNavegador */
+function abrirPolitica(){
+  const u=SITE_URL+"politica-privacidade.html";
+  if(window.Apk&&Apk.abrirNavegador)Apk.abrirNavegador(u);
+  else window.open(u,"_blank","noopener");
+}
 function abrirSobre(){
   const tot=vinhos.reduce((s,v)=>s+v.qtd,0);
   $("#modal-detail-body").innerHTML=`
@@ -2287,6 +2410,7 @@ function abrirSobre(){
       <p style="margin-bottom:10px">Base mundial offline <b>X-Wines</b> (licença CC BY-NC-SA): <b>${baseMundialPronta.length.toLocaleString("pt-BR")} vinhos</b> ${baseMundialPronta.length>1000?"— base completa carregada ✓":"— amostra (a base completa vive no APK)"}</p>
       <p style="margin-bottom:10px">Comunidade na nuvem: <b>${nuvemOK?"conectada ✅ (banco real Supabase)":"offline — modo local ⚪"}</b></p>\n      <p style="margin-bottom:10px">IA de visão do scanner: <b>${getIaKey()?"ativa neste aparelho ✅":"não configurada — ative no menu 🔑"}</b></p>
       <p style="color:var(--ink-2)">Este é um protótipo de validação: dados de comunidade simulados.</p>
+      <p style="margin-top:10px"><a href="#" onclick="abrirPolitica();return false" style="color:var(--wine-3)">📜 Política de privacidade</a></p>
     </div>
     <div style="text-align:center;margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3);letter-spacing:.5px">by <span class="serif" style="font-size:14px;color:var(--wine)">Claude</span></div>`;
   $("#modal-detail").classList.add("open");
@@ -2421,10 +2545,561 @@ function carregarDemo(){
   const d=JSON.parse(JSON.stringify(DEMO_SEED));
   vinhos=d.vinhos;historico=d.historico;eventos=d.eventos;seguindo=d.seguindo;ADEGAS=d.ADEGAS;adegaDemo=true;
   adegaAtiva="todas";
+  distribuirDemoNoMapa();
   persist();refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();renderHist();
   toast("🎬 Adega de demonstração carregada — 153 garrafas para explorar!");
   go("dashboard");
 }
+/* ==================== MAPA DA ADEGA (v0.50) ====================
+   Pedido de um testador que veio do Oeni: ver a adega desenhada, cada garrafa
+   no seu lugar físico, para não puxar garrafa por garrafa atrás do rótulo
+   certo (movimentar vinho, além de chato, faz mal a ele).
+
+   Modelo de dados — deliberadamente mínimo:
+   • ADEGAS[i].grade = {linhas, colunas}  → a estrutura física (opcional);
+   • vinhos[i].pos   = ["A1","C4",...]    → onde estão as garrafas daquele
+     rótulo, no máximo qtd posições. Casas nomeadas como coordenada de mapa:
+     prateleira A, B, C… de cima para baixo; casa 1, 2, 3… da esquerda.
+   A ocupação é DERIVADA dos vinhos a cada render, nunca guardada em separado —
+   assim não existe a categoria de erro "mapa diz X, adega diz Y".
+
+   Tudo local, como toda a adega: nada disso sobe ao servidor. E tudo opcional:
+   quem não mapear continua usando o aplicativo exatamente como antes.
+
+   Onde superamos o Oeni: o mapa conversa com o resto. O Harmonizar responde
+   "abra o Esporão 2020 — prateleira C, casa 3"; a ficha mostra onde está; e ao
+   consumir, a casa é liberada sozinha. Mapa que precisa de manutenção manual
+   morre em duas semanas. */
+const LETRAS="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const MAPA_MAX_LINHAS=26, MAPA_MAX_COLUNAS=40;
+let mapaAdegaAberta=null;   /* id da adega exibida no pop-up */
+let mapaColocando=null;     /* id do vinho em modo "guardar no mapa" */
+let mapaDestacar=null;      /* id do vinho a acender no modo consulta */
+let mapaCelSel=null;        /* casa tocada no modo consulta */
+
+function posTexto(v,max){
+  return (Array.isArray(v.pos)&&v.pos.length)?" · 📍 "+v.pos.slice(0,max||3).join(", ")+(v.pos.length>(max||3)?"…":""):"";
+}
+function mapaOcupacao(adegaId){
+  const m={};
+  vinhos.filter(v=>v.adega===adegaId&&Array.isArray(v.pos)).forEach(v=>v.pos.forEach(p=>{m[p]=v}));
+  return m;
+}
+function garrafasMapeadas(adegaId){
+  return vinhos.filter(v=>v.adega===adegaId&&Array.isArray(v.pos)).reduce((s,v)=>s+v.pos.length,0);
+}
+/* v0.52: o estoque é a verdade — quem tem 4 garrafas e só 1 no mapa aparece
+   aqui com "faltam 3". É a resposta ao caso real do Jorge: Barolo com 4
+   garrafas e uma única casa marcada, sem nenhum aviso. */
+function pendenciasMapa(adegaId){
+  return vinhos.filter(v=>v.adega===adegaId&&v.qtd>((v.pos&&v.pos.length)||0))
+    .map(v=>({v,faltam:v.qtd-((v.pos&&v.pos.length)||0)}));
+}
+
+/* Módulo da primeira tela (v0.51): cada adega pelo nome que o usuário deu,
+   com uma miniatura viva do mapa — as mesmas cores por tipo do mapa grande.
+   A miniatura é leitura pura de mapaOcupacao(): nunca diverge do mapa real. */
+function renderMapaAdegasResumo(){
+  const el=$("#mapa-adegas-resumo");if(!el)return;
+  el.innerHTML=ADEGAS.map(a=>{
+    const gfs=vinhos.filter(v=>v.adega===a.id).reduce((s,v)=>s+v.qtd,0);
+    const g=a.grade, nm=garrafasMapeadas(a.id);
+    let mini="";
+    if(g){
+      const ocup=mapaOcupacao(a.id);
+      mini=`<div class="mini-mapa" style="grid-template-columns:repeat(${g.colunas},10px)">`+
+        Array.from({length:g.linhas*g.colunas},(_,i)=>{
+          const p=LETRAS[Math.floor(i/g.colunas)]+(i%g.colunas+1), v=ocup[p];
+          return v?`<i class="oc" style="background:${CORES[v.tipo]||"var(--wine-3)"}"></i>`:"<i></i>";
+        }).join("")+`</div>`;
+    }
+    return `<div class="mapa-adega-linha" onclick="abrirMapaAdega('${a.id}')">
+      <div style="flex:1;min-width:0">
+        <b>${a.icone} ${esc(a.nome)}</b>
+        <div style="font-size:12px;color:var(--ink-2);margin-top:2px">${g
+          ?`${g.linhas} prateleira${g.linhas===1?"":"s"} × ${g.colunas} casas · <b>${nm}</b> de ${gfs} garrafa${gfs===1?"":"s"} no mapa${(f=>f?` · <b style="color:#a06a00">falta${f===1?"":"m"} ${f}</b>`:"")(gfs-nm)}`
+          :`${gfs} garrafa${gfs===1?"":"s"} · toque para desenhar o mapa`}</div>
+      </div>
+      ${mini||`<span style="font-size:12.5px;color:var(--wine);font-weight:600;flex:none">criar mapa →</span>`}
+    </div>`;
+  }).join("");
+}
+
+function abrirMapaAdega(adegaId,opts){
+  opts=opts||{};
+  mapaAdegaAberta=adegaId;
+  mapaColocando=opts.colocar||null;
+  mapaDestacar=opts.destacar||null;
+  mapaCelSel=null;
+  renderMapaModal();
+}
+/* menu ☰ e Configurações chegam sem adega definida: resolve sozinho ou pergunta */
+function abrirMapaEscolha(){
+  if(adegaAtiva!=="todas"){abrirMapaAdega(adegaAtiva);return}
+  if(ADEGAS.length===1){abrirMapaAdega(ADEGAS[0].id);return}
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🗺️ Mapa da adega</h3>
+    <div class="sub">De qual adega?</div>
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+      ${ADEGAS.map(a=>{const g=a.grade;const n=garrafasMapeadas(a.id);
+        return `<button class="btn btn-ghost" style="justify-content:flex-start;text-align:left" onclick="abrirMapaAdega('${a.id}')">${a.icone} ${esc(a.nome)}
+          <span style="margin-left:auto;font-size:12px;color:var(--ink-3)">${g?`${g.linhas}×${g.colunas} · ${n} garrafa${n===1?"":"s"} no mapa`:"sem mapa ainda"}</span></button>`}).join("")}
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+
+function renderMapaModal(){
+  const a=adegaDe(mapaAdegaAberta);
+  if(!a){closeModal("modal-detail");return}
+
+  /* sem estrutura definida: primeiro se desenha a adega */
+  if(!a.grade){
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="closeModal('modal-detail')">✕</button>
+      <h3 class="serif">🗺️ ${a.icone} ${esc(a.nome)}</h3>
+      <div class="sub">Desenhe a sua adega uma única vez — depois é só apontar onde cada garrafa mora.</div>
+      <div class="explain-box" style="margin-top:12px">
+        Conte como ela é de verdade: quantas <b>prateleiras</b> (fileiras, de cima
+        para baixo) e quantas <b>casas por prateleira</b> (da esquerda para a direita).
+        Dá para ajustar depois, sem perder o que já foi marcado.
+      </div>
+      <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:120px"><label>Prateleiras</label>
+          <input id="mapa-linhas" type="number" min="1" max="${MAPA_MAX_LINHAS}" value="6" style="width:100%"></div>
+        <div class="field" style="flex:1;min-width:120px"><label>Casas por prateleira</label>
+          <input id="mapa-colunas" type="number" min="1" max="${MAPA_MAX_COLUNAS}" value="8" style="width:100%"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="definirGrade()">🗺️ Criar o mapa</button>
+        <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+      </div>`;
+    $("#modal-detail").classList.add("open");
+    return;
+  }
+
+  const g=a.grade, ocup=mapaOcupacao(a.id);
+  const colocando=mapaColocando?vinhos.find(v=>v.id===mapaColocando):null;
+  if(mapaColocando&&!colocando)mapaColocando=null;
+
+  /* v0.52: a foto da adega real como fundo é escolha do dono — quem prefere
+     a nossa formatação continua nela; a grade fica translúcida sobre a foto */
+  const comFoto=!!(a.foto&&a.fotoOn);
+  let grade=`<div class="mapa-grade${comFoto?" com-foto":""}" style="grid-template-columns:32px repeat(${g.colunas},32px)${comFoto?`;background-image:url('${a.foto}')`:""}">`;
+  grade+=`<span class="mapa-rot"></span>`;
+  for(let c=0;c<g.colunas;c++)grade+=`<span class="mapa-rot">${c+1}</span>`;
+  for(let l=0;l<g.linhas;l++){
+    grade+=`<span class="mapa-rot">${LETRAS[l]}</span>`;
+    for(let c=0;c<g.colunas;c++){
+      const p=LETRAS[l]+(c+1), v=ocup[p];
+      const classes=["mapa-cel"];
+      if(v)classes.push("ocupada");
+      if(v&&mapaDestacar&&v.id===mapaDestacar)classes.push("destaque");
+      if(v&&colocando&&v.id===colocando.id)classes.push("propria");
+      grade+=`<button class="${classes.join(" ")}" ${v?`style="background:${CORES[v.tipo]||"var(--wine-3)"}"`:""}
+        title="${p}${v?" · "+esc(v.nome):""}" onclick="tocarCelula('${p}')">${v?"":""}</button>`;
+    }
+  }
+  grade+=`</div>`;
+
+  const tiposPresentes=[...new Set(Object.values(ocup).map(v=>v.tipo))];
+  const nMapa=garrafasMapeadas(a.id);
+  const nTotal=vinhos.filter(v=>v.adega===a.id).reduce((s,v)=>s+v.qtd,0);
+
+  /* v0.52: no modo consulta, o mapa confessa o que ainda falta guardar.
+     Cada vinho pendente vira um botão que já abre o modo de colocação. */
+  const pend=(!colocando&&!mapaDestacar)?pendenciasMapa(a.id):[];
+  const pendTotal=pend.reduce((s,x)=>s+x.faltam,0);
+  const pendBox=pend.length?`<div class="mapa-pend">
+    🍾 <b>${pendTotal} garrafa${pendTotal===1?"":"s"} ainda ${pendTotal===1?"está":"estão"} fora do mapa.</b>
+    Toque num vinho e aponte onde ${pendTotal===1?"ela mora":"elas moram"}:
+    <div>${pend.slice(0,8).map(x=>`<button class="chip-pend" onclick="abrirMapaAdega('${a.id}',{colocar:${x.v.id}})">📍 ${esc(x.v.nome)} · falta${x.faltam===1?"":"m"} ${x.faltam}</button>`).join("")}
+    ${pend.length>8?`<span style="font-size:12px;color:var(--ink-2)">… e mais ${pend.length-8} vinho${pend.length-8===1?"":"s"}</span>`:""}</div>
+  </div>`:"";
+
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="fecharMapa()">✕</button>
+    <h3 class="serif">🗺️ ${a.icone} ${esc(a.nome)}</h3>
+    <div class="sub">${g.linhas} prateleira${g.linhas===1?"":"s"} × ${g.colunas} casas · ${nMapa} de ${nTotal} garrafa${nTotal===1?"":"s"} no mapa</div>
+    ${colocando?`<div class="explain-box" style="margin-top:10px;border-left-color:var(--gold)">
+      📍 Guardando <b>${esc(colocando.nome)} ${safraTxt(colocando)}</b> — ${(colocando.pos||[]).length} de ${colocando.qtd} garrafa${colocando.qtd===1?"":"s"} posicionada${colocando.qtd===1?"":"s"}.<br>
+      <span style="font-size:12px">Toque numa casa vazia para guardar; toque numa casa desta cor com contorno para tirar.</span></div>`:""}
+    ${mapaDestacar?`<div class="explain-box" style="margin-top:10px;border-left-color:var(--gold)">
+      As casas piscando em dourado são as garrafas procuradas.</div>`:""}
+    ${pendBox}
+    <div class="mapa-scroll">${grade}</div>
+    <div class="mapa-legenda">
+      ${tiposPresentes.map(t=>`<span><i style="background:${CORES[t]}"></i>${t}</span>`).join("")}
+      <span><i style="background:${comFoto?"rgba(255,255,255,.4)":"var(--cream)"};border:1px solid var(--line)"></i>vazia</span>
+    </div>
+    <div id="mapa-info"></div>
+    <input id="mapa-foto-input" type="file" accept="image/*" class="hidden" onchange="carregarFotoAdega(this)">
+    <div class="modal-actions" style="margin-top:12px">
+      ${colocando?`<button class="btn btn-primary" onclick="concluirColocacao()">✓ Concluir</button>`
+                 :`<button class="btn btn-ghost btn-sm" onclick="abrirRedimensionar()">📐 Ajustar tamanho</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirFundoMapa()">🖼️ Fundo</button>`}
+      <button class="btn btn-ghost" onclick="fecharMapa()">Fechar</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+  if(mapaCelSel)mostrarInfoCelula(mapaCelSel);
+}
+
+function tocarCelula(p){
+  const a=adegaDe(mapaAdegaAberta);if(!a||!a.grade)return;
+  const ocup=mapaOcupacao(a.id), dono=ocup[p];
+
+  if(mapaColocando){
+    const v=vinhos.find(x=>x.id===mapaColocando);if(!v)return;
+    v.pos=Array.isArray(v.pos)?v.pos:[];
+    if(dono&&dono.id===v.id){ v.pos=v.pos.filter(x=>x!==p); persist(); renderMapaModal(); return }
+    if(dono){ toast(`A casa ${p} já tem ${dono.nome}. 🍾`); return }
+    if(v.pos.length>=v.qtd){ toast(`Todas as ${v.qtd} garrafa${v.qtd===1?"":"s"} já ${v.qtd===1?"está":"estão"} no mapa.`); return }
+    v.pos.push(p); v.pos.sort(); persist(); renderMapaModal(); return;
+  }
+  mapaCelSel=p;
+  mostrarInfoCelula(p);
+}
+function mostrarInfoCelula(p){
+  const el=$("#mapa-info");if(!el)return;
+  const v=mapaOcupacao(mapaAdegaAberta)[p];
+  el.innerHTML=v
+    ?`<div class="mapa-info"><b>${p}</b> · ${esc(v.nome)} ${safraTxt(v)} <span style="color:var(--ink-3)">· ${esc(v.vinicola)}</span>
+       <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="fecharMapa();openDetail(${v.id})">Ver ficha</button></div>`
+    :`<div class="mapa-info"><b>${p}</b> · casa vazia</div>`;
+}
+function concluirColocacao(){
+  const v=vinhos.find(x=>x.id===mapaColocando);
+  const aid=mapaAdegaAberta;
+  mapaColocando=null;
+  renderMapaModal();
+  if(!v)return;
+  const tem=(v.pos&&v.pos.length)||0, faltam=v.qtd-tem;
+  /* v0.52: concluir com garrafa sobrando não passa mais em silêncio — o
+     estoque é conferido e o mapa pergunta na hora onde estão as demais */
+  if(faltam>0){
+    const el=$("#mapa-info");
+    if(el)el.innerHTML=`<div class="mapa-info" style="border-left:4px solid var(--gold)">
+      🍾 <b>${esc(v.nome)}</b>: ${tem} guardada${tem===1?"":"s"}, mas a adega diz que você tem <b>${v.qtd}</b> —
+      falta${faltam===1?"":"m"} <b>${faltam}</b>. Onde ${faltam===1?"está a outra":"estão as outras"}?
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="abrirMapaAdega('${aid}',{colocar:${v.id}})">📍 Marcar agora</button>
+        <button class="btn btn-ghost btn-sm" onclick="renderMapaModal()">Deixar para depois</button>
+      </div></div>`;
+  } else toast(`📍 ${v.nome}: todas as ${v.qtd} garrafa${v.qtd===1?"":"s"} no mapa. ✓`);
+}
+function fecharMapa(){
+  mapaColocando=null;mapaDestacar=null;mapaCelSel=null;mapaAdegaAberta=null;
+  closeModal("modal-detail");
+  /* a miniatura da primeira tela acompanha o que acabou de mudar no mapa */
+  try{renderMapaAdegasResumo()}catch(e){}
+}
+
+/* ===== v0.52: a demonstração chega com o mapa já povoado =====
+   Pedido do Jorge para demonstrar o app a um usuário sem começar do zero.
+   Como distribui: as garrafas do MESMO vinho ficam vizinhas (é assim numa
+   adega de verdade — ninguém espalha as 6 do Bourgogne pelos cantos), a ordem
+   dos vinhos é sorteada e ~15% das casas ficam vazias ao acaso, para o mapa
+   parecer vivido, não carimbado. Um único vinho fica de propósito com 1
+   garrafa fora do mapa: é a deixa para mostrar a conferência de estoque. */
+function distribuirDemoNoMapa(){
+  if(!adegaDemo)return;
+  ADEGAS.forEach(a=>{
+    const vs=vinhos.filter(v=>v.adega===a.id);
+    const total=vs.reduce((s,v)=>s+v.qtd,0);
+    if(!total){delete a.grade;return}
+    const colunas=Math.min(10,Math.max(6,Math.ceil(Math.sqrt(total*1.3))));
+    const linhas=Math.min(MAPA_MAX_LINHAS,Math.max(2,Math.ceil(total*1.25/colunas)));
+    a.grade={linhas,colunas};
+    const casas=[];
+    for(let l=0;l<linhas;l++)for(let c=1;c<=colunas;c++)casas.push(LETRAS[l]+c);
+    const folga=casas.length-total;               /* casas que podem ficar vazias */
+    let puladas=0,i=0,restantes=total;
+    const emOrdem=vs.slice();
+    for(let k=emOrdem.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[emOrdem[k],emOrdem[j]]=[emOrdem[j],emOrdem[k]]}
+    emOrdem.forEach(v=>{
+      v.pos=[];
+      for(let g=0;g<v.qtd&&i<casas.length;g++){
+        /* só pula uma casa se ainda sobrar espaço para TODAS as garrafas seguintes */
+        while(puladas<folga&&(casas.length-i-1)>=restantes&&Math.random()<0.15){i++;puladas++}
+        v.pos.push(casas[i++]);restantes--;
+      }
+      v.pos.sort();
+    });
+  });
+  /* a pendência pedagógica: um tinto com 3+ garrafas "esquece" uma fora do mapa */
+  const alvo=vinhos.find(v=>v.qtd>=3&&Array.isArray(v.pos)&&v.pos.length===v.qtd);
+  if(alvo)alvo.pos.pop();
+}
+
+/* ===== v0.52: o fundo do mapa é escolha do dono da adega =====
+   Duas opções, sempre reversíveis: a nossa formatação (grade limpa) ou uma
+   foto da adega de verdade, com a grade translúcida por cima. A foto é
+   comprimida no próprio aparelho e guardada junto com a adega — nunca sobe
+   ao servidor, seguindo a regra de sempre: a adega não sai daqui. */
+function abrirFundoMapa(){
+  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  const el=$("#mapa-info");if(!el)return;
+  el.innerHTML=`<div class="mapa-info">
+    <b>🖼️ Fundo do mapa</b> — como você prefere ver esta adega?
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      ${a.foto?`
+      <button class="btn ${a.fotoOn?"btn-primary":"btn-ghost"} btn-sm" onclick="alternarFotoAdega(true)">📷 Foto da minha adega</button>
+      <button class="btn ${a.fotoOn?"btn-ghost":"btn-primary"} btn-sm" onclick="alternarFotoAdega(false)">🎨 Nossa formatação</button>
+      <button class="btn btn-ghost btn-sm" onclick="$('#mapa-foto-input').click()">🔄 Trocar a foto</button>
+      <button class="btn btn-ghost btn-sm" onclick="removerFotoAdega()">🗑️ Remover</button>`
+      :`<button class="btn btn-primary btn-sm" onclick="$('#mapa-foto-input').click()">📷 Usar uma foto da minha adega</button>
+      <span style="font-size:12px;color:var(--ink-2);align-self:center">A foto fica só neste aparelho, como tudo na sua adega.</span>`}
+    </div></div>`;
+}
+function alternarFotoAdega(ligar){
+  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  a.fotoOn=!!ligar;persist();renderMapaModal();
+}
+function removerFotoAdega(){
+  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  delete a.foto;delete a.fotoOn;persist();renderMapaModal();
+  toast("🖼️ Foto removida — de volta à nossa formatação.");
+}
+function carregarFotoAdega(inp){
+  const a=adegaDe(mapaAdegaAberta), f=inp.files&&inp.files[0];
+  inp.value="";
+  if(!a||!f)return;
+  const img=new Image();
+  img.onload=()=>{
+    URL.revokeObjectURL(img.src);
+    /* comprime no aparelho: lado maior 1400px, JPEG progressivamente mais
+       leve até caber com folga no armazenamento local */
+    const fator=Math.min(1,1400/Math.max(img.width,img.height));
+    const cv=document.createElement("canvas");
+    cv.width=Math.round(img.width*fator);cv.height=Math.round(img.height*fator);
+    cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+    let q=0.72,durl=cv.toDataURL("image/jpeg",q);
+    while(durl.length>900000&&q>0.35){q-=0.12;durl=cv.toDataURL("image/jpeg",q)}
+    const antes={foto:a.foto,fotoOn:a.fotoOn};
+    a.foto=durl;a.fotoOn=true;
+    try{persist()}catch(e){
+      a.foto=antes.foto;a.fotoOn=antes.fotoOn;
+      if(!a.foto){delete a.foto;delete a.fotoOn}
+      persist();toast("Essa foto ficou grande demais para guardar aqui. Tente outra.");return;
+    }
+    renderMapaModal();
+    toast("📷 Sua adega de verdade agora é o fundo do mapa.");
+  };
+  img.onerror=()=>{toast("Não consegui ler essa imagem. Tente outra foto.")};
+  img.src=URL.createObjectURL(f);
+}
+
+function definirGrade(){
+  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  const l=Math.min(MAPA_MAX_LINHAS,Math.max(1,+$("#mapa-linhas").value||6));
+  const c=Math.min(MAPA_MAX_COLUNAS,Math.max(1,+$("#mapa-colunas").value||8));
+  a.grade={linhas:l,colunas:c};
+  persist();
+  toast(`🗺️ Mapa criado: ${l} prateleira${l===1?"":"s"} × ${c} casas.`);
+  renderMapaModal();
+}
+function abrirRedimensionar(){
+  const a=adegaDe(mapaAdegaAberta);if(!a||!a.grade)return;
+  const el=$("#mapa-info");if(!el)return;
+  el.innerHTML=`<div class="mapa-info">
+    <b>📐 Ajustar:</b>
+    <input id="mapa-linhas" type="number" min="1" max="${MAPA_MAX_LINHAS}" value="${a.grade.linhas}" style="width:64px"> prateleiras ×
+    <input id="mapa-colunas" type="number" min="1" max="${MAPA_MAX_COLUNAS}" value="${a.grade.colunas}" style="width:64px"> casas
+    <button class="btn btn-primary btn-sm" style="margin-left:6px" onclick="redimensionarGrade()">Aplicar</button>
+  </div>`;
+}
+function redimensionarGrade(){
+  const a=adegaDe(mapaAdegaAberta);if(!a||!a.grade)return;
+  const l=Math.min(MAPA_MAX_LINHAS,Math.max(1,+$("#mapa-linhas").value||a.grade.linhas));
+  const c=Math.min(MAPA_MAX_COLUNAS,Math.max(1,+$("#mapa-colunas").value||a.grade.colunas));
+  /* encolher pode deixar garrafa fora do mapa: avisa ANTES e, se confirmar,
+     devolve essas garrafas ao estado "sem posição" — nunca as apaga */
+  const fora=[];
+  vinhos.filter(v=>v.adega===a.id&&Array.isArray(v.pos)).forEach(v=>v.pos.forEach(p=>{
+    const li=LETRAS.indexOf(p[0]), co=parseInt(p.slice(1),10);
+    if(li>=l||co>c)fora.push({v,p});
+  }));
+  if(fora.length){
+    if(!confirm(`Encolher para ${l}×${c} deixa ${fora.length} garrafa${fora.length===1?"":"s"} fora do mapa `+
+      `(${fora.slice(0,4).map(f=>f.p).join(", ")}${fora.length>4?"…":""}).\n\n`+
+      `Elas NÃO são apagadas da adega — apenas voltam a ficar sem posição marcada.\n\nContinuar?`))return;
+    fora.forEach(({v,p})=>{v.pos=v.pos.filter(x=>x!==p)});
+  }
+  a.grade={linhas:l,colunas:c};
+  persist();renderMapaModal();
+  toast(`📐 Mapa ajustado para ${l}×${c}.`);
+}
+
+/* ============ A DEMONSTRAÇÃO NÃO TOCA NO QUE É REAL (v0.49) ============
+   A vitrine existe para aprender o aplicativo. O risco que ela criava: alguém
+   com 153 garrafas de mentira entrar num encontro ou numa confraria de verdade
+   e anunciar um Barolo que não tem — seja por brincadeira, seja sem perceber
+   que a adega não é dele. Quem está do outro lado não tem como saber.
+
+   A regra passa a ser uma só: **nada que venha da demonstração aparece para
+   outra pessoa.** Três camadas, em pontos de estrangulamento, nunca espalhadas:
+
+     1. publicarMinhasStats  — os números da adega nunca subiram (desde a v0.40);
+     2. addAtividade         — nenhuma atividade entra no feed da comunidade;
+     3. demoBloqueia()       — as ações em que a pessoa clica e espera resultado.
+
+   O que continua liberado, de propósito: seguir gente, conversar, aceitar
+   convite, falar no bate-papo do encontro. Nada disso afirma um fato falso
+   sobre uma coleção — é interação honesta, e é justamente o que alguém precisa
+   experimentar para decidir se quer o aplicativo. Travar tudo transformaria a
+   demonstração numa sala vazia. */
+function demoBloqueia(oQue){
+  if(!adegaDemo)return false;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🎬 Isto é a adega de demonstração</h3>
+    <div class="sub">Ela serve para conhecer o aplicativo — não para ${esc(oQue)}.</div>
+    <div class="explain-box" style="margin-top:12px">
+      As 153 garrafas da demonstração não são suas. Levá-las para um encontro ou
+      para a comunidade mostraria às outras pessoas uma coleção que não existe, e
+      elas não teriam como perceber.
+    </div>
+    <div class="explain-box">
+      Enquanto a demonstração estiver carregada, o Apotheca também não publica as
+      suas atividades no feed nem os números da sua adega. <b>Seguir pessoas,
+      conversar e participar dos encontros continua tudo liberado.</b>
+    </div>
+    <div class="explain-box">
+      Para valer de verdade: saia da demonstração e cadastre os seus vinhos.
+      A primeira garrafa leva menos de um minuto — dá para ler o rótulo pela foto.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="closeModal('modal-detail');abrirZerarAdega()">🧹 Sair da demonstração</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Continuar explorando</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+  return true;
+}
+
+/* ============ ZERAR A ADEGA (v0.49) ============
+   Faltava o caminho de volta: dava para ENTRAR na demonstração desde sempre,
+   mas não para sair dela; e quem cadastrou tudo errado no começo, ou vendeu a
+   coleção, não tinha como recomeçar.
+
+   Os dois casos têm peso diferente e por isso têm tratamento diferente:
+
+   • Demonstração — nada ali é do usuário, nem as garrafas nem o consumo. Some
+     tudo de uma vez, com uma confirmação simples. Guardar "histórico" de um
+     consumo que nunca aconteceu só sujaria a adega verdadeira que vem depois.
+
+   • Adega real — é trabalho de meses e não volta. Exige digitar ZERAR, mostra
+     exatamente o que se perde, oferece baixar os dados antes, e deixa o
+     histórico de consumo como ESCOLHA: as garrafas já bebidas são memória do
+     que a pessoa provou, não estoque atual. */
+function abrirZerarAdega(){
+  const gf = vinhos.reduce((s,v)=>s+v.qtd,0);
+  const hist = historico.length;
+
+  if(adegaDemo){
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="closeModal('modal-detail')">✕</button>
+      <h3 class="serif">🧹 Sair da demonstração</h3>
+      <div class="sub">Você está com a adega de exemplo carregada.</div>
+      <div class="explain-box" style="margin-top:12px">
+        Vão embora as <b>${gf} garrafas</b> de exemplo, os <b>${vinhos.length} rótulos</b>
+        e também o <b>consumo de exemplo</b> (${hist} registro${hist===1?"":"s"}).
+        Nada disso é seu — o consumo dali nunca aconteceu, e mantê-lo só sujaria
+        a sua adega de verdade.
+      </div>
+      <div class="explain-box">Suas adegas (${ADEGAS.length}), seus seguidores, suas conversas e seus encontros <b>não são afetados</b>.</div>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="zerarAdega(true)">🧹 Zerar e começar do zero</button>
+        <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+      </div>`;
+    $("#modal-detail").classList.add("open");
+    return;
+  }
+
+  if(!vinhos.length){
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="closeModal('modal-detail')">✕</button>
+      <h3 class="serif">🧹 Zerar minha adega</h3>
+      <div class="explain-box" style="margin-top:12px">A sua adega já está vazia — não há nada para apagar.</div>
+      <div style="margin-top:14px"><button class="btn btn-ghost" onclick="closeModal('modal-detail')">Fechar</button></div>`;
+    $("#modal-detail").classList.add("open");
+    return;
+  }
+
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🧹 Zerar minha adega</h3>
+    <div class="sub">Isto apaga a sua coleção deste aparelho. Não há como desfazer.</div>
+    <div class="explain-box" style="margin-top:12px">
+      Some para sempre: <b>${gf} garrafa${gf===1?"":"s"}</b> em <b>${vinhos.length} rótulo${vinhos.length===1?"":"s"}</b>,
+      com preços, safras e anotações.
+    </div>
+    <div class="explain-box">
+      <b>Não são afetados:</b> as suas adegas (${ADEGAS.length}), seus seguidores, suas conversas e seus encontros.
+    </div>
+    <div class="explain-box">
+      📦 Antes de apagar, vale <b onclick="baixarMeusDados()" style="color:var(--wine-3);cursor:pointer;text-decoration:underline">baixar os seus dados</b> —
+      o arquivo inclui a adega inteira e nunca mais será possível recuperá-la daqui.
+    </div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">E O HISTÓRICO DE CONSUMO?</div>
+    <div class="explain-box">
+      Você tem <b>${hist} garrafa${hist===1?"":"s"} já aberta${hist===1?"":"s"}</b> registrada${hist===1?"":"s"}, com nota e data.
+      Isso é memória do que você provou, não estoque — por isso a escolha é sua.
+    </div>
+    <label style="display:flex;gap:9px;align-items:flex-start;margin:10px 2px;font-size:13.5px;cursor:pointer">
+      <input type="checkbox" id="zerar-hist" style="margin-top:3px">
+      <span>Apagar também o histórico de consumo (as ${hist} garrafa${hist===1?"":"s"} já aberta${hist===1?"":"s"})</span>
+    </label>
+    <div style="margin-top:12px">
+      <div style="font-size:13px;color:var(--ink-2);margin-bottom:6px">Para confirmar, digite <b>ZERAR</b>:</div>
+      <input id="conf-zerar" placeholder="ZERAR" autocomplete="off" style="width:100%">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="confirmarZerarAdega()">🧹 Zerar minha adega</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+
+function confirmarZerarAdega(){
+  const campo = $("#conf-zerar");
+  const digitado = (campo?campo.value:"").trim().toUpperCase();
+  if(digitado !== "ZERAR"){
+    toast("Digite ZERAR para confirmar. 🧹");
+    if(campo)campo.focus();
+    return;
+  }
+  const comHistorico = !!($("#zerar-hist") && $("#zerar-hist").checked);
+  zerarAdega(comHistorico);
+}
+
+function zerarAdega(comHistorico){
+  const eraDemo = adegaDemo;
+  const gf = vinhos.reduce((s,v)=>s+v.qtd,0);
+  const hist = historico.length;
+
+  vinhos = [];
+  /* na demonstração o consumo também é de mentira: vai junto, sempre */
+  if(eraDemo || comHistorico) historico = [];
+  /* v0.52: o mapa e a foto da vitrine também são de mentira — saem junto.
+     Sem isso, a adega nova do usuário herdaria grades 12×10 vazias da demo. */
+  if(eraDemo) ADEGAS.forEach(a=>{delete a.grade;delete a.foto;delete a.fotoOn});
+  adegaDemo = false;          /* a adega passa a ser do usuário, ainda que vazia */
+  adegaAtiva = "todas";
+  pratoResumo = null;
+
+  persist();
+  try{ refreshAdegaSelect(); renderAdegaBar() }catch(e){}
+  renderDash(); renderColecao(); renderHist();
+  closeModal("modal-detail");
+  go("dashboard");
+
+  toast(eraDemo
+    ? `🧹 Demonstração encerrada — a adega é sua agora. Toque em ＋ para o primeiro vinho.`
+    : (comHistorico
+        ? `🧹 Adega zerada: ${gf} garrafa${gf===1?"":"s"} e ${hist} registro${hist===1?"":"s"} de consumo apagados.`
+        : `🧹 Adega zerada: ${gf} garrafa${gf===1?"":"s"} apagada${gf===1?"":"s"}. O histórico de consumo foi mantido.`));
+}
+
 function sairSessao(){
   if(sessao){ /* encerra a sessão Google de verdade (melhor esforço) */
     try{fetch(SB_BASE+"/auth/v1/logout",{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+sessao.access_token}}).catch(()=>{})}catch(e){}
@@ -2651,9 +3326,90 @@ function renderDash(){
   const sobra=Math.max(0,urgentes.length-3)+Math.max(0,emGuarda.length-2);
   if(sobra)html+=`<div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="abrirTodasJanelas()">⏳ Ver todas as ${urgentes.length+emGuarda.length} garrafas →</button></div>`;
   $("#alerts").innerHTML=html||`<div class="empty">Tudo em ordem — nenhuma garrafa fora da janela ideal. 🥂</div>`;
+  /* prévia dos pratos no atalho da harmonização */
+  renderMapaAdegasResumo();
+  const fd=$("#faixa-demo");
+  if(fd){
+    fd.classList.toggle("hidden",!adegaDemo);
+    if(adegaDemo)fd.innerHTML=
+      `<div style="flex:1;min-width:190px">🎬 <b>Adega de demonstração.</b> Estas garrafas são de exemplo, para você conhecer o aplicativo. `+
+      `Elas não vão para encontros nem aparecem para outras pessoas.</div>`+
+      `<button class="sair" onclick="abrirZerarAdega()">Começar a minha adega</button>`;
+  }
+  renderHarmResumo();
   const dh=$("#dash-hist");
   if(typeof renderFeed==="function")renderFeed();
   if(dh)dh.innerHTML=histRowsHtml(3)+(historico.length>3?`<div style="text-align:center;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="abrirTodoHistorico()">📜 Ver as ${historico.length} garrafas abertas →</button></div>`:"");
+}
+
+/* ============ HARMONIZAR NA TELA MINHA ADEGA (v0.49) ============
+   Substituiu o painel de Comunidade que ficava aqui. O raciocínio: a tela
+   Minha Adega deve falar exclusivamente das garrafas do próprio usuário, e
+   Comunidade já tem lugar fixo em duas barras. Além disso, "o que eu abro
+   hoje?" é uma pergunta que nasce olhando a adega — obrigar a trocar de tela
+   para responder era atrito puro.
+
+   Usa o MESMO motor da tela cheia (scoreWine), então as duas nunca divergem. */
+let pratoResumo = null;
+
+function pratosDoResumo(){ return (typeof PRATOS!=="undefined"?PRATOS:[]).slice(0,8) }
+
+function harmonizarNoResumo(id){
+  pratoResumo = (pratoResumo===id ? null : id);   /* tocar de novo fecha */
+  renderHarmResumo();
+}
+
+function verNaTelaCheia(id){
+  go("harmonizar");
+  setTimeout(()=>{ try{ harmonizar(id) }catch(e){} }, 60);
+}
+
+function renderHarmResumo(){
+  const box = $("#harm-pratos");
+  if(!box) return;
+  const lista = pratosDoResumo();
+  const resto = Math.max(0,(typeof PRATOS!=="undefined"?PRATOS.length:0) - lista.length);
+  box.innerHTML =
+    lista.map(p=>`<button class="chip-prato${pratoResumo===p.id?" sel":""}" onclick="harmonizarNoResumo('${p.id}')">${p.em} ${esc(p.nome)}</button>`).join("") +
+    `<button class="chip-prato mais" onclick="go('harmonizar')">+${resto} pratos · ou descreva o seu →</button>`;
+
+  const r = $("#harm-resumo");
+  if(!r) return;
+
+  const adega = (typeof vinhosAtivos==="function" ? vinhosAtivos() : []);
+  if(!adega.length){
+    r.innerHTML = `<div style="font-size:13px;color:var(--ink-2);padding:8px 2px">A sua adega está vazia — assim que houver garrafas aqui, o Apotheca diz qual delas combina com cada prato.</div>`;
+    return;
+  }
+  if(!pratoResumo){
+    const gf = adega.reduce((s,v)=>s+v.qtd,0);
+    r.innerHTML = `<div style="font-size:13px;color:var(--ink-2);padding:8px 2px">Toque num prato: o Apotheca percorre as <b>${gf}</b> garrafas da sua adega e diz qual abrir — e por quê.</div>`;
+    return;
+  }
+
+  const p = PRATOS.find(x=>x.id===pratoResumo);
+  if(!p){ pratoResumo=null; r.innerHTML=""; return }
+
+  const rank = adega.map(v=>({v,...scoreWine(v,p)})).sort((a,b)=>b.pts-a.pts).slice(0,2);
+  const medalhas = ["🥇","🥈"];
+  r.innerHTML = `
+    <div class="explain-box" style="margin-bottom:8px"><b>${p.em} ${esc(p.nome)}</b> — ${p.ctx}</div>
+    ${rank.map((x,i)=>`
+      <div class="harm-linha">
+        <div class="med">${medalhas[i]}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap">
+            <b class="serif" style="font-size:15px">${esc(x.v.nome)} ${safraTxt(x.v)}</b>
+            <span class="match">${Math.min(99,Math.round(x.pts/110*100))}% match</span>
+          </div>
+          <div style="font-size:12px;color:var(--ink-2)">${esc(x.v.vinicola)} · ${esc(x.v.pais)} — <b>${x.v.qtd} gf. em ${adegaDe(x.v.adega).icone} ${esc(adegaDe(x.v.adega).nome)}${posTexto(x.v)}</b></div>
+          <ul class="why" style="margin:5px 0 0">${x.why.slice(0,2).map(w=>`<li>${w}</li>`).join("")||"<li>Boa opção geral da sua adega para este prato.</li>"}</ul>
+          ${i===0?`<div class="pair-actions" style="margin-top:7px">
+            <button class="btn btn-primary btn-sm" onclick="openConsume(${x.v.id},'${p.nome.replace(/'/g,"")}')">🍷 Abrir esta garrafa</button>
+            <button class="btn btn-ghost btn-sm" onclick="verNaTelaCheia('${p.id}')">Ver as outras sugestões →</button>
+          </div>`:""}
+        </div>
+      </div>`).join("")}`;
 }
 
 /* ================== COLEÇÃO ================== */
@@ -2701,7 +3457,7 @@ function openDetail(id){
       <div><b>Acidez</b>${meter(v.acidez)}</div>
       <div><b>Taninos</b>${meter(v.tanino)}</div>
       <div><b>Doçura</b>${meter(v.doc)}</div>
-      <div><b>Localização</b>${adegaDe(v.adega).icone} ${adegaDe(v.adega).nome} · ${v.qtd} garrafa${v.qtd>1?"s":""}</div>
+      <div><b>Localização</b>${adegaDe(v.adega).icone} ${adegaDe(v.adega).nome} · ${v.qtd} garrafa${v.qtd>1?"s":""}${posTexto(v,6)}</div>
       <div><b>Preço de aquisição</b>${brl(v.preco)} / garrafa</div>
       <div><b>Comunidade Apotheca</b><span class="stars">★</span> ${comunidade(v).nota} / 5,0 <span style="color:var(--ink-3)">(${fmt(comunidade(v).n)} avaliações de usuários)</span></div>
       <div><b>Sua última nota</b>${(h=>h?`<span class="stars">${"★".repeat(h.estrelas)}${"☆".repeat(5-h.estrelas)}</span>`:"você ainda não avaliou")(historico.find(x=>x.nome.startsWith(v.nome)))}</div>
@@ -2712,6 +3468,7 @@ function openDetail(id){
       <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Fechar</button>
     </div>
     <div class="modal-actions" style="margin-top:10px">
+      <button class="btn btn-ghost btn-sm" onclick="abrirMapaAdega('${v.adega}',${(v.pos&&v.pos.length>=v.qtd)?`{destacar:${v.id}}`:`{colocar:${v.id}}`})">${(v.pos&&v.pos.length>=v.qtd)?"🗺️ Ver no mapa":(v.pos&&v.pos.length)?`📍 Guardar no mapa · falta${v.qtd-v.pos.length===1?"":"m"} ${v.qtd-v.pos.length}`:"📍 Guardar no mapa"}</button>
       <button class="btn btn-ghost btn-sm" onclick="editarVinho(${v.id})">✏️ Corrigir ficha</button>
       <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="excluirVinho(${v.id},this)">🗑️ Excluir da adega</button>
     </div>
@@ -2746,10 +3503,15 @@ function openConsume(id,prato){
 function confirmConsume(id){
   const v=vinhos.find(x=>x.id===id);if(!v)return;
   v.qtd--;
+  /* v0.50: o mapa se mantém sozinho — abriu uma garrafa, uma casa é liberada.
+     Sai a última posição da lista (ordenada, então a "mais funda"); se a pessoa
+     pegou outra fisicamente, o ajuste fino fica a um toque em Guardar no mapa. */
+  let casaLivre=null;
+  if(Array.isArray(v.pos)&&v.pos.length>v.qtd)casaLivre=v.pos.pop();
   historico.unshift({nome:`${v.nome} ${safraTxt(v)} · ${v.vinicola}`,prato:$("#c-prato").value||"—",data:new Intl.DateTimeFormat("pt-BR").format(new Date()),estrelas:rateSel||0});
   addAtividade(`abriu um <b>${v.nome} ${safraTxt(v)}</b>${$("#c-prato").value?" com "+$("#c-prato").value:""}`,rateSel||0);
   if(v.qtd<=0){vinhos=vinhos.filter(x=>x.id!==id);toast(`Última garrafa de ${v.nome} consumida — rótulo movido ao histórico. 🍷`)}
-  else toast(`Saúde! Restam ${v.qtd} garrafa${v.qtd>1?"s":""} de ${v.nome}. 🥂`);
+  else toast(`Saúde! Restam ${v.qtd} garrafa${v.qtd>1?"s":""} de ${v.nome}.${casaLivre?` Casa ${casaLivre} liberada no mapa.`:""} 🥂`);
   closeModal("modal-consume");persist();renderAdegaBar();renderDash();renderColecao();
 }
 /* ===== Gerenciar adegas: renomear, trocar ícone, excluir ===== */
@@ -2834,9 +3596,12 @@ function moveOne(id,destino){
   const v=vinhos.find(x=>x.id===id);if(!v)return;
   const d=adegaDe(destino);
   const irmao=vinhos.find(x=>x.id!==v.id&&x.adega===destino&&x.nome===v.nome&&x.safra===v.safra&&x.vinicola===v.vinicola);
-  if(v.qtd<=1&&!irmao){v.adega=destino}          /* última garrafa e sem par no destino: move o rótulo inteiro */
-  else if(irmao){v.qtd--;irmao.qtd++;if(v.qtd<=0)vinhos=vinhos.filter(x=>x.id!==v.id)}
-  else{v.qtd--;vinhos.push({...v,id:NEXT_ID++,qtd:1,adega:destino})}
+  /* v0.50: posição no mapa pertence à ADEGA — mudou de prédio, perdeu a casa.
+     A cópia criada no destino nasce sem pos (senão herdaria, por referência,
+     casas de OUTRA adega); a origem libera uma casa quando perde uma garrafa. */
+  if(v.qtd<=1&&!irmao){v.adega=destino;delete v.pos}
+  else if(irmao){v.qtd--;irmao.qtd++;if(Array.isArray(v.pos)&&v.pos.length>v.qtd)v.pos.pop();if(v.qtd<=0)vinhos=vinhos.filter(x=>x.id!==v.id)}
+  else{v.qtd--;if(Array.isArray(v.pos)&&v.pos.length>v.qtd)v.pos.pop();vinhos.push({...v,pos:undefined,id:NEXT_ID++,qtd:1,adega:destino})}
   closeModal("modal-detail");persist();renderAdegaBar();renderDash();renderColecao();
   toast(`1 garrafa de ${v.nome} movida para ${d.icone} ${d.nome}.`);
 }
@@ -2878,6 +3643,11 @@ function saveWine(){
   if(editandoId){
     const v=vinhos.find(x=>x.id===editandoId);
     if(v){
+      /* v0.50: mudou de adega pela ficha → as casas do mapa antigo não valem mais */
+      if(v.adega!==adegaSel&&Array.isArray(v.pos)&&v.pos.length){delete v.pos;toast("O vinho mudou de adega — marque as novas posições no mapa. 📍")}
+      /* diminuiu a quantidade → libera as casas excedentes */
+      const novaQtd=Math.max(1,+$("#a-qtd").value||1);
+      if(Array.isArray(v.pos)&&v.pos.length>novaQtd)v.pos=v.pos.slice(0,novaQtd);
       Object.assign(v,{nome,vinicola:$("#a-vinicola").value||"—",pais:$("#a-pais").value,regiao:$("#a-regiao").value||"—",
         safra:+$("#a-safra").value||0,tipo:$("#a-tipo").value,uvas:($("#a-uvas").value||"").split(",").map(s=>s.trim()).filter(Boolean),
         corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,adega:adegaSel,
@@ -3255,7 +4025,7 @@ function harmonizar(pratoId,rotulo){
         <div class="medal">${medals[i]}</div>
         <div style="flex:1">
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
-            <div><h4 class="serif">${r.v.nome} ${safraTxt(r.v)}</h4><div class="vin">${r.v.vinicola} · ${r.v.regiao} · ${r.v.pais} — <b>${r.v.qtd} gf. em ${adegaDe(r.v.adega).icone} ${adegaDe(r.v.adega).nome}</b></div></div>
+            <div><h4 class="serif">${r.v.nome} ${safraTxt(r.v)}</h4><div class="vin">${r.v.vinicola} · ${r.v.regiao} · ${r.v.pais} — <b>${r.v.qtd} gf. em ${adegaDe(r.v.adega).icone} ${adegaDe(r.v.adega).nome}${posTexto(r.v)}</b></div></div>
             <span class="match">${Math.min(99,Math.round(r.pts/110*100))}% match</span>
           </div>
           <ul class="why">${r.why.slice(0,4).map(w=>`<li>${w}</li>`).join("")||"<li>Boa opção geral dentro da sua adega para este prato.</li>"}</ul>
@@ -3330,6 +4100,14 @@ function tempoRel(ts){
   return "há "+Math.round(h/24)+" d";
 }
 function addAtividade(txt,est){
+  /* v0.49: a demonstração NÃO escreve na comunidade.
+     O feed é o registro público do que pessoas reais andam bebendo. Uma
+     garrafa da vitrine entrando ali seria informação falsa apresentada como
+     verdadeira — e quem lê não tem como distinguir. O bloqueio fica aqui, no
+     único ponto por onde tudo passa, e não em cada chamada: assim qualquer
+     atividade nova que eu criar amanhã já nasce protegida, sem depender de eu
+     lembrar. Os números da adega já eram barrados em publicarMinhasStats. */
+  if(adegaDemo)return;
   const item={id:NEXT_FEED++,user:perfil?perfil.user:"voce",txt,est:est||0,ts:Date.now(),brindes:0,meu:false};
   feed.unshift(item);
   if(feed.length>60)feed.length=60;
@@ -3420,6 +4198,9 @@ function renderFeed(){
         ?'<div class="empty"><div class="big">🍷</div>Nada por aqui ainda.<br>Vá em <b>Minha rede → Descobrir</b> e siga apreciadores para ver o que eles andam abrindo.</div>'
         :'<div class="empty"><div class="big">🍷</div>Nenhuma atividade na comunidade ainda.</div>');
   }
+  /* v0.49: o resumo do feed na tela Minha Adega deixou de existir — aquela tela
+     é só sobre as garrafas do próprio usuário. O guard fica porque o elemento
+     pode voltar, e porque renderFeed é chamada de vários lugares. */
   const dz=$("#dash-feed");
   if(dz)dz.innerHTML=feed.slice(0,3).map(f=>feedItemHtml(f,true)).join("")||'<div style="font-size:13px;color:var(--ink-2);padding:6px">Sem atividades ainda.</div>';
 }
@@ -4370,6 +5151,109 @@ document.addEventListener("visibilitychange",()=>{
 });
 setInterval(sincronizarComunidade,60000);
 setInterval(garantirSessaoValida,10*60*1000);
+
+/* ===================== AVISO DE VERSÃO NOVA (v0.47) =====================
+   Problema que resolve: quem instalou o APK ficava preso à versão daquele
+   arquivo — o site atualiza, o celular não — e podia passar semanas relatando
+   defeito já corrigido. Quem usa pelo navegador se atualiza sozinho em até dez
+   minutos (o servidor manda cache-control: max-age=600), mas também não tinha
+   como saber que havia novidade.
+
+   Como funciona: o site publica um versao.json ao lado do index.html. O
+   aplicativo o consulta alguns segundos depois de abrir — nunca durante o
+   arranque, para não atrasar a primeira tela — e só se anuncia se a versão de
+   lá for MAIOR que a daqui. Falhou a consulta (sem internet, site fora do ar,
+   arquivo ausente)? Não acontece nada: o aplicativo segue igual. */
+const VERSAO_URL = SITE_URL + "versao.json";
+const VERSAO_DISPENSADA = "apotheca_versao_dispensada";
+let versaoNova = null;
+
+/* Comparação parte a parte, como número inteiro — nunca como texto nem como
+   decimal. "0.5" > "0.47" seria falso na comparação de texto ("4" < "5" salva
+   por sorte, mas "0.10" < "0.9" quebraria), e como decimal 0.5 < 0.47 é
+   simplesmente errado quando 0.5 vem DEPOIS de 0.47 na nossa numeração.
+   Aqui 0.47 vira [0,47], 0.50 vira [0,50] e 1.0 vira [1,0]: sempre certo. */
+function versaoMaior(a, b){
+  const pa = String(a||"").split(".").map(n => parseInt(n,10) || 0);
+  const pb = String(b||"").split(".").map(n => parseInt(n,10) || 0);
+  for(let i = 0; i < Math.max(pa.length, pb.length); i++){
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if(x > y) return true;
+    if(x < y) return false;
+  }
+  return false;
+}
+
+function noApk(){ return typeof window !== "undefined" && !!window.Apk }
+
+async function conferirVersaoNova(){
+  try{
+    const r = await fetch(VERSAO_URL + "?cb=" + Date.now(), {cache:"no-store"});
+    if(!r.ok) return;
+    const d = await r.json();
+    if(!d || !d.versao || !versaoMaior(d.versao, APP_VERSION)) return;
+    let dispensada = "";
+    try{ dispensada = localStorage.getItem(VERSAO_DISPENSADA) || "" }catch(e){}
+    if(dispensada === d.versao) return;   /* já disse "agora não" para ESTA versão */
+    versaoNova = d;
+    mostrarTarjaVersao(d);
+  }catch(e){ /* silêncio de propósito: aviso de versão jamais atrapalha o uso */ }
+}
+
+function mostrarTarjaVersao(d){
+  const t = $("#tarja-versao");
+  if(!t) return;
+  /* No APK o arquivo é embutido: atualizar significa BAIXAR e instalar por cima.
+     No navegador basta recarregar furando a cópia guardada. Dois textos, porque
+     prometer "toque para atualizar" a quem precisa reinstalar seria mentira. */
+  const dentroDoApk = noApk();
+  const temArquivo = !!d.apk;
+  /* Caso chato mas real: estamos no APK e o arquivo novo ainda não foi
+     publicado. Botão que leva a lugar nenhum é pior do que nenhum botão —
+     então aqui a tarja só informa, e diz o que fazer. */
+  const semCaminho = dentroDoApk && !temArquivo;
+  const acao = dentroDoApk ? "Baixar" : "Atualizar";
+  /* v0.49: a garantia é fixa e aparece SEMPRE, não depende do texto da versão.
+     Motivo: o resumo do que mudou fala de funções, e função nova pode ter nome
+     assustador ("zerar a adega"). Sem esta linha, quem tem coleção de verdade lê
+     a tarja como ameaça e prefere ficar na versão velha — exatamente o oposto do
+     que o aviso existe para fazer. Atualizar nunca mexe na adega: no navegador é
+     só recarregar a página, e no Android instala por cima com a mesma
+     assinatura, que é o que preserva os dados do aparelho. */
+  t.innerHTML =
+    `<div class="txt"><b>Versão ${esc(d.versao)} disponível</b>` +
+    (d.novidades ? `<small>${esc(d.novidades)}</small>` : "") +
+    (semCaminho ? `<small>Peça o arquivo novo a quem lhe enviou o aplicativo.</small>` : "") +
+    `<small class="garantia">🔒 Sua adega não é alterada.</small>` +
+    `</div>` +
+    (semCaminho ? "" : `<button class="agora" onclick="atualizarAgora()">${acao}</button>`) +
+    `<button class="depois" onclick="dispensarVersao()">${semCaminho ? "ok" : "agora não"}</button>`;
+  t.classList.remove("hidden");
+}
+
+function atualizarAgora(){
+  const d = versaoNova;
+  if(!d) return;
+  if(noApk() && d.apk){
+    /* o WebView não instala nada: manda o Android abrir o navegador de verdade */
+    try{ Apk.abrirNavegador(d.apk) }catch(e){ location.href = d.apk }
+    return;
+  }
+  try{
+    const u = new URL(location.href);      /* preserva ?convite=... e o resto */
+    u.searchParams.set("fresh", d.versao); /* URL diferente = busca obrigatória no servidor */
+    location.replace(u.toString());
+  }catch(e){ location.reload() }
+}
+
+function dispensarVersao(){
+  try{ if(versaoNova) localStorage.setItem(VERSAO_DISPENSADA, versaoNova.versao) }catch(e){}
+  const t = $("#tarja-versao");
+  if(t) t.classList.add("hidden");
+}
+
+setTimeout(conferirVersaoNova, 5000);          /* depois que a primeira tela já apareceu */
+setInterval(conferirVersaoNova, 6*60*60*1000); /* e de seis em seis horas, para quem deixa aberto */
 (function(){
   const ok=PERSISTE;
   const vb=$("#ver-badge");if(vb)vb.textContent="v"+APP_VERSION;
