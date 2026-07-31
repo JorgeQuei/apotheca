@@ -283,6 +283,13 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 .mapa-legenda{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--ink-2)}
 .mapa-legenda i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .mapa-info{background:var(--cream);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:13px}
+/* Módulo "Mapa das Adegas" na primeira tela (v0.51) */
+.mapa-adega-linha{display:flex;gap:12px;align-items:center;padding:11px 2px;border-top:1px solid var(--line);cursor:pointer}
+.mapa-adega-linha:first-child{border-top:0}
+.mapa-adega-linha:hover b{color:var(--wine)}
+.mini-mapa{display:grid;gap:2px;flex:none;max-width:44vw;overflow:hidden}
+.mini-mapa i{width:10px;height:10px;border-radius:2.5px;background:var(--cream);border:1px solid var(--line)}
+.mini-mapa i.oc{border-color:transparent}
 .hidden{display:none!important}
 .empty{color:var(--ink-2);text-align:center;padding:40px 20px;font-size:14px;line-height:1.6}
 .empty .big{font-size:40px;margin-bottom:10px}
@@ -378,6 +385,14 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
           <h3>Garrafas por país <small>· origem</small></h3>
           <div class="hbars" id="chart-paises"></div>
         </div>
+      </div>
+      <!-- v0.51: Mapa das Adegas na primeira tela, pedido do Jorge. Até aqui o
+           mapa só era alcançável pelo menu ☰ e pela ficha do vinho — invisível
+           para quem não sabia que existia. Cada adega aparece pelo NOME que o
+           usuário lhe deu, com uma miniatura viva do próprio mapa. -->
+      <div class="panel" style="margin-top:16px">
+        <h3>🗺️ Mapa das Adegas <small>· toque numa adega e veja cada garrafa no seu lugar</small></h3>
+        <div id="mapa-adegas-resumo" style="margin-top:6px"></div>
       </div>
       <div class="panel" style="margin-top:16px">
         <h3>⏳ Janela de consumo — atenção</h3>
@@ -674,7 +689,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.50"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.51"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2545,6 +2560,35 @@ function garrafasMapeadas(adegaId){
   return vinhos.filter(v=>v.adega===adegaId&&Array.isArray(v.pos)).reduce((s,v)=>s+v.pos.length,0);
 }
 
+/* Módulo da primeira tela (v0.51): cada adega pelo nome que o usuário deu,
+   com uma miniatura viva do mapa — as mesmas cores por tipo do mapa grande.
+   A miniatura é leitura pura de mapaOcupacao(): nunca diverge do mapa real. */
+function renderMapaAdegasResumo(){
+  const el=$("#mapa-adegas-resumo");if(!el)return;
+  el.innerHTML=ADEGAS.map(a=>{
+    const gfs=vinhos.filter(v=>v.adega===a.id).reduce((s,v)=>s+v.qtd,0);
+    const g=a.grade, nm=garrafasMapeadas(a.id);
+    let mini="";
+    if(g){
+      const ocup=mapaOcupacao(a.id);
+      mini=`<div class="mini-mapa" style="grid-template-columns:repeat(${g.colunas},10px)">`+
+        Array.from({length:g.linhas*g.colunas},(_,i)=>{
+          const p=LETRAS[Math.floor(i/g.colunas)]+(i%g.colunas+1), v=ocup[p];
+          return v?`<i class="oc" style="background:${CORES[v.tipo]||"var(--wine-3)"}"></i>`:"<i></i>";
+        }).join("")+`</div>`;
+    }
+    return `<div class="mapa-adega-linha" onclick="abrirMapaAdega('${a.id}')">
+      <div style="flex:1;min-width:0">
+        <b>${a.icone} ${esc(a.nome)}</b>
+        <div style="font-size:12px;color:var(--ink-2);margin-top:2px">${g
+          ?`${g.linhas} prateleira${g.linhas===1?"":"s"} × ${g.colunas} casas · <b>${nm}</b> de ${gfs} garrafa${gfs===1?"":"s"} no mapa`
+          :`${gfs} garrafa${gfs===1?"":"s"} · toque para desenhar o mapa`}</div>
+      </div>
+      ${mini||`<span style="font-size:12.5px;color:var(--wine);font-weight:600;flex:none">criar mapa →</span>`}
+    </div>`;
+  }).join("");
+}
+
 function abrirMapaAdega(adegaId,opts){
   opts=opts||{};
   mapaAdegaAberta=adegaId;
@@ -2679,6 +2723,8 @@ function concluirColocacao(){
 function fecharMapa(){
   mapaColocando=null;mapaDestacar=null;mapaCelSel=null;mapaAdegaAberta=null;
   closeModal("modal-detail");
+  /* a miniatura da primeira tela acompanha o que acabou de mudar no mapa */
+  try{renderMapaAdegasResumo()}catch(e){}
 }
 
 function definirGrade(){
@@ -3116,6 +3162,7 @@ function renderDash(){
   if(sobra)html+=`<div style="text-align:center;margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="abrirTodasJanelas()">⏳ Ver todas as ${urgentes.length+emGuarda.length} garrafas →</button></div>`;
   $("#alerts").innerHTML=html||`<div class="empty">Tudo em ordem — nenhuma garrafa fora da janela ideal. 🥂</div>`;
   /* prévia dos pratos no atalho da harmonização */
+  renderMapaAdegasResumo();
   const fd=$("#faixa-demo");
   if(fd){
     fd.classList.toggle("hidden",!adegaDemo);
