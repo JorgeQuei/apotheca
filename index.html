@@ -707,7 +707,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.53"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.56"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2422,6 +2422,8 @@ function abrirSobre(){
       <p style="margin-bottom:10px">Base mundial offline <b>X-Wines</b> (licença CC BY-NC-SA): <b>${baseMundialPronta.length.toLocaleString("pt-BR")} vinhos</b> ${baseMundialPronta.length>1000?"— base completa carregada ✓":"— amostra (a base completa vive no APK)"}</p>
       <p style="margin-bottom:10px">Comunidade na nuvem: <b>${nuvemOK?"conectada ✅ (banco real Supabase)":"offline — modo local ⚪"}</b></p>\n      <p style="margin-bottom:10px">IA de visão do scanner: <b>${getIaKey()?"ativa neste aparelho ✅":"não configurada — ative no menu 🔑"}</b></p>
       <p style="color:var(--ink-2)">Este é um protótipo de validação: dados de comunidade simulados.</p>
+      ${(()=>{try{if(window.Apk&&Apk.diagnosticoTela){const d=JSON.parse(Apk.diagnosticoTela());
+        return `<p style="font-size:11.5px;color:var(--ink-3)">🔧 Ajuste de tela (${d.modo||"?"}): Android ${d.sdk} · barras informadas: topo ${d.declT}, base ${d.declB} · barra de status ${d.barraStatus} · <b>aplicado: topo ${d.padT}, base ${d.padB}</b></p>`}}catch(e){}return ""})()}
       <p style="margin-top:10px"><a href="#" onclick="abrirPolitica();return false" style="color:var(--wine-3)">📜 Política de privacidade</a></p>
     </div>
     <div style="text-align:center;margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3);letter-spacing:.5px">by <span class="serif" style="font-size:14px;color:var(--wine)">Claude</span></div>`;
@@ -3736,6 +3738,35 @@ function go(view,fromHash){
   window.scrollTo({top:0});
 }
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.view)));
+
+/* ===== v0.53.1: deslizar o dedo troca de tela (pedido do Jorge no Z Fold) =====
+   A ordem é a da barra de baixo: Adega → Coleção → Comunidade → Encontros.
+   Desliza para a ESQUERDA avança, para a DIREITA volta — e PARA no último,
+   sem dar a volta. O gesto é ignorado quando: há modal/menu/scanner aberto,
+   o toque começou num mapa (que rola de lado), numa aba, num campo de texto,
+   ou colado na borda da tela (ali mora o gesto de voltar do Android). */
+const SWIPE_ORDEM=["dashboard","colecao","comunidade","encontros"];
+let swX=null,swY=null,swT=0,swAlvo=null;
+document.addEventListener("touchstart",e=>{
+  if(e.touches.length!==1){swX=null;return}
+  swX=e.touches[0].clientX;swY=e.touches[0].clientY;swT=Date.now();swAlvo=e.target;
+},{passive:true});
+document.addEventListener("touchend",e=>{
+  if(swX===null)return;
+  const x0=swX, dx=e.changedTouches[0].clientX-swX, dy=e.changedTouches[0].clientY-swY;
+  swX=null;
+  if(Date.now()-swT>600)return;                                   /* arrasto lento não é deslize */
+  if(Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*1.6)return;       /* curto ou mais vertical que horizontal */
+  if(x0<24||x0>window.innerWidth-24)return;                       /* borda = gesto do sistema */
+  if(algumOverlayAberto())return;
+  if($("#login-screen").classList.contains("open"))return;
+  if(swAlvo&&swAlvo.closest&&swAlvo.closest(".mapa-scroll,.stabs,.mini-mapa,input,textarea,select,.chat-box"))return;
+  const i=SWIPE_ORDEM.indexOf(viewAtual);
+  if(i<0)return;                                                  /* telas fora da barra não deslizam */
+  const ni=i+(dx<0?1:-1);
+  if(ni<0||ni>=SWIPE_ORDEM.length)return;                         /* para no último */
+  go(SWIPE_ORDEM[ni]);
+},{passive:true});
 function algumOverlayAberto(){
   return document.querySelector(".modal-bg.open")||$("#scanner").classList.contains("open")||$("#menu-pop").classList.contains("open");
 }
