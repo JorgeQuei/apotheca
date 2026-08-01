@@ -295,6 +295,15 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 .chip-pend{display:inline-flex;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--gold);border-radius:99px;
   padding:5px 12px;margin:6px 6px 0 0;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--ink)}
 .chip-pend:active{transform:scale(.96)}
+/* v0.53: ilustração estilizada dos modelos do catálogo (nossa, sem foto de fabricante) */
+.cat-moldura{flex:none;background:linear-gradient(160deg,#3a2a24,#241713);border-radius:8px;padding:5px;border:1px solid #1c110d}
+.cat-vidro{background:linear-gradient(135deg,rgba(107,27,44,.55),rgba(60,20,30,.75));border-radius:5px;padding:5px;border:1px solid rgba(243,227,201,.18)}
+/* v0.53: abas das seções do mapa */
+.mapa-abas{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.mapa-aba{background:var(--cream);border:1.5px solid var(--line);border-radius:99px;padding:6px 14px;
+  font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;font-family:inherit}
+.mapa-aba.ativa{background:var(--wine);border-color:var(--wine);color:#f3e3c9}
+.mapa-aba.add{padding:6px 11px;color:var(--wine);border-style:dashed}
 .mapa-grade.com-foto{background-size:cover;background-position:center;border-radius:12px;padding:8px}
 .mapa-grade.com-foto .mapa-cel{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.55)}
 .mapa-grade.com-foto .mapa-cel.ocupada{border-color:rgba(255,255,255,.85);box-shadow:0 1px 4px rgba(0,0,0,.45)}
@@ -698,7 +707,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.52"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.53"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2104,7 +2113,7 @@ function persist(){
    de verdade. Só roda quando NADA foi posicionado ainda: nunca mexe em mapa
    que o usuário (ou uma sessão anterior) já organizou. */
 setTimeout(()=>{  /* adiado: as constantes do mapa são declaradas mais abaixo */
-  if(adegaDemo&&!ADEGAS.some(a=>a.grade)&&!vinhos.some(v=>v.pos&&v.pos.length)){
+  if(adegaDemo&&!ADEGAS.some(a=>a.grade||a.secoes)&&!vinhos.some(v=>v.pos&&v.pos.length)){
     try{distribuirDemoNoMapa();persist();renderMapaAdegasResumo()}catch(e){}
   }
 },0);
@@ -2316,6 +2325,9 @@ function abrirConfiguracoes(){
       (n=>n?n+" com mapa":"nenhum ainda")(ADEGAS.filter(a=>a.grade).length),
       "closeModal('modal-detail');abrirMapaEscolha()",
       "Cada garrafa no seu lugar físico — prateleira e casa")}
+    ${linhaConfig("📥","Importar de outro aplicativo","CSV",
+      "abrirImportador()",
+      "Traga a sua adega do CellarTracker, Vivino, VinoCell ou de planilha")}
     ${linhaConfig("🧹","Zerar minha adega",
       adegaDemo?"demonstração":vinhos.length?vinhos.length+(vinhos.length===1?" rótulo":" rótulos"):"já está vazia",
       "closeModal('modal-detail');abrirZerarAdega()",
@@ -2550,6 +2562,284 @@ function carregarDemo(){
   toast("🎬 Adega de demonstração carregada — 153 garrafas para explorar!");
   go("dashboard");
 }
+/* ============ IMPORTAR DE OUTRO APLICATIVO (v0.53) ============
+   Pedido que chegou por telefone: um testador decidido a migrar do
+   CellarTracker. Um importador, quatro portas: CellarTracker, Vivino,
+   VinoCell — reconhecidos pela "assinatura" das colunas — e a porta
+   genérica, onde o usuário aponta qual coluna é o quê.
+   Tudo lido NO APARELHO: o arquivo nunca sobe para servidor nenhum. */
+
+const IMP_PAISES={ "france":"França","italy":"Itália","italia":"Itália","spain":"Espanha","espagne":"Espanha",
+  "portugal":"Portugal","argentina":"Argentina","chile":"Chile","brazil":"Brasil","bresil":"Brasil",
+  "united states":"Estados Unidos","usa":"Estados Unidos","us":"Estados Unidos","germany":"Alemanha","allemagne":"Alemanha",
+  "australia":"Austrália","australie":"Austrália","south africa":"África do Sul","afrique du sud":"África do Sul",
+  "new zealand":"Nova Zelândia","austria":"Áustria","uruguay":"Uruguai","greece":"Grécia","hungary":"Hungria",
+  "switzerland":"Suíça","england":"Inglaterra","united kingdom":"Inglaterra","lebanon":"Líbano","israel":"Israel" };
+const IMP_TIPOS=[ [/red|rouge|tinto/,"Tinto"],[/white|blanc|branco/,"Branco"],[/ros/,"Rosé"],
+  [/sparkling|champagne|espumante|mousseux|effervescent|cava|prosecco|cremant/,"Espumante"],
+  [/fortified|port\b|porto|fortificado|sherry|jerez|madeira|vin doux/,"Fortificado"],
+  [/dessert|sweet|doce|late harvest|colheita tardia/,"Branco"] ];
+
+function impNorm(s){return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim()}
+
+/* leitor de tabela: descobre sozinho o separador (tab, ; ou ,) e respeita aspas */
+function impLerTabela(texto){
+  texto=texto.replace(/^﻿/,"");
+  const linha1=texto.split(/\r?\n/,1)[0]||"";
+  const sep=linha1.includes("\t")?"\t":((linha1.match(/;/g)||[]).length>(linha1.match(/,/g)||[]).length?";":",");
+  const linhas=[];let campo="",atual=[],aspas=false;
+  for(let i=0;i<texto.length;i++){
+    const c=texto[i];
+    if(aspas){
+      if(c==='"'){ if(texto[i+1]==='"'){campo+='"';i++;} else aspas=false; }
+      else campo+=c;
+    }else if(c==='"')aspas=true;
+    else if(c===sep){atual.push(campo);campo="";}
+    else if(c==="\n"||c==="\r"){ if(c==="\r"&&texto[i+1]==="\n")i++;
+      atual.push(campo);campo="";
+      if(atual.some(x=>x.trim()!==""))linhas.push(atual);
+      atual=[]; }
+    else campo+=c;
+  }
+  if(campo!==""||atual.length){atual.push(campo);if(atual.some(x=>x.trim()!==""))linhas.push(atual);}
+  if(!linhas.length)return {colunas:[],linhas:[]};
+  const colunas=linhas[0].map(c=>c.trim());
+  return {colunas, linhas:linhas.slice(1).map(l=>{const o={};colunas.forEach((c,i)=>o[c]=(l[i]||"").trim());return o})};
+}
+
+function impDetectar(colunas){
+  const n=colunas.map(impNorm);
+  const tem=x=>n.some(c=>c===x||c.includes(x));
+  if(tem("iwine")||tem("beginconsume")||(tem("producer")&&tem("vintage")&&tem("quantity")))return "CellarTracker";
+  if(tem("winery")&&(tem("wine name")||tem("your rating")||tem("scan date")))return "Vivino";
+  if((tem("millesime")||tem("cepage")||tem("apogee"))&&(tem("nom")||tem("vin")))return "VinoCell";
+  return null;
+}
+
+/* acha o valor da primeira coluna cujo nome bate com um dos candidatos */
+function impPegar(linha,colunas,candidatos){
+  for(const cand of candidatos){
+    const col=colunas.find(c=>impNorm(c)===cand)||colunas.find(c=>impNorm(c).includes(cand));
+    if(col&&linha[col]!==undefined&&String(linha[col]).trim()!=="")return String(linha[col]).trim();
+  }
+  return "";
+}
+const IMP_CANDIDATOS={
+  nome:["wine name","wine","nom du vin","vin","nome","vinho","rotulo","name","nom"],
+  vinicola:["producer","winery","domaine","producteur","chateau","vinicola","produtor"],
+  safra:["vintage","millesime","safra","ano","year"],
+  tipo:["wine type","type","color","couleur","tipo","cor","category"],
+  uvas:["varietal","master varietal","cepage","grape","uvas","uva","cepa"],
+  pais:["country","pays","pais","origem"],
+  regiao:["region","regiao","appellation","locale"],
+  qtd:["quantity","quantite","qty","stock","nombre","quantidade","qtd","garrafas","bottles","amount"],
+  preco:["price","prix","valuation","preco","valor","cost"],
+  janIni:["beginconsume","apogee debut","a boire de","drink from","janela inicio"],
+  janFim:["endconsume","apogee fin","a boire jusqu","drink to","drink until","janela fim"],
+  notas:["mynotes","your review","private note","tasting note","notes","notas","observacoes","commentaire"],
+  local:["location","bin","emplacement","casier"]
+};
+
+function impTraduzTipo(v){
+  const t=impNorm(v);
+  for(const [re,pt] of IMP_TIPOS)if(re.test(t))return pt;
+  return "Tinto";
+}
+function impTraduzPais(v){ if(!v)return ""; return IMP_PAISES[impNorm(v)]||v }
+function impNumero(v){ const s=String(v||"").replace(/[^\d.,-]/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",",".");
+  const n=parseFloat(s); return isFinite(n)?n:null }
+function impSafra(v){ const n=parseInt(String(v||"").replace(/\D/g,""),10);
+  return (n>=1900&&n<=2100)?n:null } /* 1001 do CellarTracker = sem safra */
+
+function impNormalizar(linhas,colunas,mapa){
+  const pega=mapa
+    ?(l,campo)=>{const col=mapa[campo];return col?String(l[col]||"").trim():""}
+    :(l,campo)=>impPegar(l,colunas,IMP_CANDIDATOS[campo]);
+  const regs=[];
+  linhas.forEach(l=>{
+    const nome=pega(l,"nome");if(!nome)return;
+    const vinicola=pega(l,"vinicola");
+    const ji=impSafra(pega(l,"janIni")),jf=impSafra(pega(l,"janFim"));
+    const local=pega(l,"local");
+    let notas=pega(l,"notas");
+    if(local)notas=(notas?notas+" · ":"")+"No app anterior: "+local;
+    regs.push({
+      nome, vinicola:vinicola||"—",
+      safra:impSafra(pega(l,"safra")),
+      tipo:impTraduzTipo(pega(l,"tipo")),
+      uvas:pega(l,"uvas")?pega(l,"uvas").split(/[,;\/]+/).map(x=>x.trim()).filter(Boolean):[],
+      pais:impTraduzPais(pega(l,"pais")),
+      regiao:pega(l,"regiao"),
+      qtd:Math.max(1,parseInt(pega(l,"qtd"),10)||1),
+      preco:impNumero(pega(l,"preco"))||0,
+      jan:(ji&&jf&&jf>=ji)?[ji,jf]:null,
+      notas
+    });
+  });
+  /* agrupa: a exportação por garrafa vira uma linha por vinho */
+  const porChave={};
+  regs.forEach(r=>{
+    const k=impNorm(r.nome)+"|"+(r.safra||"")+"|"+impNorm(r.vinicola);
+    if(porChave[k])porChave[k].qtd+=r.qtd; else porChave[k]=r;
+  });
+  return Object.values(porChave);
+}
+
+let impPend=null; /* {registros, origem, colunas, linhas} entre as telas */
+
+function abrirImportador(){
+  if(adegaDemo){
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="closeModal('modal-detail')">✕</button>
+      <h3 class="serif">📥 Importar de outro aplicativo</h3>
+      <div class="explain-box" style="margin-top:12px">Você está na <b>adega de demonstração</b>.
+        Para importar a sua adega de verdade, primeiro saia da demonstração — as 153 garrafas
+        de exemplo dão lugar às suas.</div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="closeModal('modal-detail');abrirZerarAdega()">🧹 Sair da demonstração</button>
+        <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Agora não</button>
+      </div>`;
+    $("#modal-detail").classList.add("open");return;
+  }
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">📥 Importar de outro aplicativo</h3>
+    <div class="sub">Traga a sua adega do CellarTracker, Vivino, VinoCell ou de qualquer planilha.</div>
+    <div style="font-size:13.5px;line-height:1.6;margin-top:10px">
+      <p style="margin-bottom:8px"><b>CellarTracker:</b> no site (computador), abra <i>My Cellar</i> e toque em <b>Export</b>.</p>
+      <p style="margin-bottom:8px"><b>Vivino:</b> no site vivino.com, perfil → Configurações → fim da página → <b>Exportar</b>.</p>
+      <p style="margin-bottom:8px"><b>Planilha própria:</b> salve como <b>CSV</b> no Excel. Eu pergunto qual coluna é o quê.</p>
+    </div>
+    <div class="explain-box" style="margin-top:10px">🔒 O arquivo é lido <b>aqui no seu aparelho</b> e
+      nada é enviado a servidor nenhum — como tudo na sua adega.</div>
+    <input id="imp-arquivo" type="file" accept=".csv,.txt,.tsv,text/csv,text/plain" class="hidden" onchange="impLerArquivo(this)">
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="$('#imp-arquivo').click()">📂 Escolher o arquivo</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+
+function impLerArquivo(inp){
+  const f=inp.files&&inp.files[0];inp.value="";if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const {colunas,linhas}=impLerTabela(String(r.result||""));
+      if(!colunas.length||!linhas.length){toast("Não encontrei dados nesse arquivo. É um CSV mesmo?");return}
+      const origem=impDetectar(colunas);
+      if(origem){
+        const registros=impNormalizar(linhas,colunas,null);
+        if(!registros.length){toast("Reconheci o "+origem+", mas nenhuma linha tinha nome de vinho.");return}
+        impPend={registros,origem};
+        impMostrarPrevia();
+      }else{
+        impPend={colunas,linhas,origem:"Planilha"};
+        impAbrirMapeador();
+      }
+    }catch(e){toast("Não consegui ler esse arquivo.")}
+  };
+  r.onerror=()=>toast("Não consegui abrir esse arquivo.");
+  r.readAsText(f);
+}
+
+/* porta genérica: o usuário aponta qual coluna é o quê (com palpite automático) */
+function impAbrirMapeador(){
+  const {colunas}=impPend;
+  const CAMPOS=[["nome","Nome do vinho *"],["qtd","Quantidade"],["vinicola","Vinícola"],["safra","Safra"],
+    ["tipo","Tipo (tinto/branco…)"],["pais","País"],["regiao","Região"],["uvas","Uvas"],["preco","Preço"],["notas","Notas"]];
+  const palpite=campo=>{
+    for(const cand of IMP_CANDIDATOS[campo])
+      {const c=colunas.find(x=>impNorm(x)===cand)||colunas.find(x=>impNorm(x).includes(cand));if(c)return c}
+    return "";
+  };
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">📥 Qual coluna é o quê?</h3>
+    <div class="sub">Não reconheci o aplicativo de origem — me aponte os campos (já chutei os óbvios).</div>
+    <div style="margin-top:10px;max-height:52vh;overflow:auto">
+      ${CAMPOS.map(([campo,rotulo])=>`
+        <div class="field" style="margin-bottom:8px"><label>${rotulo}</label>
+          <select id="imp-map-${campo}" style="width:100%">
+            <option value="">— ignorar —</option>
+            ${colunas.map(c=>`<option value="${esc(c)}" ${c===palpite(campo)?"selected":""}>${esc(c)}</option>`).join("")}
+          </select></div>`).join("")}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="impAplicarMapeamento()">Continuar →</button>
+      <button class="btn btn-ghost" onclick="abrirImportador()">← Voltar</button>
+    </div>`;
+}
+function impAplicarMapeamento(){
+  const mapa={};
+  ["nome","qtd","vinicola","safra","tipo","pais","regiao","uvas","preco","notas"].forEach(c=>{
+    const v=$("#imp-map-"+c);if(v&&v.value)mapa[c]=v.value;
+  });
+  if(!mapa.nome){toast("Preciso ao menos da coluna com o NOME do vinho.");return}
+  const registros=impNormalizar(impPend.linhas,impPend.colunas,mapa);
+  if(!registros.length){toast("Nenhuma linha tinha nome de vinho preenchido.");return}
+  impPend={registros,origem:"Planilha"};
+  impMostrarPrevia();
+}
+
+function impMostrarPrevia(){
+  const {registros,origem}=impPend;
+  const garrafas=registros.reduce((s,r)=>s+r.qtd,0);
+  const semPais=registros.filter(r=>!r.pais).length;
+  const semSafra=registros.filter(r=>!r.safra).length;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">📥 Prévia da importação</h3>
+    <div class="sub">Arquivo do <b>${origem}</b> lido aqui no aparelho.</div>
+    <div class="explain-box" style="margin-top:10px;border-left-color:var(--gold)">
+      Encontrei <b>${registros.length} vinho${registros.length===1?"":"s"}</b> ·
+      <b>${garrafas} garrafa${garrafas===1?"":"s"}</b>
+      ${semPais||semSafra?`<br><small>${semSafra?semSafra+" sem safra (ficam como NV)":""}${semPais&&semSafra?" · ":""}${semPais?semPais+" sem país":""} — dá para completar depois, na ficha.</small>`:""}
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px">
+      <tr style="color:var(--ink-3);text-align:left"><th>Vinho</th><th>Safra</th><th>Tipo</th><th style="text-align:right">Qtd</th></tr>
+      ${registros.slice(0,6).map(r=>`<tr style="border-top:1px solid var(--line)">
+        <td style="padding:5px 4px">${esc(r.nome)}</td><td>${r.safra||"NV"}</td><td>${r.tipo}</td>
+        <td style="text-align:right">${r.qtd}</td></tr>`).join("")}
+      ${registros.length>6?`<tr><td colspan="4" style="padding:6px 4px;color:var(--ink-3)">… e mais ${registros.length-6} vinhos</td></tr>`:""}
+    </table>
+    <div class="field" style="margin-top:12px"><label>Importar para qual adega?</label>
+      <select id="imp-adega" style="width:100%">
+        ${ADEGAS.map(a=>`<option value="${a.id}">${a.icone} ${esc(a.nome)}</option>`).join("")}
+        <option value="__nova__">➕ Criar uma adega nova para estes vinhos</option>
+      </select></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="impConfirmar()">📥 Importar ${garrafas} garrafa${garrafas===1?"":"s"}</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+
+function impConfirmar(){
+  const {registros}=impPend||{};if(!registros||!registros.length)return;
+  let adegaId=$("#imp-adega").value;
+  if(adegaId==="__nova__"){
+    const nova={id:"imp"+Date.now(),nome:"Adega Importada",icone:"📥"};
+    ADEGAS.push(nova);adegaId=nova.id;
+  }
+  let novos=0,somados=0;
+  registros.forEach(r=>{
+    const jaTem=vinhos.find(v=>v.adega===adegaId&&impNorm(v.nome)===impNorm(r.nome)&&(v.safra||null)===(r.safra||null));
+    if(jaTem){jaTem.qtd+=r.qtd;somados++;return}
+    vinhos.push({ id:NEXT_ID++, nome:r.nome, qtd:r.qtd, tipo:r.tipo, adega:adegaId,
+      preco:r.preco, safra:r.safra||null, jan:r.jan, regiao:r.regiao||"—", pais:r.pais||"—",
+      uvas:r.uvas, corpo:3, tanino:3, acidez:3, doc:1, vinicola:r.vinicola, notas:r.notas||"" });
+    novos++;
+  });
+  impPend=null;
+  persist();
+  try{refreshAdegaSelect();renderAdegaBar()}catch(e){}
+  renderDash();renderColecao();
+  closeModal("modal-detail");
+  go("dashboard");
+  toast(`📥 Importação concluída: ${novos} vinho${novos===1?"":"s"} novo${novos===1?"":"s"}${somados?` e ${somados} somado${somados===1?"":"s"} aos já existentes`:""}. Bem-vindo${novos+somados>1?"s":""} à Apotheca! 🍷`);
+}
+
 /* ==================== MAPA DA ADEGA (v0.50) ====================
    Pedido de um testador que veio do Oeni: ver a adega desenhada, cada garrafa
    no seu lugar físico, para não puxar garrafa por garrafa atrás do rótulo
@@ -2576,9 +2866,34 @@ let mapaAdegaAberta=null;   /* id da adega exibida no pop-up */
 let mapaColocando=null;     /* id do vinho em modo "guardar no mapa" */
 let mapaDestacar=null;      /* id do vinho a acender no modo consulta */
 let mapaCelSel=null;        /* casa tocada no modo consulta */
+let mapaSecaoAtiva=null;    /* v0.53: id da seção exibida (parede da adega) */
 
+/* ===== v0.53: SEÇÕES — a adega grande é um conjunto de paredes simples =====
+   Pedido do Jorge: adegas em "U", "L" ou fechadas. Em vez de plantas baixas
+   complicadas, cada adega pode ter até 6 seções (Frente, Lateral esquerda,
+   Lateral direita, Fundo — renomeáveis), cada uma com a sua própria grade e
+   a sua própria foto. Quem tem adega simples não vê NADA disso: a grade
+   única de sempre vira uma "seção virtual" invisível, e as posições seguem
+   sendo "A1". Nas adegas com seções, a posição vira "S1:A1" e aparece para
+   o usuário como "Fundo · A1". */
+const SECOES_MAX=6;
+const SECOES_PRESETS=["Frente","Lateral esquerda","Lateral direita","Fundo"];
+function secoesDe(a){
+  if(a&&Array.isArray(a.secoes)&&a.secoes.length)return a.secoes;
+  if(a&&a.grade)return [{id:"__unica",nome:"",grade:a.grade,foto:a.foto,fotoOn:a.fotoOn,_virtual:true}];
+  return [];
+}
+function posDividir(p){const i=String(p).indexOf(":");return i<0?{sec:"__unica",casa:String(p)}:{sec:String(p).slice(0,i),casa:String(p).slice(i+1)}}
+function posNome(a,p){
+  const {sec,casa}=posDividir(p);
+  if(sec==="__unica")return casa;
+  const s=secoesDe(a).find(x=>x.id===sec);
+  return (s&&s.nome?s.nome+" · ":"")+casa;
+}
 function posTexto(v,max){
-  return (Array.isArray(v.pos)&&v.pos.length)?" · 📍 "+v.pos.slice(0,max||3).join(", ")+(v.pos.length>(max||3)?"…":""):"";
+  if(!Array.isArray(v.pos)||!v.pos.length)return "";
+  const a=adegaDe(v.adega);
+  return " · 📍 "+v.pos.slice(0,max||3).map(p=>posNome(a,p)).join(", ")+(v.pos.length>(max||3)?"…":"");
 }
 function mapaOcupacao(adegaId){
   const m={};
@@ -2603,21 +2918,30 @@ function renderMapaAdegasResumo(){
   const el=$("#mapa-adegas-resumo");if(!el)return;
   el.innerHTML=ADEGAS.map(a=>{
     const gfs=vinhos.filter(v=>v.adega===a.id).reduce((s,v)=>s+v.qtd,0);
-    const g=a.grade, nm=garrafasMapeadas(a.id);
+    const secs=secoesDe(a), nm=garrafasMapeadas(a.id);
     let mini="";
-    if(g){
+    if(secs.length){
       const ocup=mapaOcupacao(a.id);
-      mini=`<div class="mini-mapa" style="grid-template-columns:repeat(${g.colunas},10px)">`+
-        Array.from({length:g.linhas*g.colunas},(_,i)=>{
-          const p=LETRAS[Math.floor(i/g.colunas)]+(i%g.colunas+1), v=ocup[p];
-          return v?`<i class="oc" style="background:${CORES[v.tipo]||"var(--wine-3)"}"></i>`:"<i></i>";
-        }).join("")+`</div>`;
+      /* v0.53: uma miniatura por seção (até 3), empilhadas — todas vivas */
+      mini=`<div style="display:flex;flex-direction:column;gap:3px;flex:none">`+
+        secs.slice(0,3).map(sec=>{
+          const g=sec.grade, pref=sec._virtual?"":sec.id+":";
+          return `<div class="mini-mapa" style="grid-template-columns:repeat(${g.colunas},10px)">`+
+            Array.from({length:g.linhas*g.colunas},(_,i)=>{
+              const p=pref+LETRAS[Math.floor(i/g.colunas)]+(i%g.colunas+1), v=ocup[p];
+              return v?`<i class="oc" style="background:${CORES[v.tipo]||"var(--wine-3)"}"></i>`:"<i></i>";
+            }).join("")+`</div>`;
+        }).join("")+
+        (secs.length>3?`<span style="font-size:10px;color:var(--ink-3);text-align:right">+${secs.length-3} seções</span>`:"")+`</div>`;
     }
+    const estrutura=secs.length===0?""
+      :secs[0]._virtual?`${secs[0].grade.linhas} prateleira${secs[0].grade.linhas===1?"":"s"} × ${secs[0].grade.colunas} casas`
+      :`${secs.length} seç${secs.length===1?"ão":"ões"} (${secs.map(x=>esc(x.nome)).slice(0,4).join(", ")}${secs.length>4?"…":""})`;
     return `<div class="mapa-adega-linha" onclick="abrirMapaAdega('${a.id}')">
       <div style="flex:1;min-width:0">
         <b>${a.icone} ${esc(a.nome)}</b>
-        <div style="font-size:12px;color:var(--ink-2);margin-top:2px">${g
-          ?`${g.linhas} prateleira${g.linhas===1?"":"s"} × ${g.colunas} casas · <b>${nm}</b> de ${gfs} garrafa${gfs===1?"":"s"} no mapa${(f=>f?` · <b style="color:#a06a00">falta${f===1?"":"m"} ${f}</b>`:"")(gfs-nm)}`
+        <div style="font-size:12px;color:var(--ink-2);margin-top:2px">${secs.length
+          ?`${estrutura} · <b>${nm}</b> de ${gfs} garrafa${gfs===1?"":"s"} no mapa${(f=>f?` · <b style="color:#a06a00">falta${f===1?"":"m"} ${f}</b>`:"")(gfs-nm)}`
           :`${gfs} garrafa${gfs===1?"":"s"} · toque para desenhar o mapa`}</div>
       </div>
       ${mini||`<span style="font-size:12.5px;color:var(--wine);font-weight:600;flex:none">criar mapa →</span>`}
@@ -2631,6 +2955,11 @@ function abrirMapaAdega(adegaId,opts){
   mapaColocando=opts.colocar||null;
   mapaDestacar=opts.destacar||null;
   mapaCelSel=null;
+  /* v0.53: se veio procurar um vinho, abre direto na seção onde ele mora */
+  if(mapaDestacar){
+    const v=vinhos.find(x=>x.id===mapaDestacar);
+    if(v&&Array.isArray(v.pos)&&v.pos.length)mapaSecaoAtiva=posDividir(v.pos[0]).sec;
+  }
   renderMapaModal();
 }
 /* menu ☰ e Configurações chegam sem adega definida: resolve sozinho ou pergunta */
@@ -2642,9 +2971,10 @@ function abrirMapaEscolha(){
     <h3 class="serif">🗺️ Mapa da adega</h3>
     <div class="sub">De qual adega?</div>
     <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
-      ${ADEGAS.map(a=>{const g=a.grade;const n=garrafasMapeadas(a.id);
+      ${ADEGAS.map(a=>{const ss=secoesDe(a);const n=garrafasMapeadas(a.id);
+        const rot=ss.length?(ss[0]._virtual?`${ss[0].grade.linhas}×${ss[0].grade.colunas}`:`${ss.length} seções`)+` · ${n} garrafa${n===1?"":"s"} no mapa`:"sem mapa ainda";
         return `<button class="btn btn-ghost" style="justify-content:flex-start;text-align:left" onclick="abrirMapaAdega('${a.id}')">${a.icone} ${esc(a.nome)}
-          <span style="margin-left:auto;font-size:12px;color:var(--ink-3)">${g?`${g.linhas}×${g.colunas} · ${n} garrafa${n===1?"":"s"} no mapa`:"sem mapa ainda"}</span></button>`}).join("")}
+          <span style="margin-left:auto;font-size:12px;color:var(--ink-3)">${rot}</span></button>`}).join("")}
     </div>`;
   $("#modal-detail").classList.add("open");
 }
@@ -2654,7 +2984,8 @@ function renderMapaModal(){
   if(!a){closeModal("modal-detail");return}
 
   /* sem estrutura definida: primeiro se desenha a adega */
-  if(!a.grade){
+  const secs=secoesDe(a);
+  if(!secs.length){
     $("#modal-detail-body").innerHTML=`
       <button class="close" onclick="closeModal('modal-detail')">✕</button>
       <h3 class="serif">🗺️ ${a.icone} ${esc(a.nome)}</h3>
@@ -2673,31 +3004,39 @@ function renderMapaModal(){
       <div class="modal-actions">
         <button class="btn btn-primary" onclick="definirGrade()">🗺️ Criar o mapa</button>
         <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
+      </div>
+      <div style="text-align:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+        <button class="btn btn-ghost" style="border-color:var(--gold)" onclick="abrirCatalogoAdegas()">🗄️ Ou escolha o modelo da sua adega climatizada</button>
       </div>`;
     $("#modal-detail").classList.add("open");
     return;
   }
 
-  const g=a.grade, ocup=mapaOcupacao(a.id);
+  /* v0.53: a seção ativa é a parede exibida; adega simples tem uma "virtual" */
+  const sec=secs.find(s=>s.id===mapaSecaoAtiva)||secs[0];
+  mapaSecaoAtiva=sec.id;
+  const pref=sec._virtual?"":sec.id+":";
+  const g=sec.grade, ocup=mapaOcupacao(a.id);
   const colocando=mapaColocando?vinhos.find(v=>v.id===mapaColocando):null;
   if(mapaColocando&&!colocando)mapaColocando=null;
 
   /* v0.52: a foto da adega real como fundo é escolha do dono — quem prefere
-     a nossa formatação continua nela; a grade fica translúcida sobre a foto */
-  const comFoto=!!(a.foto&&a.fotoOn);
-  let grade=`<div class="mapa-grade${comFoto?" com-foto":""}" style="grid-template-columns:32px repeat(${g.colunas},32px)${comFoto?`;background-image:url('${a.foto}')`:""}">`;
+     a nossa formatação continua nela; a grade fica translúcida sobre a foto.
+     v0.53: cada seção pode ter a SUA foto (cada parede, uma foto frontal). */
+  const comFoto=!!(sec.foto&&sec.fotoOn);
+  let grade=`<div class="mapa-grade${comFoto?" com-foto":""}" style="grid-template-columns:32px repeat(${g.colunas},32px)${comFoto?`;background-image:url('${sec.foto}')`:""}">`;
   grade+=`<span class="mapa-rot"></span>`;
   for(let c=0;c<g.colunas;c++)grade+=`<span class="mapa-rot">${c+1}</span>`;
   for(let l=0;l<g.linhas;l++){
     grade+=`<span class="mapa-rot">${LETRAS[l]}</span>`;
     for(let c=0;c<g.colunas;c++){
-      const p=LETRAS[l]+(c+1), v=ocup[p];
+      const p=pref+LETRAS[l]+(c+1), v=ocup[p];
       const classes=["mapa-cel"];
       if(v)classes.push("ocupada");
       if(v&&mapaDestacar&&v.id===mapaDestacar)classes.push("destaque");
       if(v&&colocando&&v.id===colocando.id)classes.push("propria");
       grade+=`<button class="${classes.join(" ")}" ${v?`style="background:${CORES[v.tipo]||"var(--wine-3)"}"`:""}
-        title="${p}${v?" · "+esc(v.nome):""}" onclick="tocarCelula('${p}')">${v?"":""}</button>`;
+        title="${posDividir(p).casa}${v?" · "+esc(v.nome):""}" onclick="tocarCelula('${p}')">${v?"":""}</button>`;
     }
   }
   grade+=`</div>`;
@@ -2717,10 +3056,18 @@ function renderMapaModal(){
     ${pend.length>8?`<span style="font-size:12px;color:var(--ink-2)">… e mais ${pend.length-8} vinho${pend.length-8===1?"":"s"}</span>`:""}</div>
   </div>`:"";
 
+  /* v0.53: abas das seções (só aparecem quando a adega tem seções de verdade) */
+  const temSecoes=!sec._virtual;
+  const abas=temSecoes?`<div class="mapa-abas">
+    ${secs.map(s=>`<button class="mapa-aba${s.id===sec.id?" ativa":""}" onclick="trocarSecao('${s.id}')">${esc(s.nome||"Seção")}</button>`).join("")}
+    ${(!colocando&&secs.length<SECOES_MAX)?`<button class="mapa-aba add" onclick="abrirSecoes()">＋</button>`:""}
+  </div>`:"";
+
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="fecharMapa()">✕</button>
     <h3 class="serif">🗺️ ${a.icone} ${esc(a.nome)}</h3>
-    <div class="sub">${g.linhas} prateleira${g.linhas===1?"":"s"} × ${g.colunas} casas · ${nMapa} de ${nTotal} garrafa${nTotal===1?"":"s"} no mapa</div>
+    <div class="sub">${temSecoes?`${secs.length} seções · <b>${esc(sec.nome)}</b>: `:""}${g.linhas} prateleira${g.linhas===1?"":"s"} × ${g.colunas} casas · ${nMapa} de ${nTotal} garrafa${nTotal===1?"":"s"} no mapa</div>
+    ${abas}
     ${colocando?`<div class="explain-box" style="margin-top:10px;border-left-color:var(--gold)">
       📍 Guardando <b>${esc(colocando.nome)} ${safraTxt(colocando)}</b> — ${(colocando.pos||[]).length} de ${colocando.qtd} garrafa${colocando.qtd===1?"":"s"} posicionada${colocando.qtd===1?"":"s"}.<br>
       <span style="font-size:12px">Toque numa casa vazia para guardar; toque numa casa desta cor com contorno para tirar.</span></div>`:""}
@@ -2737,7 +3084,8 @@ function renderMapaModal(){
     <div class="modal-actions" style="margin-top:12px">
       ${colocando?`<button class="btn btn-primary" onclick="concluirColocacao()">✓ Concluir</button>`
                  :`<button class="btn btn-ghost btn-sm" onclick="abrirRedimensionar()">📐 Ajustar tamanho</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirFundoMapa()">🖼️ Fundo</button>`}
+      <button class="btn btn-ghost btn-sm" onclick="abrirFundoMapa()">🖼️ Fundo</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirSecoes()">🧱 Seções</button>`}
       <button class="btn btn-ghost" onclick="fecharMapa()">Fechar</button>
     </div>`;
   $("#modal-detail").classList.add("open");
@@ -2745,14 +3093,14 @@ function renderMapaModal(){
 }
 
 function tocarCelula(p){
-  const a=adegaDe(mapaAdegaAberta);if(!a||!a.grade)return;
+  const a=adegaDe(mapaAdegaAberta);if(!a||!secoesDe(a).length)return;
   const ocup=mapaOcupacao(a.id), dono=ocup[p];
 
   if(mapaColocando){
     const v=vinhos.find(x=>x.id===mapaColocando);if(!v)return;
     v.pos=Array.isArray(v.pos)?v.pos:[];
     if(dono&&dono.id===v.id){ v.pos=v.pos.filter(x=>x!==p); persist(); renderMapaModal(); return }
-    if(dono){ toast(`A casa ${p} já tem ${dono.nome}. 🍾`); return }
+    if(dono){ toast(`A casa ${posDividir(p).casa} já tem ${dono.nome}. 🍾`); return }
     if(v.pos.length>=v.qtd){ toast(`Todas as ${v.qtd} garrafa${v.qtd===1?"":"s"} já ${v.qtd===1?"está":"estão"} no mapa.`); return }
     v.pos.push(p); v.pos.sort(); persist(); renderMapaModal(); return;
   }
@@ -2762,10 +3110,11 @@ function tocarCelula(p){
 function mostrarInfoCelula(p){
   const el=$("#mapa-info");if(!el)return;
   const v=mapaOcupacao(mapaAdegaAberta)[p];
+  const rot=posNome(adegaDe(mapaAdegaAberta),p);
   el.innerHTML=v
-    ?`<div class="mapa-info"><b>${p}</b> · ${esc(v.nome)} ${safraTxt(v)} <span style="color:var(--ink-3)">· ${esc(v.vinicola)}</span>
+    ?`<div class="mapa-info"><b>${rot}</b> · ${esc(v.nome)} ${safraTxt(v)} <span style="color:var(--ink-3)">· ${esc(v.vinicola)}</span>
        <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="fecharMapa();openDetail(${v.id})">Ver ficha</button></div>`
-    :`<div class="mapa-info"><b>${p}</b> · casa vazia</div>`;
+    :`<div class="mapa-info"><b>${rot}</b> · casa vazia</div>`;
 }
 function concluirColocacao(){
   const v=vinhos.find(x=>x.id===mapaColocando);
@@ -2787,6 +3136,89 @@ function concluirColocacao(){
       </div></div>`;
   } else toast(`📍 ${v.nome}: todas as ${v.qtd} garrafa${v.qtd===1?"":"s"} no mapa. ✓`);
 }
+/* ===== v0.53: gerência das seções ===== */
+function trocarSecao(sid){mapaSecaoAtiva=sid;mapaCelSel=null;renderMapaModal()}
+
+/* a adega de grade única vira uma adega de seções: a grade atual vira a
+   primeira seção e TODAS as posições ganham o prefixo dela — nada se perde */
+function converterEmSecoes(a,nomePrimeira){
+  if(!a||Array.isArray(a.secoes))return;
+  const s1={id:"S1",nome:nomePrimeira||"Fundo",grade:a.grade||{linhas:6,colunas:8}};
+  if(a.foto){s1.foto=a.foto;s1.fotoOn=a.fotoOn}
+  a.secoes=[s1];
+  delete a.grade;delete a.foto;delete a.fotoOn;
+  vinhos.filter(v=>v.adega===a.id&&Array.isArray(v.pos)).forEach(v=>{
+    v.pos=v.pos.map(p=>p.includes(":")?p:"S1:"+p);
+  });
+}
+function abrirSecoes(){
+  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  const secs=secoesDe(a);
+  const virtual=secs.length&&secs[0]._virtual;
+  const ocupadasNa=sid=>vinhos.filter(v=>v.adega===a.id&&Array.isArray(v.pos))
+    .reduce((s,v)=>s+v.pos.filter(p=>posDividir(p).sec===sid).length,0);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="renderMapaModal()">✕</button>
+    <h3 class="serif">🧱 Seções — ${a.icone} ${esc(a.nome)}</h3>
+    <div class="sub">Adega grande, em "U", "L" ou fechada? Divida em paredes: cada seção tem a sua grade e a sua foto.</div>
+    ${virtual?`<div class="explain-box" style="margin-top:10px">
+      Hoje esta adega tem <b>uma grade única</b> (${secs[0].grade.linhas}×${secs[0].grade.colunas}).
+      Ao dividir, ela vira a primeira seção — <b>nenhuma garrafa sai do lugar</b> — e você acrescenta as outras paredes.
+      <div class="field" style="margin-top:8px"><label>Nome da seção atual</label>
+        <select id="sec-nome1" style="width:100%">${SECOES_PRESETS.map(n=>`<option ${n==="Fundo"?"selected":""}>${n}</option>`).join("")}</select></div>
+      <div class="modal-actions"><button class="btn btn-primary" onclick="converterEmSecoes(adegaDe(mapaAdegaAberta),$('#sec-nome1').value);persist();mapaSecaoAtiva='S1';abrirSecoes()">🧱 Dividir em seções</button></div>
+    </div>`
+    :`<div style="margin-top:10px">
+      ${(a.secoes||[]).map(s=>{const oc=ocupadasNa(s.id);
+        return `<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)">
+          <input value="${esc(s.nome)}" onchange="renomearSecao('${s.id}',this.value)" style="flex:1;min-width:0">
+          <span style="font-size:11.5px;color:var(--ink-3);flex:none">${s.grade.linhas}×${s.grade.colunas} · ${oc} 🍾</span>
+          <button class="btn btn-ghost btn-sm" style="flex:none${oc?";opacity:.4":""}" onclick="removerSecao('${s.id}')">🗑️</button>
+        </div>`}).join("")}
+      ${(a.secoes||[]).length<SECOES_MAX?`
+      <div style="margin-top:10px;font-size:12.5px;color:var(--ink-2)">Acrescentar parede:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${SECOES_PRESETS.filter(n=>!(a.secoes||[]).some(s=>s.nome===n)).map(n=>`<button class="chip-pend" onclick="addSecao('${n}')">＋ ${n}</button>`).join("")}
+        <button class="chip-pend" onclick="addSecao('')">＋ Outro nome…</button>
+      </div>`:`<div style="margin-top:10px;font-size:12.5px;color:var(--ink-2)">Limite de ${SECOES_MAX} seções atingido.</div>`}
+    </div>`}
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="renderMapaModal()">← Voltar ao mapa</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+function addSecao(nome){
+  const a=adegaDe(mapaAdegaAberta);if(!a||!Array.isArray(a.secoes))return;
+  if(a.secoes.length>=SECOES_MAX)return;
+  if(!nome){nome=prompt("Nome da nova seção (ex.: Ilha central):","");if(!nome)return}
+  const max=a.secoes.reduce((m,s)=>Math.max(m,parseInt(s.id.slice(1),10)||0),0);
+  const ref=a.secoes[0].grade;
+  a.secoes.push({id:"S"+(max+1),nome:nome.trim().slice(0,24),grade:{linhas:ref.linhas,colunas:ref.colunas}});
+  persist();abrirSecoes();
+  toast(`🧱 Seção "${nome.trim()}" criada — ajuste o tamanho dela na aba, em 📐.`);
+}
+function renomearSecao(sid,nome){
+  const a=adegaDe(mapaAdegaAberta);if(!a||!Array.isArray(a.secoes))return;
+  const s=a.secoes.find(x=>x.id===sid);if(!s)return;
+  s.nome=(nome||"Seção").trim().slice(0,24)||"Seção";
+  persist();
+}
+function removerSecao(sid){
+  const a=adegaDe(mapaAdegaAberta);if(!a||!Array.isArray(a.secoes))return;
+  if(a.secoes.length<=1){toast("A adega precisa de ao menos uma seção.");return}
+  const s=a.secoes.find(x=>x.id===sid);if(!s)return;
+  const oc=vinhos.filter(v=>v.adega===a.id&&Array.isArray(v.pos))
+    .reduce((n,v)=>n+v.pos.filter(p=>posDividir(p).sec===sid).length,0);
+  if(oc&&!confirm(`A seção "${s.nome}" tem ${oc} garrafa${oc===1?"":"s"} no mapa.\n\n`+
+    `Elas NÃO saem da adega — apenas voltam a ficar sem posição marcada.\n\nRemover a seção?`))return;
+  vinhos.filter(v=>v.adega===a.id&&Array.isArray(v.pos)).forEach(v=>{
+    v.pos=v.pos.filter(p=>posDividir(p).sec!==sid);
+  });
+  a.secoes=a.secoes.filter(x=>x.id!==sid);
+  if(mapaSecaoAtiva===sid)mapaSecaoAtiva=a.secoes[0].id;
+  persist();abrirSecoes();
+}
+
 function fecharMapa(){
   mapaColocando=null;mapaDestacar=null;mapaCelSel=null;mapaAdegaAberta=null;
   closeModal("modal-detail");
@@ -2836,8 +3268,17 @@ function distribuirDemoNoMapa(){
    foto da adega de verdade, com a grade translúcida por cima. A foto é
    comprimida no próprio aparelho e guardada junto com a adega — nunca sobe
    ao servidor, seguindo a regra de sempre: a adega não sai daqui. */
+/* v0.53: a foto pertence à SEÇÃO ativa (cada parede, uma foto frontal).
+   Na adega simples, a seção virtual guarda na própria adega — como sempre. */
+function alvoFotoMapa(){
+  const a=adegaDe(mapaAdegaAberta);if(!a)return null;
+  const secs=secoesDe(a);
+  const sec=secs.find(s=>s.id===mapaSecaoAtiva)||secs[0];
+  if(!sec)return null;
+  return sec._virtual?a:sec;
+}
 function abrirFundoMapa(){
-  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  const a=alvoFotoMapa();if(!a)return;
   const el=$("#mapa-info");if(!el)return;
   el.innerHTML=`<div class="mapa-info">
     <b>🖼️ Fundo do mapa</b> — como você prefere ver esta adega?
@@ -2852,16 +3293,16 @@ function abrirFundoMapa(){
     </div></div>`;
 }
 function alternarFotoAdega(ligar){
-  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  const a=alvoFotoMapa();if(!a)return;
   a.fotoOn=!!ligar;persist();renderMapaModal();
 }
 function removerFotoAdega(){
-  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  const a=alvoFotoMapa();if(!a)return;
   delete a.foto;delete a.fotoOn;persist();renderMapaModal();
   toast("🖼️ Foto removida — de volta à nossa formatação.");
 }
 function carregarFotoAdega(inp){
-  const a=adegaDe(mapaAdegaAberta), f=inp.files&&inp.files[0];
+  const a=alvoFotoMapa(), f=inp.files&&inp.files[0];
   inp.value="";
   if(!a||!f)return;
   const img=new Image();
@@ -2898,34 +3339,102 @@ function definirGrade(){
   toast(`🗺️ Mapa criado: ${l} prateleira${l===1?"":"s"} × ${c} casas.`);
   renderMapaModal();
 }
+/* ===== v0.53: CATÁLOGO DE ADEGAS CLIMATIZADAS =====
+   Ideia do Jorge: o usuário escolhe o MODELO da adega que comprou e o mapa
+   nasce com a estrutura exata — zero configuração. Ilustração estilizada
+   NOSSA (moldura + grade), nunca foto de fabricante: sem risco de direitos
+   autorais. Capacidades e prateleiras dos modelos mais vendidos no Brasil;
+   a grade é aproximada e o 📐 ajusta qualquer diferença. */
+const CATALOGO_ADEGAS=[
+  {marca:"Electrolux",modelo:"ACB08",cap:8,linhas:4,colunas:2},
+  {marca:"Electrolux",modelo:"ACB12",cap:12,linhas:6,colunas:2},
+  {marca:"Philco",modelo:"PAD12E",cap:12,linhas:5,colunas:3},
+  {marca:"Brastemp",modelo:"BZC12B",cap:12,linhas:5,colunas:3},
+  {marca:"Electrolux",modelo:"WSF24",cap:24,linhas:4,colunas:6},
+  {marca:"Midea",modelo:"WBB242",cap:24,linhas:4,colunas:6},
+  {marca:"EOS",modelo:"EAC24G Sommelier",cap:24,linhas:5,colunas:5},
+  {marca:"Venax",modelo:"Piubella 100",cap:24,linhas:5,colunas:5},
+  {marca:"Electrolux",modelo:"WDF29 Dual Zone",cap:29,linhas:6,colunas:5},
+  {marca:"Suggar",modelo:"Toulouse AD2711IX",cap:29,linhas:6,colunas:5},
+  {marca:"Brastemp",modelo:"BZB33BE Dual Zone",cap:33,linhas:5,colunas:7},
+  {marca:"EOS",modelo:"EAC33D Dual Zone",cap:33,linhas:5,colunas:7},
+  {marca:"Electrolux",modelo:"WSF34",cap:34,linhas:6,colunas:6},
+  {marca:"EOS",modelo:"EAC78D Premium",cap:78,linhas:8,colunas:10}
+];
+function ilustracaoModelo(m){
+  return `<div class="cat-moldura"><div class="cat-vidro">
+    <div class="mini-mapa" style="grid-template-columns:repeat(${Math.min(m.colunas,10)},7px);gap:1.5px">
+      ${Array.from({length:Math.min(m.linhas,8)*Math.min(m.colunas,10)},()=>`<i style="width:7px;height:7px;background:rgba(243,227,201,.28);border-color:rgba(243,227,201,.15)"></i>`).join("")}
+    </div></div></div>`;
+}
+function abrirCatalogoAdegas(){
+  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="renderMapaModal()">✕</button>
+    <h3 class="serif">🗄️ Qual é a sua adega climatizada?</h3>
+    <div class="sub">Escolha o modelo e o mapa nasce pronto, prateleira por prateleira.</div>
+    <div style="margin-top:10px;max-height:56vh;overflow:auto">
+      ${CATALOGO_ADEGAS.map((m,i)=>`
+        <div class="mapa-adega-linha" onclick="usarModeloCatalogo(${i})">
+          ${ilustracaoModelo(m)}
+          <div style="flex:1;min-width:0">
+            <b>${m.marca} ${m.modelo}</b>
+            <div style="font-size:12px;color:var(--ink-2);margin-top:2px">${m.cap} garrafas · ${m.linhas} prateleiras</div>
+          </div>
+          <span style="font-size:12.5px;color:var(--wine);font-weight:600;flex:none">usar →</span>
+        </div>`).join("")}
+    </div>
+    <div class="explain-box" style="margin-top:10px;font-size:12px">A disposição interna é aproximada —
+      se a sua tiver arranjo diferente, o <b>📐 Ajustar tamanho</b> resolve em segundos.
+      Não achou o seu modelo? Volte e conte prateleiras e casas manualmente.</div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="renderMapaModal()">← Voltar</button></div>`;
+  $("#modal-detail").classList.add("open");
+}
+function usarModeloCatalogo(i){
+  const a=adegaDe(mapaAdegaAberta), m=CATALOGO_ADEGAS[i];if(!a||!m)return;
+  const alvo=Array.isArray(a.secoes)?secaoAtivaDe(a):a;
+  alvo.grade={linhas:m.linhas,colunas:m.colunas};
+  a.modeloTxt=m.marca+" "+m.modelo;
+  persist();renderMapaModal();
+  toast(`🗄️ ${m.marca} ${m.modelo}: ${m.linhas} prateleiras prontas. Ajuste em 📐 se a sua for diferente.`);
+}
+
+/* v0.53: o ajuste de tamanho vale para a SEÇÃO ativa */
+function secaoAtivaDe(a){
+  const secs=secoesDe(a);
+  return secs.find(s=>s.id===mapaSecaoAtiva)||secs[0]||null;
+}
 function abrirRedimensionar(){
-  const a=adegaDe(mapaAdegaAberta);if(!a||!a.grade)return;
+  const a=adegaDe(mapaAdegaAberta);const sec=a&&secaoAtivaDe(a);if(!sec)return;
   const el=$("#mapa-info");if(!el)return;
   el.innerHTML=`<div class="mapa-info">
-    <b>📐 Ajustar:</b>
-    <input id="mapa-linhas" type="number" min="1" max="${MAPA_MAX_LINHAS}" value="${a.grade.linhas}" style="width:64px"> prateleiras ×
-    <input id="mapa-colunas" type="number" min="1" max="${MAPA_MAX_COLUNAS}" value="${a.grade.colunas}" style="width:64px"> casas
+    <b>📐 Ajustar${sec._virtual?"":" — "+esc(sec.nome)}:</b>
+    <input id="mapa-linhas" type="number" min="1" max="${MAPA_MAX_LINHAS}" value="${sec.grade.linhas}" style="width:64px"> prateleiras ×
+    <input id="mapa-colunas" type="number" min="1" max="${MAPA_MAX_COLUNAS}" value="${sec.grade.colunas}" style="width:64px"> casas
     <button class="btn btn-primary btn-sm" style="margin-left:6px" onclick="redimensionarGrade()">Aplicar</button>
   </div>`;
 }
 function redimensionarGrade(){
-  const a=adegaDe(mapaAdegaAberta);if(!a||!a.grade)return;
-  const l=Math.min(MAPA_MAX_LINHAS,Math.max(1,+$("#mapa-linhas").value||a.grade.linhas));
-  const c=Math.min(MAPA_MAX_COLUNAS,Math.max(1,+$("#mapa-colunas").value||a.grade.colunas));
+  const a=adegaDe(mapaAdegaAberta);const sec=a&&secaoAtivaDe(a);if(!sec)return;
+  const l=Math.min(MAPA_MAX_LINHAS,Math.max(1,+$("#mapa-linhas").value||sec.grade.linhas));
+  const c=Math.min(MAPA_MAX_COLUNAS,Math.max(1,+$("#mapa-colunas").value||sec.grade.colunas));
   /* encolher pode deixar garrafa fora do mapa: avisa ANTES e, se confirmar,
      devolve essas garrafas ao estado "sem posição" — nunca as apaga */
   const fora=[];
   vinhos.filter(v=>v.adega===a.id&&Array.isArray(v.pos)).forEach(v=>v.pos.forEach(p=>{
-    const li=LETRAS.indexOf(p[0]), co=parseInt(p.slice(1),10);
+    const d=posDividir(p);
+    if(sec._virtual?d.sec!=="__unica":d.sec!==sec.id)return;
+    const li=LETRAS.indexOf(d.casa[0]), co=parseInt(d.casa.slice(1),10);
     if(li>=l||co>c)fora.push({v,p});
   }));
   if(fora.length){
     if(!confirm(`Encolher para ${l}×${c} deixa ${fora.length} garrafa${fora.length===1?"":"s"} fora do mapa `+
-      `(${fora.slice(0,4).map(f=>f.p).join(", ")}${fora.length>4?"…":""}).\n\n`+
+      `(${fora.slice(0,4).map(f=>posDividir(f.p).casa).join(", ")}${fora.length>4?"…":""}).\n\n`+
       `Elas NÃO são apagadas da adega — apenas voltam a ficar sem posição marcada.\n\nContinuar?`))return;
     fora.forEach(({v,p})=>{v.pos=v.pos.filter(x=>x!==p)});
   }
-  a.grade={linhas:l,colunas:c};
+  if(sec._virtual)a.grade={linhas:l,colunas:c};
+  else sec.grade={linhas:l,colunas:c};
   persist();renderMapaModal();
   toast(`📐 Mapa ajustado para ${l}×${c}.`);
 }
@@ -3082,7 +3591,7 @@ function zerarAdega(comHistorico){
   if(eraDemo || comHistorico) historico = [];
   /* v0.52: o mapa e a foto da vitrine também são de mentira — saem junto.
      Sem isso, a adega nova do usuário herdaria grades 12×10 vazias da demo. */
-  if(eraDemo) ADEGAS.forEach(a=>{delete a.grade;delete a.foto;delete a.fotoOn});
+  if(eraDemo) ADEGAS.forEach(a=>{delete a.grade;delete a.foto;delete a.fotoOn;delete a.secoes});
   adegaDemo = false;          /* a adega passa a ser do usuário, ainda que vazia */
   adegaAtiva = "todas";
   pratoResumo = null;
@@ -3511,7 +4020,7 @@ function confirmConsume(id){
   historico.unshift({nome:`${v.nome} ${safraTxt(v)} · ${v.vinicola}`,prato:$("#c-prato").value||"—",data:new Intl.DateTimeFormat("pt-BR").format(new Date()),estrelas:rateSel||0});
   addAtividade(`abriu um <b>${v.nome} ${safraTxt(v)}</b>${$("#c-prato").value?" com "+$("#c-prato").value:""}`,rateSel||0);
   if(v.qtd<=0){vinhos=vinhos.filter(x=>x.id!==id);toast(`Última garrafa de ${v.nome} consumida — rótulo movido ao histórico. 🍷`)}
-  else toast(`Saúde! Restam ${v.qtd} garrafa${v.qtd>1?"s":""} de ${v.nome}.${casaLivre?` Casa ${casaLivre} liberada no mapa.`:""} 🥂`);
+  else toast(`Saúde! Restam ${v.qtd} garrafa${v.qtd>1?"s":""} de ${v.nome}.${casaLivre?` Casa ${posNome(adegaDe(v.adega),casaLivre)} liberada no mapa.`:""} 🥂`);
   closeModal("modal-consume");persist();renderAdegaBar();renderDash();renderColecao();
 }
 /* ===== Gerenciar adegas: renomear, trocar ícone, excluir ===== */
