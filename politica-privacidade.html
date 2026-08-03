@@ -81,7 +81,9 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
       <tr><td>Adega (rótulos, quantidades, preços, notas, fotos de rótulo)</td><td>Só no seu aparelho</td><td>É o seu acervo</td></tr>
       <tr><td>Histórico de consumo e avaliações pessoais</td><td>Só no seu aparelho</td><td>Sua memória de degustação</td></tr>
       <tr><td>Mapa da adega (estrutura e posição das garrafas)</td><td>Só no seu aparelho</td><td>Achar a garrafa sem revirar a adega</td></tr>
-      <tr><td>Chave da IA de scanner (se você configurar)</td><td>Só no seu aparelho</td><td>Ler rótulos por foto</td></tr>
+      <tr><td>Fotos dos vinhos que você cadastra</td><td>Só no seu aparelho</td><td>Ver a garrafa na ficha</td></tr>
+      <tr><td>Foto do rótulo no momento do escaneamento</td><td>Passa pelo servidor e é <b>descartada em seguida</b></td><td>Identificar o vinho</td></tr>
+      <tr><td>Contagem de leituras do scanner (quantas, em qual mês)</td><td>Servidor</td><td>Garantir as leituras gratuitas de cada pessoa</td></tr>
       <tr><td>Perfil público (@usuário, nome de exibição, cidade)</td><td>Servidor</td><td>Ser encontrado pelos amigos</td></tr>
       <tr><td>E-mail da conta Google (login)</td><td>Servidor</td><td>Entrar sem senha e recuperar a conta</td></tr>
       <tr><td>Quem você segue e quem segue você</td><td>Servidor</td><td>A rede social funcionar</td></tr>
@@ -92,6 +94,29 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
       <tr><td>Denúncias e registros de moderação</td><td>Servidor</td><td>Proteger quem usa o aplicativo</td></tr>
       <tr><td>Feedbacks enviados por você</td><td>Servidor</td><td>Melhorar o aplicativo</td></tr>
     </table>
+  </div>
+
+  <div class="card">
+    <h2>O leitor de rótulos (scanner)</h2>
+    <p>
+      Quando você fotografa um rótulo, a imagem é enviada ao nosso servidor, que a repassa
+      ao serviço de visão do Google (Gemini) apenas para identificar o vinho. A resposta volta
+      para o seu aparelho e <b>a foto é descartada na mesma operação</b>: não guardamos a imagem,
+      não a associamos ao seu perfil e não a usamos para treinar nada.
+    </p>
+    <p>
+      Para garantir a gratuidade a todos, registramos apenas <b>quantas leituras</b> cada conta fez
+      em cada mês — um número, nada mais. Você pode conferir esse número no próprio aplicativo.
+    </p>
+    <div class="destaque">
+      Prefere que nem isso passe por nós? Em <b>Configurações → Leitor de rótulos → Modo avançado</b>
+      você pode usar a sua própria chave do Google: nesse caso a foto vai direto do seu aparelho
+      ao Google, sem tocar no servidor do Apotheca. Uma ressalva honesta: <b>se a sua chave
+      falhar</b> (vencida, cota estourada ou serviço fora do ar), o aplicativo refaz a leitura pelo
+      nosso servidor para não deixar você na mão — e aí valem as mesmas regras do parágrafo acima:
+      a foto é usada para identificar o vinho e descartada na mesma operação. O aplicativo avisa
+      na tela sempre que isso acontece.
+    </div>
   </div>
 
   <div class="card">
@@ -114,7 +139,7 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
     <ul>
       <li><b>Supabase</b> — hospeda o banco de dados do servidor (perfil, rede, mensagens, encontros). Os dados podem ser armazenados em servidores fora do Brasil, com salvaguardas contratuais do provedor;</li>
       <li><b>GitHub Pages</b> — serve o site. Não recebe dados de conta;</li>
-      <li><b>Google</b> — o login "Entrar com Google" segue as regras do Google; recebemos apenas seu e-mail verificado e nome. E, <b>somente se você configurar a sua própria chave</b> da IA de scanner, as fotos de rótulo que você escanear são enviadas ao Google (Gemini) para leitura — usando a sua chave, sob os termos do Google.</li>
+      <li><b>Google</b> — o login "Entrar com Google" segue as regras do Google; recebemos apenas seu e-mail verificado e nome. As fotos de rótulo que você escaneia são enviadas ao Google (Gemini) para leitura, com a chave do Apotheca (ou com a sua, se você a configurar no modo avançado), sob os termos do Google, e não são guardadas por nós.</li>
     </ul>
   </div>
 
@@ -184,7 +209,7 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
 <footer class="wrap">
   Apotheca · <a href="https://apotheca.app.br/">apotheca.app.br</a> ·
   <a href="https://apotheca.app.br/excluir-conta.html">excluir minha conta</a><br>
-  Política vigente desde 31 de julho de 2026 · Controlador: Jorge Queiroz (pessoa física) · privacidade@apotheca.app.br
+  Política vigente desde 3 de agosto de 2026 · Controlador: Jorge Queiroz (pessoa física) · privacidade@apotheca.app.br
 </footer>
 </body>
 </html>

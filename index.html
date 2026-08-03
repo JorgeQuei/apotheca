@@ -68,7 +68,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 
 /* ===== Sugestões da base mundial no cadastro ===== */
 .sug-wrap{position:relative}
-.sug-box{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--gold);border-radius:0 0 12px 12px;box-shadow:0 10px 26px rgba(40,15,25,.18);z-index:70;max-height:260px;overflow:auto}
+.sug-box{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--gold);border-radius:0 0 12px 12px;box-shadow:0 10px 26px rgba(40,15,25,.18);z-index:70;max-height:340px;overflow:auto}
+.sug-ia{background:#fbf3ea;position:sticky;bottom:0;border-top:1px solid var(--gold);border-bottom:none;box-shadow:0 -6px 12px rgba(40,15,25,.10)}
+.sug-nota{padding:8px 13px;font-size:11px;color:var(--ink-3);border-top:1px solid var(--cream);line-height:1.5}
+.sug-nota a{color:var(--wine-3)}
 .sug-item{padding:10px 13px;cursor:pointer;border-bottom:1px solid var(--cream);font-size:13px;display:flex;gap:8px;align-items:center}
 .sug-item:hover{background:var(--cream)}
 .sug-item .inf{flex:1;min-width:0}
@@ -295,6 +298,18 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 .chip-pend{display:inline-flex;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--gold);border-radius:99px;
   padding:5px 12px;margin:6px 6px 0 0;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--ink)}
 .chip-pend:active{transform:scale(.96)}
+/* v0.57: foto do vinho na ficha e na coleção */
+.foto-vinho{float:right;width:104px;height:139px;object-fit:cover;border-radius:12px;margin:0 0 10px 12px;
+  border:1px solid var(--line);background:var(--cream);cursor:pointer;box-shadow:0 2px 8px rgba(60,30,40,.12)}
+button.foto-vinho.vazia{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  border:1.5px dashed var(--line);color:var(--ink-3);font-family:inherit;font-size:11.5px;line-height:1.25;text-align:center}
+button.foto-vinho.vazia span{font-size:26px}
+.foto-lupa{position:fixed;inset:0;background:rgba(20,10,14,.92);z-index:200;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;padding:24px;cursor:zoom-out}
+.foto-lupa img{max-width:100%;max-height:76vh;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.foto-lupa .acoes{display:flex;gap:10px}
+.foto-lupa .btn{background:rgba(255,255,255,.92)}
+.mini-foto{width:44px;height:58px;object-fit:cover;border-radius:8px;flex:none;border:1px solid var(--line);background:var(--cream)}
 /* v0.53: ilustração estilizada dos modelos do catálogo (nossa, sem foto de fabricante) */
 .cat-moldura{flex:none;background:linear-gradient(160deg,#3a2a24,#241713);border-radius:8px;padding:5px;border:1px solid #1c110d}
 .cat-vidro{background:linear-gradient(135deg,rgba(107,27,44,.55),rgba(60,20,30,.75));border-radius:5px;padding:5px;border:1px solid rgba(243,227,201,.18)}
@@ -471,7 +486,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
       <div class="panel" id="form-panel">
         <h3 id="form-title">Ficha do vinho</h3>
         <div class="formgrid">
-          <div class="field wide sug-wrap"><label>Nome do vinho * <span style="font-weight:400;text-transform:none;letter-spacing:0">· digite e busque na base mundial de 100 mil vinhos</span></label><input id="a-nome" placeholder="Ex.: Catena, Esporão, Miolo…" autocomplete="off"><div class="sug-box hidden" id="nome-sug"></div></div>
+          <div class="field wide sug-wrap"><label>Nome do vinho * <span style="font-weight:400;text-transform:none;letter-spacing:0">· digite: busca na base de 100 mil vinhos — e na IA, se você pedir</span></label><input id="a-nome" placeholder="Ex.: Catena, Esporão, Miolo…" autocomplete="off"><div class="sug-box hidden" id="nome-sug"></div></div>
           <div class="field"><label>Vinícola / Produtor</label><input id="a-vinicola" placeholder="Ex.: Vinícola Miolo"></div>
           <div class="field"><label>País</label><select id="a-pais"></select></div>
           <div class="field"><label>Região</label><input id="a-regiao" placeholder="Ex.: Vale dos Vinhedos"></div>
@@ -628,7 +643,6 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   <div class="mi" id="mi-config" onclick="fecharMenu();abrirConfiguracoes()">⚙️ Configurações</div>
   <div class="mi" onclick="fecharMenu();go('historico')">📜 Histórico</div>
   <div class="mi" onclick="fecharMenu();abrirFeedback()">💬 Enviar feedback</div>
-  <div class="mi hidden" id="mi-fundador" onclick="fecharMenu();abrirFeedbacksFundador()">📥 Feedbacks (fundador)</div>
   <div class="mi" onclick="fecharMenu();abrirAjuda()">❓ Ajuda e suporte</div>
   <div class="mi" onclick="fecharMenu();abrirSobre()">ℹ️ Sobre o Apotheca</div>
   <div class="mi sair" onclick="fecharMenu();sairSessao()">🚪 Sair da sessão</div>
@@ -707,7 +721,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.56"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.59"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -867,11 +881,108 @@ function buscarSugestoes(){
   }
   res.sort((a,b)=>b.s-a.s||a.w[0].length-b.w[0].length);
   const top=res.slice(0,6);
-  if(!top.length){box.classList.add("hidden");return}
   window.__sugs=top.map(x=>x.w);
-  box.innerHTML=`<div class="sug-head">\ud83c\udf0d BASE MUNDIAL \u2014 TOQUE PARA PREENCHER A FICHA</div>`+
-    top.map((x,i)=>`<div class="sug-item" onclick="preencherDaBase(window.__sugs[${i}])"><i class="dot" style="background:${CORES[x.w[1]]||'#999'}"></i><div class="inf"><b>${nomeExibicao(x.w)}</b><small>${x.w[5]||"\u2014"} \u00b7 ${x.w[4]||"\u2014"} \u00b7 ${x.w[3]||"\u2014"}${x.w[2]?" \u00b7 "+x.w[2]:""}</small></div></div>`).join("");
+  box.innerHTML=(top.length
+    ?`<div class="sug-head">\ud83c\udf0d BASE MUNDIAL \u2014 TOQUE PARA PREENCHER A FICHA</div>`+
+      top.map((x,i)=>`<div class="sug-item" onclick="preencherDaBase(window.__sugs[${i}])"><i class="dot" style="background:${CORES[x.w[1]]||'#999'}"></i><div class="inf"><b>${esc(nomeExibicao(x.w))}</b><small>${esc(x.w[5]||"\u2014")} \u00b7 ${esc(x.w[4]||"\u2014")} \u00b7 ${esc(x.w[3]||"\u2014")}${x.w[2]?" \u00b7 "+esc(x.w[2]):""}</small></div></div>`).join("")
+    :`<div class="sug-head">\ud83c\udf0d BASE MUNDIAL</div><div class="sug-item" style="cursor:default"><div class="inf"><small>Nenhum vinho com esse nome na base local.</small></div></div>`)
+    +linhaBuscaIA(q);
   box.classList.remove("hidden");
+}
+
+/* ===== BUSCA POR NOME COM IA (v0.59) =====
+   Três camadas, da mais barata para a mais cara:
+   1) base mundial embutida — instantânea, de graça, funciona sem internet;
+   2) memória do modelo — cobre a esmagadora maioria dos vinhos conhecidos;
+   3) pesquisa REAL na web, com fontes citadas — só quando a IA não tem certeza.
+   O usuário decide quando gastar: nada acontece sem ele tocar no botão. */
+let iaBuscaBusy=false;
+let buscaRestantes=null;   /* preenchido pela resposta do servidor */
+
+function linhaBuscaIA(q){
+  return `<div class="sug-item sug-ia" onclick="buscarNomeComIA()">
+    <i class="dot" style="background:var(--gold)"></i>
+    <div class="inf"><b>\ud83d\udd0e Procurar \u201c${esc(q)}\u201d com a IA</b>
+    <small>Fora da base local \u2014 preenche a ficha inteira${buscaRestantes!==null?` \u00b7 ${buscaRestantes} buscas neste m\u00eas`:""}</small></div></div>`;
+}
+
+function avisoBusca(titulo,detalhe){
+  const box=$("#nome-sug");
+  box.innerHTML=`<div class="sug-head">\ud83d\udd0e BUSCA COM IA</div>
+    <div class="sug-item" style="cursor:default"><div class="inf"><b>${esc(titulo)}</b><small style="white-space:normal">${esc(detalhe)}</small></div></div>`;
+  box.classList.remove("hidden");
+}
+
+async function buscarNomeComIA(){
+  if(iaBuscaBusy)return;
+  const q=($("#a-nome").value||"").trim();
+  if(q.length<3){toast("Escreva ao menos 3 letras do nome. \u270d\ufe0f");return}
+  iaBuscaBusy=true;
+  avisoBusca("Consultando o sommelier-IA sobre \u201c"+q+"\u201d\u2026","Leva alguns segundos. Se ele n\u00e3o tiver certeza, faz uma pesquisa de verdade na web.");
+  try{
+    const r=await buscarVinhoNoServidor(q);
+    mostrarResultadoIA(q,r);
+  }catch(e){
+    /* servidor ainda na vers\u00e3o antiga: s\u00f3 entende foto, n\u00e3o entende texto */
+    const antigo=/foto de um r.tulo|imagem ausente/i.test(e.message||"");
+    const m=e.message==="SEM_LOGIN"
+      ?"A sua sessão expirou — entre de novo para usar a busca por nome."
+      :e.message==="LIMITE"
+        ?"Voc\u00ea usou as suas buscas deste m\u00eas."
+        :antigo
+          ?"A busca por nome ainda n\u00e3o foi ligada no servidor."
+          :e.message;
+    avisoBusca(m,"Voc\u00ea pode preencher a ficha \u00e0 m\u00e3o normalmente \u2014 nada se perde.");
+  }finally{iaBuscaBusy=false}
+}
+
+function mostrarResultadoIA(q,r){
+  const box=$("#nome-sug");
+  const v=(r&&r.vinho)||{};
+  if(typeof r.restantes==="number")buscaRestantes=r.restantes;
+  if(!v.nome||(v.confianca||0)<40){
+    avisoBusca("N\u00e3o encontrei \u201c"+q+"\u201d com seguran\u00e7a.",
+      "Prefiro dizer que n\u00e3o sei a inventar uma ficha. Tente incluir o produtor (ex.: \u201cCatena Zapata Malbec\u201d) ou preencha \u00e0 m\u00e3o.");
+    return;
+  }
+  window.__iaVinho=v;
+  const selo=r.origem==="web"?"\ud83c\udf10 PESQUISADO NA WEB":"\ud83e\udde0 SOMMELIER-IA";
+  const fontes=(r.fontes||[]).slice(0,3);
+  box.innerHTML=`<div class="sug-head">${selo} \u2014 TOQUE PARA PREENCHER A FICHA</div>
+    <div class="sug-item" onclick="preencherDaIA()"><i class="dot" style="background:${CORES[v.tipo]||'#999'}"></i>
+      <div class="inf"><b>${esc(v.nome)}${(v.safra&&!String(v.nome).includes(v.safra))?" "+esc(v.safra):""}</b>
+      <small>${esc(v.vinicola||"\u2014")} \u00b7 ${esc(v.regiao||"\u2014")} \u00b7 ${esc(v.pais||"\u2014")}${(v.uvas&&v.uvas.length)?" \u00b7 "+esc(v.uvas.join(", ")):""}</small></div>
+      <span class="tag ${v.confianca>=80?"auge":"logo"}" style="padding:2px 8px;flex:none">${v.confianca|0}%</span></div>
+    ${fontes.length?`<div class="sug-nota">Fontes: ${fontes.map(f=>`<a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">${esc(f.titulo)}</a>`).join(" \u00b7 ")}</div>`:""}
+    ${r.sugestoes?`<div class="sug-nota google-sug"></div>`:""}
+    <div class="sug-nota">\u26a0\ufe0f Preenchido por IA \u2014 confira antes de salvar.${buscaRestantes!==null?` \u00b7 ${buscaRestantes} buscas restantes neste m\u00eas`:""}</div>`;
+  /* Exigência do contrato de uso da pesquisa do Google: quando a resposta vem
+     de busca real, as sugestões de pesquisa dele precisam aparecer na tela.
+     O trecho vem do Google através do NOSSO servidor e mora num bloco próprio. */
+  if(r.sugestoes){const g=box.querySelector(".google-sug");if(g)g.innerHTML=r.sugestoes}
+  box.classList.remove("hidden");
+}
+
+function preencherDaIA(){
+  const o=window.__iaVinho;if(!o)return;
+  $("#a-nome").value=o.nome||"";
+  $("#a-vinicola").value=o.vinicola||"";
+  if(o.uvas&&o.uvas.length)$("#a-uvas").value=o.uvas.join(", ");
+  if(PAISES.includes(o.pais))$("#a-pais").value=o.pais;
+  $("#a-regiao").value=o.regiao||"";
+  if(TIPOS.includes(o.tipo))$("#a-tipo").value=o.tipo;
+  if(o.safra&&/^(19|20)\d{2}$/.test(String(o.safra)))$("#a-safra").value=o.safra;
+  const n15=x=>{x=Math.round(+x);return x>=1&&x<=5?x:3};
+  const corpo=n15(o.corpo),acidez=n15(o.acidez),tanino=n15(o.taninos);
+  $("#a-corpo").value=corpo;$("#v-corpo").textContent=corpo;
+  $("#a-acidez").value=acidez;$("#v-acidez").textContent=acidez;
+  $("#a-tanino").value=tanino;$("#v-tanino").textContent=tanino;
+  const anoOk=a=>{a=Math.round(+a);return a>=1950&&a<=2060?a:0};
+  if(anoOk(o.janela_inicio))$("#a-jan1").value=anoOk(o.janela_inicio);
+  if(anoOk(o.janela_fim))$("#a-jan2").value=anoOk(o.janela_fim);
+  if(o.notas&&!($("#a-notas").value||"").trim())$("#a-notas").value=String(o.notas).trim();
+  $("#nome-sug").classList.add("hidden");
+  toast("Ficha preenchida pela IA \u2014 confira e salve. \ud83e\udde0");
 }
 document.addEventListener("DOMContentLoaded",()=>{});
 
@@ -966,6 +1077,22 @@ function ehSite(){return location.protocol==="https:"||location.protocol==="http
 function tokenAtual(){return (sessao&&sessao.access_token)?sessao.access_token:SB_KEY}
 function salvarSessao(){try{sessao?localStorage.setItem("apotheca_sessao",JSON.stringify(sessao)):localStorage.removeItem("apotheca_sessao")}catch(e){}}
 function entrarGoogleReal(){
+  /* No APK a página mora em file://, onde location.origin vale "null" e o
+     Google recusa OAuth dentro de WebView. Por isso o aplicativo abre o
+     navegador do celular e volta pelo endereço apotheca://auth.
+     v0.59c: essa rota existia SÓ no botão da tela de login. Qualquer outro
+     botão de entrar mandava o WebView para um endereço que não existe — e o
+     aplicativo ficava preso numa página de erro, sem caminho de volta.
+     Agora a escolha do caminho mora aqui dentro, e vale para todos. */
+  if(window.Apk&&Apk.abrirNavegador){
+    Apk.abrirNavegador(SB_BASE+"/auth/v1/authorize?provider=google&redirect_to="+encodeURIComponent("apotheca://auth"));
+    toast("🌐 Complete o login no navegador que abriu — eu trago você de volta. 🍷");
+    return;
+  }
+  if(location.protocol!=="https:"&&location.protocol!=="http:"){
+    toast("O login com o Google funciona no aplicativo e no site. 🔑");
+    return;
+  }
   const volta=location.origin+location.pathname;
   location.href=SB_BASE+"/auth/v1/authorize?provider=google&redirect_to="+encodeURIComponent(volta);
 }
@@ -992,14 +1119,21 @@ async function renovarSessao(){
   if(!sessao||!sessao.refresh_token)return false;
   try{
     const r=await fetch(SB_BASE+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:sessao.refresh_token})});
-    if(!r.ok)throw 0;
+    if(!r.ok){
+      /* v0.59: só 400/401 significam "este refresh_token morreu" — aí sim é
+         logout de verdade. Antes, QUALQUER falha apagava a sessão: bastava o
+         relógio de 10 minutos cair num momento sem sinal para o usuário ser
+         deslogado sem perceber, e descobrir só ao fotografar um rótulo. */
+      if(r.status===400||r.status===401){sessao=null;salvarSessao()}
+      return false;
+    }
     const d=await r.json();
     sessao.access_token=d.access_token;
     sessao.refresh_token=d.refresh_token||sessao.refresh_token;
     sessao.expira=Date.now()+((d.expires_in||3600)-120)*1000;
     salvarSessao();
     return true;
-  }catch(e){sessao=null;salvarSessao();return false}
+  }catch(e){return false}   /* sem internet não é motivo para deslogar */
 }
 async function garantirSessaoValida(){
   if(sessao&&sessao.expira&&Date.now()>sessao.expira)await renovarSessao();
@@ -1062,7 +1196,7 @@ async function aposLoginGoogle(){
   $("#login-screen").classList.add("open");
   $("#login-p1").classList.add("hidden");$("#login-p2").classList.remove("hidden");
   const fb=$("#reg-feedback");
-  if(fb&&sessao&&sessao.email)fb.innerHTML='<span style="color:var(--ok)">✓ Conectado como '+sessao.email+'</span>';
+  if(fb&&sessao&&sessao.email)fb.innerHTML='<span style="color:var(--ok)">✓ Conectado como '+esc(sessao.email)+'</span>';
   setTimeout(()=>{
     const i=$("#reg-user");
     if(i){
@@ -1306,7 +1440,7 @@ function renderConfrariasPub(){
         :`<span class="tag logo" style="padding:3px 9px;flex:none">⏳ Aguardando</span>`):
       `<button class="btn btn-gold btn-sm" onclick="entrarConfraria('${escJS(c.id)}')">${c.tipo==="aberta"?"Entrar":"Pedir vaga"}</button>`;
     return `<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:6px">
-      <span style="font-size:20px;cursor:pointer" onclick="abrirConfraria('${escJS(c.id)}')">${c.brasao||"🏛️"}</span>
+      <span style="font-size:20px;cursor:pointer" onclick="abrirConfraria('${escJS(c.id)}')">${esc(c.brasao||"🏛️")}</span>
       <div class="inf" style="cursor:pointer" onclick="abrirConfraria('${escJS(c.id)}')"><b>${esc(c.nome)}</b> <span style="font-size:11px;color:var(--ink-3)">· ${TIPO_LABEL[c.tipo]||c.tipo}</span>${pend}<small>📍 ${esc(c.cidade)} · ${c.membros} membros · ${esc(c.desc)}</small></div>
       ${status}
     </div>`;
@@ -1382,10 +1516,10 @@ async function abrirGestaoConfraria(id){
   const pend=(c.pendentes||[]).filter(p=>!c.membrosLista.includes(p));
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
-    <h3 class="serif">${c.brasao||"🏛️"} ${esc(c.nome)}</h3>
+    <h3 class="serif">${esc(c.brasao||"🏛️")} ${esc(c.nome)}</h3>
     <div class="sub">📍 ${esc(c.cidade)} · ${TIPO_LABEL[c.tipo]||c.tipo} · você é ${sou?"👑 fundador":"🛡️ moderador"}</div>
     ${pend.length?`<div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">⏳ PEDIDOS DE VAGA (${pend.length})</div>
-      ${pend.map(p=>{const u=USUARIOS_APP.find(x=>x.user===p);return `<div class="sug-item" style="border:1px solid var(--gold,#b8860b);border-radius:10px;margin-bottom:6px"><span style="cursor:pointer" onclick="abrirPerfil('${escJS(p)}')">${avatarDe(p,30)}</span><div class="inf"><b>${u?esc(u.nome):p}</b><small>@${p}${u?" · 📍 "+esc(u.cidade):""}</small></div><span style="display:flex;gap:6px;flex:none"><button class="btn btn-gold btn-sm" onclick="aprovarPendente('${escJS(c.id)}','${escJS(p)}')">✓ Aprovar</button><button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="recusarPendente('${escJS(c.id)}','${escJS(p)}')">✕</button></span></div>`}).join("")}`:""}
+      ${pend.map(p=>{const u=USUARIOS_APP.find(x=>x.user===p);return `<div class="sug-item" style="border:1px solid var(--gold,#b8860b);border-radius:10px;margin-bottom:6px"><span style="cursor:pointer" onclick="abrirPerfil('${escJS(p)}')">${avatarDe(p,30)}</span><div class="inf"><b>${u?esc(u.nome):esc(p)}</b><small>@${esc(p)}${u?" · 📍 "+esc(u.cidade):""}</small></div><span style="display:flex;gap:6px;flex:none"><button class="btn btn-gold btn-sm" onclick="aprovarPendente('${escJS(c.id)}','${escJS(p)}')">✓ Aprovar</button><button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="recusarPendente('${escJS(c.id)}','${escJS(p)}')">✕</button></span></div>`}).join("")}`:""}
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">🎟️ CONVITE DA CONFRARIA</div>
     <div style="background:var(--cream);border-radius:12px;padding:12px;margin-bottom:10px">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1411,7 +1545,7 @@ async function abrirGestaoConfraria(id){
     </div>`:""}
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">MEMBROS (${c.membrosLista.length})</div>
     ${c.membrosLista.map(m=>{const u=USUARIOS_APP.find(x=>x.user===m);const mod=(c.moderadores||[]).includes(m);
-      return `<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:6px"><span style="cursor:pointer" onclick="abrirPerfil('${escJS(m)}')">${avatarDe(m,30)}</span><div class="inf"><b>${m===perfil.user?"Você":(u?esc(u.nome):m)}</b><small>@${m}${m===c.dono?" · 👑 fundador":mod?" · 🛡️ moderador":""}</small></div>
+      return `<div class="sug-item" style="border:1px solid var(--line);border-radius:10px;margin-bottom:6px"><span style="cursor:pointer" onclick="abrirPerfil('${escJS(m)}')">${avatarDe(m,30)}</span><div class="inf"><b>${m===perfil.user?"Você":(u?esc(u.nome):esc(m))}</b><small>@${esc(m)}${m===c.dono?" · 👑 fundador":mod?" · 🛡️ moderador":""}</small></div>
       <span style="display:flex;gap:6px;flex:none">
       ${sou&&m!==c.dono?`<button class="btn btn-ghost btn-sm" title="${mod?"Destituir moderador":"Nomear moderador"}" onclick="alternarModerador('${escJS(c.id)}','${escJS(m)}')">${mod?"🛡️✕":"🛡️"}</button>`:""}
       ${m!==c.dono&&(sou||(ehModerador(c)&&!mod))?`<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="removerMembroConfraria('${escJS(c.id)}','${escJS(m)}')">✕</button>`:""}
@@ -1538,7 +1672,7 @@ function abrirConfraria(id){
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:10px">
-      <span style="font-size:44px;flex:none">${c.brasao||"🏛️"}</span>
+      <span style="font-size:44px;flex:none">${esc(c.brasao||"🏛️")}</span>
       <div><h3 class="serif" style="font-size:22px">${esc(c.nome)}</h3>
       <div style="font-size:13px;color:var(--ink-2)">📍 ${esc(c.cidade)} · ${c.membros} membros · ${TIPO_LABEL[c.tipo]||c.tipo}</div></div>
     </div>
@@ -1551,11 +1685,11 @@ function abrirConfraria(id){
       <input id="mural-in-${c.id}" placeholder="Um aviso, uma garrafa, o próximo encontro…" style="flex:1" onkeydown="if(event.key==='Enter')postarMural('${escJS(c.id)}')">
       <button class="btn btn-primary btn-sm" onclick="postarMural('${escJS(c.id)}')">Publicar</button>
     </div>
-    ${posts.map(p=>{const u=USUARIOS_APP.find(x=>x.user===p.user);return `<div class="hist-row" style="align-items:flex-start"><span>${avatarDe(p.user,30)}</span><div class="info"><h4 style="font-size:13px;font-weight:600">${p.user===(perfil&&perfil.user)?"Você":(u?esc(u.nome):"@"+p.user)}</h4><p style="font-size:13px;color:var(--ink-1)">${esc(p.txt)}</p><p>${tempoRel(p.ts)}</p></div></div>`}).join("")||'<div style="font-size:12.5px;color:var(--ink-2);padding:4px 0 8px">Mural vazio — inaugure com o próximo encontro!</div>'}
+    ${posts.map(p=>{const u=USUARIOS_APP.find(x=>x.user===p.user);return `<div class="hist-row" style="align-items:flex-start"><span>${avatarDe(p.user,30)}</span><div class="info"><h4 style="font-size:13px;font-weight:600">${p.user===(perfil&&perfil.user)?"Você":(u?esc(u.nome):"@"+esc(p.user))}</h4><p style="font-size:13px;color:var(--ink-1)">${esc(p.txt)}</p><p>${tempoRel(p.ts)}</p></div></div>`}).join("")||'<div style="font-size:12.5px;color:var(--ink-2);padding:4px 0 8px">Mural vazio — inaugure com o próximo encontro!</div>'}
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">🍷 DEGUSTAÇÕES DOS MEMBROS</div>
     ${degust.map(feedItemHtml).join("")||'<div style="font-size:12.5px;color:var(--ink-2);padding:4px 0 8px">Nenhuma atividade dos membros ainda.</div>'}
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">MEMBROS (${(c.membrosLista||[]).length})</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">${(c.membrosLista||[]).map(mb=>{const u=USUARIOS_APP.find(x=>x.user===mb);return `<span class="adega-chip" style="cursor:pointer" onclick="abrirPerfil('${escJS(mb)}')">${mb===c.dono?"👑":(c.moderadores||[]).includes(mb)?"🛡️":"👤"} ${mb===(perfil&&perfil.user)?"Você":(u?esc(u.nome):mb)}</span>`}).join("")}</div>`
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${(c.membrosLista||[]).map(mb=>{const u=USUARIOS_APP.find(x=>x.user===mb);return `<span class="adega-chip" style="cursor:pointer" onclick="abrirPerfil('${escJS(mb)}')">${mb===c.dono?"👑":(c.moderadores||[]).includes(mb)?"🛡️":"👤"} ${mb===(perfil&&perfil.user)?"Você":(u?esc(u.nome):esc(mb))}</span>`}).join("")}</div>`
     :`<div class="explain-box">🔐 O mural, as degustações e a lista de membros são reservados aos membros da confraria.</div>`}`;
   $("#modal-detail").classList.add("open");
 }
@@ -2116,6 +2250,7 @@ setTimeout(()=>{  /* adiado: as constantes do mapa são declaradas mais abaixo *
   if(adegaDemo&&!ADEGAS.some(a=>a.grade||a.secoes)&&!vinhos.some(v=>v.pos&&v.pos.length)){
     try{distribuirDemoNoMapa();persist();renderMapaAdegasResumo()}catch(e){}
   }
+  try{migrarFotosAntigas()}catch(e){}   /* v0.57: fotos antigas para o armazém novo */
 },0);
 function resetDemo(){
   try{localStorage.removeItem(STORE_KEY)}catch(e){}
@@ -2127,7 +2262,7 @@ const $=s=>document.querySelector(s);
 const fmt=n=>n.toLocaleString("pt-BR");
 const brl=n=>"R$ "+Math.round(n).toLocaleString("pt-BR");
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2800)}
-function safraTxt(v){return v.safra?v.safra:"NV"}
+function safraTxt(v){return v.safra?esc(v.safra):"NV"}
 /* Nota da comunidade Apotheca (simulada de forma estável por rótulo no protótipo) */
 function comunidade(v){const nota=(3.4+((v.id*37)%16)/10).toFixed(1);const n=(180+(v.id*577)%4200);return {nota,n}}
 function status(v){
@@ -2301,6 +2436,11 @@ function linhaConfig(icone,titulo,estado,acao,detalhe){
     <span style="flex:none;font-size:11px;background:var(--cream);padding:3px 9px;border-radius:99px;color:var(--ink-2)">${estado}</span>
   </div>`;
 }
+/* v0.57: uma única regra para "sou o dono do aplicativo" — antes essa condição
+   vivia solta no menu; agora é função, testável e usada num lugar só. */
+function ehFundador(){
+  return !!((perfil&&perfil.user==="Jorge.Queiroz")||(sessao&&sessao.email==="wp7jorge@gmail.com"));
+}
 function abrirConfiguracoes(){
   const tv=travaLer().modo;
   const permissao=(window.Apk&&Apk.notificar)?"granted":permissaoNotif();
@@ -2353,9 +2493,14 @@ function abrirConfiguracoes(){
       "alternarSom();abrirConfiguracoes()","Som curto quando chega novidade")}
 
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SCANNER</div>
-    ${linhaConfig("🔑","IA de visão (scanner)",getIaKey()?"ativa ✓":"não configurada",
+    ${linhaConfig("📸","Leitor de rótulos",getIaKey()?"chave própria ✓":"pronto ✓",
       "closeModal('modal-detail');abrirConfigIA()",
-      "Lê o rótulo pela foto e preenche a ficha sozinha")}
+      "Fotografe a garrafa e a ficha se preenche sozinha")}
+
+    ${ehFundador()?`<div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">FUNDADOR</div>
+    ${linhaConfig("📥","Feedbacks recebidos","só você",
+      "closeModal('modal-detail');abrirFeedbacksFundador()",
+      "As mensagens que os usuários enviaram pelo aplicativo")}`:""}
 
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">DEMONSTRAÇÃO</div>
     ${linhaConfig("🎬","Adega de demonstração",temReal?"cuidado":adegaDemo?"em uso":"disponível",
@@ -2367,22 +2512,22 @@ function abrirConfiguracoes(){
 
 /* ================== MENU POP-UP ================== */
 function renderMenu(){
-  const mf=$("#mi-fundador");
-  if(mf)mf.classList.toggle("hidden",!((perfil&&perfil.user==="Jorge.Queiroz")||(sessao&&sessao.email==="wp7jorge@gmail.com")));
+  /* v0.57: a caixa de feedbacks saiu do menu — vive em Configurações e só
+     aparece para a conta do fundador (ver ehFundador()) */
   /* v0.45: os seis ajustes moraram no menu até a v0.44 e o deixavam comprido.
      Agora vivem atrás da engrenagem; aqui fica só um resumo do que está ligado. */
   const mc=$("#mi-config");
   if(mc){
     const pend=[];
     if(travaLer().modo==="nenhum")pend.push("sem tranca");
-    if(!getIaKey())pend.push("IA desligada");
+    /* v0.57: o leitor de rótulos já vem pronto — nada a configurar */
     mc.innerHTML="⚙️ Configurações"+(pend.length?`<span class="cont">${pend.length} a ajustar</span>`:'<span class="cont">tudo pronto ✓</span>');
   }
   const tot=id=>vinhos.filter(v=>id==="todas"||v.adega===id).reduce((s,v)=>s+v.qtd,0);
   $("#menu-adegas").innerHTML=
     `<div class="mtit">MINHAS ADEGAS</div>`+
     `<div class="mi ${adegaAtiva==="todas"?"ativo":""}" onclick="fecharMenu();setAdega('todas');go('dashboard')">🍷 Todas as adegas ${adegaAtiva==="todas"?"✓":""}<span class="cont">${tot("todas")}</span></div>`+
-    ADEGAS.map(a=>`<div class="mi ${adegaAtiva===a.id?"ativo":""}" onclick="fecharMenu();setAdega('${a.id}');go('dashboard')">${a.icone} ${a.nome} ${adegaAtiva===a.id?"✓":""}<span class="cont">${tot(a.id)}</span></div>`).join("")+
+    ADEGAS.map(a=>`<div class="mi ${adegaAtiva===a.id?"ativo":""}" onclick="fecharMenu();setAdega('${escJS(a.id)}');go('dashboard')">${esc(a.icone)} ${esc(a.nome)} ${adegaAtiva===a.id?"✓":""}<span class="cont">${tot(a.id)}</span></div>`).join("")+
     `<div class="mtit" style="border-top:1px solid var(--cream);margin-top:4px">APLICATIVO</div>`;
 }
 function toggleMenu(e){if(e)e.stopPropagation();const aberto=!$("#menu-pop").classList.contains("open");if(aberto)renderMenu();$("#menu-pop").classList.toggle("open",aberto);$("#menu-bg").classList.toggle("open",aberto)}
@@ -2420,41 +2565,52 @@ function abrirSobre(){
       <p style="margin-bottom:10px">Protótipo <b>v${APP_VERSION}</b> · julho de 2026<br>Idealizador: <b>Jorge Queiroz</b></p>\n      <p style="margin-bottom:10px">Conta: <b>${perfil?"@"+perfil.user+" · 📍 "+perfil.cidade+" (via "+perfil.provedor+")":"não conectada"}</b></p>
       <p style="margin-bottom:10px">Sua adega hoje: <b>${vinhos.length} rótulos · ${tot} garrafas · ${ADEGAS.length} adegas</b></p>
       <p style="margin-bottom:10px">Base mundial offline <b>X-Wines</b> (licença CC BY-NC-SA): <b>${baseMundialPronta.length.toLocaleString("pt-BR")} vinhos</b> ${baseMundialPronta.length>1000?"— base completa carregada ✓":"— amostra (a base completa vive no APK)"}</p>
-      <p style="margin-bottom:10px">Comunidade na nuvem: <b>${nuvemOK?"conectada ✅ (banco real Supabase)":"offline — modo local ⚪"}</b></p>\n      <p style="margin-bottom:10px">IA de visão do scanner: <b>${getIaKey()?"ativa neste aparelho ✅":"não configurada — ative no menu 🔑"}</b></p>
+      <p style="margin-bottom:10px">Comunidade na nuvem: <b>${nuvemOK?"conectada ✅ (banco real Supabase)":"offline — modo local ⚪"}</b></p>\n      <p style="margin-bottom:10px">Leitor de rótulos: <b>${getIaKey()?"chave própria ✅ (ilimitado)":"pronto ✅ (leitor do Apotheca)"}</b></p>
       <p style="color:var(--ink-2)">Este é um protótipo de validação: dados de comunidade simulados.</p>
       ${(()=>{try{if(window.Apk&&Apk.diagnosticoTela){const d=JSON.parse(Apk.diagnosticoTela());
         return `<p style="font-size:11.5px;color:var(--ink-3)">🔧 Ajuste de tela (${d.modo||"?"}): Android ${d.sdk} · barras informadas: topo ${d.declT}, base ${d.declB} · barra de status ${d.barraStatus} · <b>aplicado: topo ${d.padT}, base ${d.padB}</b></p>`}}catch(e){}return ""})()}
       <p style="margin-top:10px"><a href="#" onclick="abrirPolitica();return false" style="color:var(--wine-3)">📜 Política de privacidade</a></p>
     </div>
-    <div style="text-align:center;margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3);letter-spacing:.5px">by <span class="serif" style="font-size:14px;color:var(--wine)">Claude</span></div>`;
+    <div style="text-align:center;margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3);letter-spacing:.5px"><span class="serif" style="font-size:14px;color:var(--wine)">Apotheca</span> © 2026</div>`;
   $("#modal-detail").classList.add("open");
 }
 function abrirConfigIA(){
   const k=getIaKey();
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
-    <h3 class="serif">🔑 IA de visão para o scanner</h3>
-    <div class="sub">Reconhecimento de rótulos de verdade — até os artísticos, como o Catena Zapata.</div>
-    <div style="font-size:13.5px;line-height:1.6">
-      <p style="margin-bottom:10px">Com uma chave de IA, o "📸 Fotografar rótulo" envia a foto para um modelo de visão que <b>entende a imagem e conhece vinhos</b> — em vez de tentar ler letras. Status atual: <b>${k?"✅ IA ativa neste aparelho":"⚪ não configurada (usando leitor local)"}</b></p>
-      <p style="margin-bottom:6px;font-weight:600">Como criar sua chave gratuita (2 min):</p>
-      <p style="margin-bottom:10px">1. Acesse <b>aistudio.google.com/apikey</b> (endereço direto da página de chaves)<br>2. Entre com sua conta Google e toque em <b>"Create API key"</b><br>3. Copie a chave — copie o valor completo mostrado ao criar — e cole abaixo:</p>
+    <h3 class="serif">📸 Leitor de rótulos</h3>
+    <div class="sub">Fotografe a garrafa e a ficha se preenche sozinha.</div>
+    <div class="explain-box" style="margin-top:12px;border-left-color:var(--ok)">
+      ✅ <b>Já está funcionando — você não precisa configurar nada.</b><br>
+      <span style="font-size:12.5px">Toque em ＋ → 📸 Fotografar rótulo. O leitor do Apotheca reconhece
+      o vinho, inclusive rótulos artísticos, e preenche uva, região, safra e janela de consumo.
+      ${scanRestantes!==null?`<br>Leituras restantes neste mês: <b>${scanRestantes}</b>.`:""}</span>
     </div>
-    <div class="field" style="margin:8px 0 10px"><label>Sua chave de IA (fica só neste aparelho)</label><input id="ia-key" value="${k.replace(/"/g,"&quot;")}" placeholder="AIza…" autocomplete="off"></div>
-    <div id="ia-status" class="explain-box hidden" style="margin-bottom:12px"></div>
-    <div class="modal-actions">
-      <button class="btn btn-gold" onclick="testarIA()">🧪 Testar conexão</button>
-      <button class="btn btn-primary" onclick="salvarIaKey()">Salvar e ativar</button>
-      ${k?`<button class="btn btn-ghost" onclick="document.getElementById('ia-key').value='';salvarIaKey()">Remover</button>`:""}
-    </div>
-    <div class="explain-box" style="margin-top:12px">A chave é salva apenas no seu aparelho e usada exclusivamente para analisar as fotos de rótulo que você tirar. No aplicativo final, isso rodará no servidor do Apotheca, sem o usuário precisar de chave.</div>`;
+    <details style="margin-top:14px;font-size:13.5px;line-height:1.6">
+      <summary style="cursor:pointer;font-weight:600;color:var(--wine)">⚙️ Modo avançado — usar a minha própria chave</summary>
+      <div style="margin-top:10px">
+        <p style="margin-bottom:10px">Só para quem quer <b>leituras ilimitadas</b> e não se importa em criar uma chave no Google.
+        Com a chave própria, a foto vai direto do seu aparelho ao Google, sem passar pelo Apotheca.
+        <b>Se a sua chave falhar</b> (vencida, cota estourada, fora do ar), o Apotheca lê pelo servidor dele para você não ficar na mão — e nesse caso a foto passa por nós e é descartada na mesma operação.
+        Status: <b>${k?"✅ chave própria ativa":"⚪ usando o leitor do Apotheca"}</b></p>
+        <p style="margin-bottom:10px">1. Acesse <b>aistudio.google.com/apikey</b><br>2. Entre com a conta Google e toque em <b>"Create API key"</b><br>3. Copie e cole abaixo:</p>
+        <div class="field" style="margin:8px 0 10px"><label>Chave de IA (fica só neste aparelho)</label><input id="ia-key" value="${k.replace(/"/g,"&quot;")}" placeholder="AQ.… ou AIza…" autocomplete="off"></div>
+        <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 8px">As chaves novas do Google começam com <b>AQ.</b> — as antigas, com AIza. As duas funcionam aqui.</div>
+        <div id="ia-status" class="explain-box hidden" style="margin-bottom:12px"></div>
+        <div class="modal-actions">
+          <button class="btn btn-gold btn-sm" onclick="testarIA()">🧪 Testar</button>
+          <button class="btn btn-primary btn-sm" onclick="salvarIaKey()">Salvar</button>
+          ${k?`<button class="btn btn-ghost btn-sm" onclick="document.getElementById('ia-key').value='';salvarIaKey()">Voltar ao leitor do Apotheca</button>`:""}
+        </div>
+      </div>
+    </details>`;
   $("#modal-detail").classList.add("open");
 }
 function salvarIaKey(){
   const k=($("#ia-key").value||"").trim();
   try{k?localStorage.setItem(IA_KEY_STORE,k):localStorage.removeItem(IA_KEY_STORE)}catch(e){}
   closeModal("modal-detail");
-  toast(k?"🧠 IA de visão ativada — fotografe um rótulo!":"Chave removida — scanner volta ao leitor local.");
+  toast(k?"🧠 Chave própria ativada — leituras ilimitadas.":"Voltou ao leitor do Apotheca. 📸");
 }
 /* Teste direto com o Google: tira a dúvida sobre a chave em segundos */
 async function testarIA(){
@@ -2522,8 +2678,8 @@ async function abrirFeedbacksFundador(){
       const fbs=await sb("/feedback?select=*&order=criado.desc&limit=100");
       const linhas=(fbs&&fbs.length)?fbs.map(f=>`
         <div style="border-bottom:1px solid var(--cream);padding:10px 0">
-          <div style="font-size:12px;color:var(--ink-2)">${f.tipo||"—"} · @${f.usuario||"anônimo"} · ${new Date(f.criado).toLocaleString("pt-BR")}</div>
-          <div style="font-size:13.5px;margin-top:3px;white-space:pre-wrap">${(f.texto||"").replace(/</g,"&lt;")}</div>
+          <div style="font-size:12px;color:var(--ink-2)">${esc(f.tipo||"—")} · @${esc(f.usuario||"anônimo")} · ${esc(new Date(f.criado).toLocaleString("pt-BR"))}</div>
+          <div style="font-size:13.5px;margin-top:3px;white-space:pre-wrap">${esc(f.texto||"")}</div>
         </div>`).join("")
         :'<div class="empty" style="padding:20px 0"><div class="big">📭</div>Nenhum feedback ainda — a caixa está vazia.</div>';
       $("#modal-detail-body").innerHTML=`
@@ -2564,6 +2720,104 @@ function carregarDemo(){
   toast("🎬 Adega de demonstração carregada — 153 garrafas para explorar!");
   go("dashboard");
 }
+/* ============ FOTOS DOS VINHOS (v0.57) ============
+   Pedido da maioria dos testadores: ver a foto do vinho ao abrir a ficha.
+   Onde guardar: NÃO no mesmo lugar dos dados. O armazenamento comum do
+   navegador tem ~5 MB; 150 fotos o estouram e derrubariam a adega inteira.
+   As fotos vivem num armazém próprio (IndexedDB), que comporta centenas de
+   megabytes. O vinho guarda só um bilhete: v.fotoId. Continua tudo no
+   aparelho — nenhuma foto sobe para servidor nenhum. */
+const FOTO_DB="apotheca_fotos", FOTO_LOJA="fotos";
+let _fotoDB=null;
+function fotoDB(){
+  if(_fotoDB)return _fotoDB;
+  _fotoDB=new Promise((ok,err)=>{
+    try{
+      const req=indexedDB.open(FOTO_DB,1);
+      req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains(FOTO_LOJA))d.createObjectStore(FOTO_LOJA)};
+      req.onsuccess=()=>ok(req.result);
+      req.onerror=()=>err(req.error);
+    }catch(e){err(e)}
+  });
+  return _fotoDB;
+}
+async function fotoSalvar(id,dataUrl){
+  const d=await fotoDB();
+  return new Promise((ok,err)=>{
+    const t=d.transaction(FOTO_LOJA,"readwrite");
+    t.objectStore(FOTO_LOJA).put(dataUrl,id);
+    t.oncomplete=()=>ok(id); t.onerror=()=>err(t.error);
+  });
+}
+async function fotoLer(id){
+  if(!id)return null;
+  try{
+    const d=await fotoDB();
+    return await new Promise((ok,err)=>{
+      const t=d.transaction(FOTO_LOJA,"readonly");
+      const r=t.objectStore(FOTO_LOJA).get(id);
+      r.onsuccess=()=>ok(r.result||null); r.onerror=()=>err(r.error);
+    });
+  }catch(e){return null}
+}
+async function fotoApagar(id){
+  if(!id)return;
+  try{
+    const d=await fotoDB();
+    await new Promise(ok=>{const t=d.transaction(FOTO_LOJA,"readwrite");t.objectStore(FOTO_LOJA).delete(id);t.oncomplete=ok;t.onerror=ok});
+  }catch(e){}
+}
+/* comprime no aparelho: 900px no lado maior, retrato de garrafa, ~60 KB */
+function fotoComprimir(arquivoOuDataUrl){
+  return new Promise((ok,err)=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        if(img._url)URL.revokeObjectURL(img._url);
+        const fator=Math.min(1,900/Math.max(img.width,img.height));
+        const cv=document.createElement("canvas");
+        cv.width=Math.max(1,Math.round(img.width*fator));
+        cv.height=Math.max(1,Math.round(img.height*fator));
+        cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+        let q=0.72,url=cv.toDataURL("image/jpeg",q);
+        while(url.length>260000&&q>0.4){q-=0.1;url=cv.toDataURL("image/jpeg",q)}
+        ok(url);
+      }catch(e){err(e)}
+    };
+    img.onerror=()=>err(new Error("imagem ilegível"));
+    if(typeof arquivoOuDataUrl==="string")img.src=arquivoOuDataUrl;
+    else{img._url=URL.createObjectURL(arquivoOuDataUrl);img.src=img._url}
+  });
+}
+/* guarda a foto de um vinho e devolve o id do bilhete */
+async function definirFotoVinho(v,arquivoOuDataUrl){
+  const url=await fotoComprimir(arquivoOuDataUrl);
+  const id=v.fotoId||("f"+v.id+"_"+Math.floor(performance.now()*1000));
+  await fotoSalvar(id,url);
+  v.fotoId=id; delete v.foto;      /* some com a cópia antiga, pesada */
+  persist();
+  return id;
+}
+/* preenche <img data-foto="id"> assim que a foto for lida do armazém */
+function pintarFotos(raiz){
+  (raiz||document).querySelectorAll("img[data-foto]:not([data-pronta])").forEach(async el=>{
+    el.setAttribute("data-pronta","1");
+    const url=await fotoLer(el.getAttribute("data-foto"));
+    if(url)el.src=url; else el.remove();
+  });
+}
+/* migração silenciosa: fotos antigas guardadas junto com os dados passam para
+   o armazém novo, liberando espaço sem o usuário perceber */
+async function migrarFotosAntigas(){
+  const antigos=vinhos.filter(v=>v.foto&&!v.fotoId);
+  if(!antigos.length)return;
+  for(const v of antigos){
+    try{ await definirFotoVinho(v,v.foto) }catch(e){ delete v.foto }
+  }
+  persist();
+  try{renderColecao()}catch(e){}
+}
+
 /* ============ IMPORTAR DE OUTRO APLICATIVO (v0.53) ============
    Pedido que chegou por telefone: um testador decidido a migrar do
    CellarTracker. Um importador, quatro portas: CellarTracker, Vivino,
@@ -2895,7 +3149,7 @@ function posNome(a,p){
 function posTexto(v,max){
   if(!Array.isArray(v.pos)||!v.pos.length)return "";
   const a=adegaDe(v.adega);
-  return " · 📍 "+v.pos.slice(0,max||3).map(p=>posNome(a,p)).join(", ")+(v.pos.length>(max||3)?"…":"");
+  return " · 📍 "+v.pos.slice(0,max||3).map(p=>esc(posNome(a,p))).join(", ")+(v.pos.length>(max||3)?"…":"");
 }
 function mapaOcupacao(adegaId){
   const m={};
@@ -3112,7 +3366,7 @@ function tocarCelula(p){
 function mostrarInfoCelula(p){
   const el=$("#mapa-info");if(!el)return;
   const v=mapaOcupacao(mapaAdegaAberta)[p];
-  const rot=posNome(adegaDe(mapaAdegaAberta),p);
+  const rot=esc(posNome(adegaDe(mapaAdegaAberta),p));
   el.innerHTML=v
     ?`<div class="mapa-info"><b>${rot}</b> · ${esc(v.nome)} ${safraTxt(v)} <span style="color:var(--ink-3)">· ${esc(v.vinicola)}</span>
        <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="fecharMapa();openDetail(${v.id})">Ver ficha</button></div>`
@@ -3625,14 +3879,8 @@ function sairSessao(){
 }
 function iniciarLogin(prov){
   provPendente=prov;
-  if(prov==="Google"&&ehSite()){entrarGoogleReal();return} /* OAuth verdadeiro no site */
-  if(prov==="Google"&&window.Apk&&Apk.abrirNavegador){
-    /* APK: o Google não permite login dentro do WebView, então abrimos o navegador
-       verdadeiro do celular; o retorno chega pelo endereço apotheca://auth */
-    Apk.abrirNavegador(SB_BASE+"/auth/v1/authorize?provider=google&redirect_to="+encodeURIComponent("apotheca://auth"));
-    toast("🌐 Complete o login no navegador que abriu — eu trago você de volta.");
-    return;
-  }
+  /* site e APK: entrarGoogleReal() já sabe escolher o caminho de cada um */
+  if(prov==="Google"&&(ehSite()||(window.Apk&&Apk.abrirNavegador))){entrarGoogleReal();return}
   if(prov==="Apple"){toast("🍎 O login Apple entra na fase de publicação na App Store — por enquanto, use o Google.");return}
   if(perfil){ /* APK: conta já existe neste aparelho, entra direto */
     $("#login-screen").classList.remove("open");go("dashboard");
@@ -3709,7 +3957,7 @@ function renderAdegaBar(){
   const tot=id=>vinhos.filter(v=>id==="todas"||v.adega===id).reduce((s,v)=>s+v.qtd,0);
   $("#adega-bar").innerHTML=
     `<span class="adega-chip ${adegaAtiva==="todas"?"sel":""}" onclick="setAdega('todas')">🍷 Todas as adegas <span class="n">${tot("todas")}</span></span>`+
-    ADEGAS.map(a=>`<span class="adega-chip ${adegaAtiva===a.id?"sel":""}" onclick="setAdega('${a.id}')">${a.icone} ${a.nome} <span class="n">${tot(a.id)}</span></span>`).join("")+
+    ADEGAS.map(a=>`<span class="adega-chip ${adegaAtiva===a.id?"sel":""}" onclick="setAdega('${escJS(a.id)}')">${esc(a.icone)} ${esc(a.nome)} <span class="n">${tot(a.id)}</span></span>`).join("")+
     `<span class="adega-chip" onclick="openAdegasManager()" title="Renomear, trocar ícone ou excluir adegas">✏️ Gerenciar</span>`;
 }
 function setAdega(id){
@@ -3968,12 +4216,14 @@ function renderColecao(){
   $("#wine-grid").innerHTML=lista.map(v=>{
     const s=status(v);
     return `<div class="wcard" style="border-left-color:${CORES[v.tipo]}" onclick="openDetail(${v.id})">
-      <div class="top"><div><h4>${v.nome} <span style="color:var(--ink-3);font-weight:400">${safraTxt(v)}</span></h4><div class="vin">${v.vinicola} · ${v.regiao}</div></div>
-      <span class="badge" style="background:${CORES[v.tipo]}">${v.tipo}</span></div>
-      <div class="meta"><span>${v.pais}</span><span>${v.uvas.join(", ")}</span><span class="tag ${s.k}" style="padding:3px 8px">${s.txt}</span>${adegaAtiva==="todas"?`<span class="adega-loc">${adegaDe(v.adega).icone} ${adegaDe(v.adega).nome}</span>`:""}</div>
+      <div class="top" style="gap:10px">${v.fotoId?`<img data-foto="${v.fotoId}" class="mini-foto" alt="">`:""}
+      <div style="flex:1;min-width:0"><h4>${esc(v.nome)} <span style="color:var(--ink-3);font-weight:400">${safraTxt(v)}</span></h4><div class="vin">${esc(v.vinicola)} · ${esc(v.regiao)}</div></div>
+      <span class="badge" style="background:${CORES[v.tipo]||"#666"}">${esc(v.tipo)}</span></div>
+      <div class="meta"><span>${esc(v.pais)}</span><span>${esc((v.uvas||[]).join(", "))}</span><span class="tag ${s.k}" style="padding:3px 8px">${s.txt}</span>${adegaAtiva==="todas"?`<span class="adega-loc">${esc(adegaDe(v.adega).icone)} ${esc(adegaDe(v.adega).nome)}</span>`:""}</div>
       <div class="bottom"><span class="qty">${v.qtd} <small>garrafa${v.qtd>1?"s":""}</small></span><span style="font-size:12.5px;color:var(--ink-2)" title="Nota média da comunidade Apotheca"><span class="stars" style="font-size:13px">★</span> <b>${comunidade(v).nota}</b> · ${fmt(comunidade(v).n)} aval.</span></div>
     </div>`;
   }).join("")||`<div class="empty" style="grid-column:1/-1"><div class="big">🔍</div>Nenhum vinho encontrado com esses filtros.</div>`;
+  pintarFotos($("#wine-grid"));
 }
 ["f-busca","f-tipo","f-pais","f-ordem"].forEach(id=>$("#"+id).addEventListener("input",renderColecao));
 $("#a-nome").addEventListener("input",()=>{clearTimeout(sugTimer);sugTimer=setTimeout(buscarSugestoes,250)});
@@ -3986,37 +4236,80 @@ function openDetail(id){
   const s=status(v);
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
-    ${v.foto?`<img src="${v.foto}" alt="Rótulo" style="float:right;width:76px;height:76px;object-fit:cover;border-radius:10px;margin:0 0 8px 10px;border:1px solid var(--line)">`:""}
-    <span class="badge" style="background:${CORES[v.tipo]};margin-bottom:8px;display:inline-block">${v.tipo}</span>
-    <h3 class="serif">${v.nome} ${safraTxt(v)}</h3>
-    <div class="sub">${v.vinicola} · ${v.regiao} · ${v.pais}</div>
+    ${v.fotoId
+      ?`<img data-foto="${v.fotoId}" alt="Foto do vinho" class="foto-vinho" onclick="ampliarFotoVinho(${v.id})">`
+      :`<button class="foto-vinho vazia" onclick="escolherFotoVinho(${v.id})" title="Adicionar foto"><span>📷</span><small>adicionar<br>foto</small></button>`}
+    <span class="badge" style="background:${CORES[v.tipo]||"#666"};margin-bottom:8px;display:inline-block">${esc(v.tipo)}</span>
+    <h3 class="serif">${esc(v.nome)} ${safraTxt(v)}</h3>
+    <div class="sub">${esc(v.vinicola)} · ${esc(v.regiao)} · ${esc(v.pais)}</div>
     <div class="spec-grid">
-      <div><b>Uvas</b>${v.uvas.join(", ")}</div>
+      <div><b>Uvas</b>${esc((v.uvas||[]).join(", "))}</div>
       <div><b>Janela de consumo</b>${v.jan[0]}–${v.jan[1]} <span class="tag ${s.k}" style="margin-left:4px;padding:2px 8px">${s.txt}</span></div>
       <div><b>Corpo</b>${meter(v.corpo)}</div>
       <div><b>Acidez</b>${meter(v.acidez)}</div>
       <div><b>Taninos</b>${meter(v.tanino)}</div>
       <div><b>Doçura</b>${meter(v.doc)}</div>
-      <div><b>Localização</b>${adegaDe(v.adega).icone} ${adegaDe(v.adega).nome} · ${v.qtd} garrafa${v.qtd>1?"s":""}${posTexto(v,6)}</div>
+      <div><b>Localização</b>${esc(adegaDe(v.adega).icone)} ${esc(adegaDe(v.adega).nome)} · ${v.qtd} garrafa${v.qtd>1?"s":""}${posTexto(v,6)}</div>
       <div><b>Preço de aquisição</b>${brl(v.preco)} / garrafa</div>
       <div><b>Comunidade Apotheca</b><span class="stars">★</span> ${comunidade(v).nota} / 5,0 <span style="color:var(--ink-3)">(${fmt(comunidade(v).n)} avaliações de usuários)</span></div>
-      <div><b>Sua última nota</b>${(h=>h?`<span class="stars">${"★".repeat(h.estrelas)}${"☆".repeat(5-h.estrelas)}</span>`:"você ainda não avaliou")(historico.find(x=>x.nome.startsWith(v.nome)))}</div>
+      <div><b>Sua última nota</b>${(h=>h?`<span class="stars">${"★".repeat(Math.max(0,Math.min(5,h.estrelas|0)))}${"☆".repeat(5-Math.max(0,Math.min(5,h.estrelas|0)))}</span>`:"você ainda não avaliou")(historico.find(x=>String(x.nome||"").startsWith(v.nome)))}</div>
     </div>
-    <div class="notes">“${v.notas}”</div>
+    <div class="notes">“${esc(v.notas)}”</div>
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="openConsume(${v.id})">🍷 Abrir uma garrafa</button>
       <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Fechar</button>
     </div>
     <div class="modal-actions" style="margin-top:10px">
       <button class="btn btn-ghost btn-sm" onclick="abrirMapaAdega('${v.adega}',${(v.pos&&v.pos.length>=v.qtd)?`{destacar:${v.id}}`:`{colocar:${v.id}}`})">${(v.pos&&v.pos.length>=v.qtd)?"🗺️ Ver no mapa":(v.pos&&v.pos.length)?`📍 Guardar no mapa · falta${v.qtd-v.pos.length===1?"":"m"} ${v.qtd-v.pos.length}`:"📍 Guardar no mapa"}</button>
+      <button class="btn btn-ghost btn-sm" onclick="escolherFotoVinho(${v.id})">📷 ${v.fotoId?"Trocar foto":"Foto da garrafa"}</button>
       <button class="btn btn-ghost btn-sm" onclick="editarVinho(${v.id})">✏️ Corrigir ficha</button>
       <button class="btn btn-ghost btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="excluirVinho(${v.id},this)">🗑️ Excluir da adega</button>
     </div>
     <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
       <div style="font-size:12px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Mover 1 garrafa para outra adega</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">${ADEGAS.filter(x=>x.id!==v.adega).map(x=>`<button class="btn btn-ghost btn-sm" onclick="moveOne(${v.id},'${x.id}')">${x.icone} ${x.nome}</button>`).join("")}</div>
-    </div>`;
+    </div>
+    <input id="foto-vinho-input" type="file" accept="image/*" class="hidden" onchange="receberFotoVinho(this)">`;
   $("#modal-detail").classList.add("open");
+  pintarFotos($("#modal-detail-body"));
+}
+/* ===== v0.57: a foto da garrafa, do jeito mais simples possível ===== */
+let fotoVinhoAlvo=null;
+function escolherFotoVinho(id){
+  fotoVinhoAlvo=id;
+  const el=$("#foto-vinho-input");
+  if(el)el.click(); else toast("Abra a ficha do vinho para trocar a foto.");
+}
+async function receberFotoVinho(inp){
+  const f=inp.files&&inp.files[0]; inp.value="";
+  const v=vinhos.find(x=>x.id===fotoVinhoAlvo);
+  if(!f||!v)return;
+  try{
+    await definirFotoVinho(v,f);
+    openDetail(v.id);
+    try{renderColecao()}catch(e){}
+    toast("📷 Foto guardada — só neste aparelho, como toda a sua adega.");
+  }catch(e){ toast("Não consegui ler essa imagem. Tente outra foto.") }
+}
+async function ampliarFotoVinho(id){
+  const v=vinhos.find(x=>x.id===id); if(!v||!v.fotoId)return;
+  const url=await fotoLer(v.fotoId); if(!url)return;
+  const bg=document.createElement("div");
+  bg.className="foto-lupa";
+  bg.innerHTML=`<img src="${url}" alt="${esc(v.nome)}">
+    <div class="acoes">
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();escolherFotoVinho(${v.id})">🔄 Trocar</button>
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();removerFotoVinho(${v.id},this)">🗑️ Remover</button>
+    </div>`;
+  bg.onclick=()=>bg.remove();
+  document.body.appendChild(bg);
+}
+async function removerFotoVinho(id,botao){
+  const v=vinhos.find(x=>x.id===id); if(!v)return;
+  await fotoApagar(v.fotoId); delete v.fotoId; delete v.foto; persist();
+  const lupa=botao&&botao.closest(".foto-lupa"); if(lupa)lupa.remove();
+  openDetail(v.id); try{renderColecao()}catch(e){}
+  toast("Foto removida.");
 }
 let rateSel=0;
 function openConsume(id,prato){
@@ -4025,9 +4318,9 @@ function openConsume(id,prato){
   rateSel=0;
   $("#modal-consume-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-consume')">✕</button>
-    <h3 class="serif">Abrir ${v.nome} ${safraTxt(v)}</h3>
+    <h3 class="serif">Abrir ${esc(v.nome)} ${safraTxt(v)}</h3>
     <div class="sub">Registre o consumo — a quantidade em adega será atualizada.</div>
-    <div class="field" style="margin-bottom:12px"><label>Com qual prato?</label><input id="c-prato" placeholder="Ex.: Feijoada de sábado" value="${prato||""}"></div>
+    <div class="field" style="margin-bottom:12px"><label>Com qual prato?</label><input id="c-prato" placeholder="Ex.: Feijoada de sábado" value="${esc(prato||"")}"></div>
     <label style="font-size:12px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px">Sua avaliação</label>
     <div class="rate-stars" id="rate">${[1,2,3,4,5].map(i=>`<span data-s="${i}">★</span>`).join("")}</div>
     <div class="modal-actions">
@@ -4193,7 +4486,7 @@ function saveWine(){
         corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,adega:adegaSel,
         qtd:Math.max(1,+$("#a-qtd").value||1),preco:+$("#a-preco").value||0,
         jan:[+$("#a-jan1").value||ANO,+$("#a-jan2").value||ANO+5],notas:$("#a-notas").value||"Sem notas registradas."});
-      if(lastFotoRotulo)v.foto=lastFotoRotulo;
+      if(lastFotoRotulo)definirFotoVinho(v,lastFotoRotulo).catch(()=>{});
     }
     editandoId=null;
     toast(`Ficha de "${nome}" corrigida! ✏️`);
@@ -4203,7 +4496,9 @@ function saveWine(){
     return;
   }
   assumirAdegaReal(); /* a partir do primeiro vinho cadastrado, a adega é de verdade */
-  vinhos.push({foto:lastFotoRotulo||undefined,ean:lastEan||undefined,adega:adegaSel,id:NEXT_ID++,nome,vinicola:$("#a-vinicola").value||"—",pais:$("#a-pais").value,regiao:$("#a-regiao").value||"—",
+  const _novoId=NEXT_ID++;
+  if(lastFotoRotulo){const _f=lastFotoRotulo;setTimeout(()=>{const nv=vinhos.find(x=>x.id===_novoId);if(nv)definirFotoVinho(nv,_f).then(()=>{try{renderColecao()}catch(e){}}).catch(()=>{})},0)}
+  vinhos.push({ean:lastEan||undefined,adega:adegaSel,id:_novoId,nome,vinicola:$("#a-vinicola").value||"—",pais:$("#a-pais").value,regiao:$("#a-regiao").value||"—",
     safra:+$("#a-safra").value||0,tipo:$("#a-tipo").value,uvas:($("#a-uvas").value||"").split(",").map(s=>s.trim()).filter(Boolean),
     corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,doc:1,
     qtd:Math.max(1,+$("#a-qtd").value||1),preco:+$("#a-preco").value||0,
@@ -4405,8 +4700,95 @@ function finalizarRotulo(){
     toast("Rótulo lido! Sem candidatos claros na base — confira e complete a ficha. 🧱");
   }
 }
-/* ===== IA de visão: envia a foto para um modelo multimodal que ENTENDE a imagem e conhece vinhos ===== */
+/* ===== IA de visão (v0.57): FUNCIONA DE FÁBRICA =====
+   Até a v0.56 o usuário precisava criar uma conta de desenvolvedor no Google,
+   gerar uma chave de API e colá-la aqui. Praticamente ninguém conseguia — o
+   scanner, que é a melhor parte do app, estava morto para a maioria.
+   Agora o Apotheca tem a própria chave, guardada no servidor: o usuário
+   fotografa e pronto. Quem quiser leituras ilimitadas ainda pode usar a
+   própria chave (vira "modo avançado", e nesse caso a foto nem passa por nós). */
+const SCAN_LIMITE_AVISO=5; /* avisa quando restarem poucas leituras do mês */
+let scanRestantes=null;    /* preenchido pela resposta do servidor */
+
+/* Um único caminho até o servidor, usado pelos dois modos: foto do rótulo
+   ({imagem}) e busca por nome ({texto}). Erros com nome próprio — SEM_LOGIN e
+   LIMITE — para quem chama poder tratar cada caso com a frase certa. */
+async function chamarLeitorServidor(corpo,segundos){
+  /* O token do Google vale 1 hora. No celular o aplicativo fica congelado em
+     segundo plano, então o relógio que renova de 10 em 10 minutos não roda —
+     quem abria o app depois de horas e fotografava um rótulo levava um
+     "faça login" mesmo estando logado. Renovamos aqui, na hora do uso, e
+     ainda tentamos uma segunda vez se o servidor recusar o token. (v0.59) */
+  if(!sessao||!sessao.refresh_token&&!sessao.access_token)throw new Error("SEM_LOGIN");
+  try{await garantirSessaoValida()}catch(e){}
+  if(!sessao||!sessao.access_token)throw new Error("SEM_LOGIN");
+
+  const bater=async()=>{
+    const ctl=new AbortController();const tt=setTimeout(()=>ctl.abort(),(segundos||30)*1000);
+    try{
+      const r=await fetch(SB_BASE+"/functions/v1/scanner",{
+        method:"POST",signal:ctl.signal,
+        headers:{"Content-Type":"application/json",apikey:SB_KEY,Authorization:"Bearer "+sessao.access_token},
+        body:JSON.stringify(corpo)
+      });
+      clearTimeout(tt);
+      let j={};try{j=await r.json()}catch(e){}
+      return {status:r.status,ok:r.ok,j};
+    }catch(e){
+      clearTimeout(tt);
+      throw new Error(e.name==="AbortError"?"A leitura demorou demais. Tente de novo.":"Sem conexão agora.");
+    }
+  };
+
+  let res=await bater();
+  if(res.status===401||res.status===403){
+    /* token recusado: renova à força e tenta de novo, uma única vez */
+    const renovou=await renovarSessao();
+    if(!renovou||!sessao||!sessao.access_token)throw new Error("SEM_LOGIN");
+    res=await bater();
+  }
+  if(res.status===429)throw new Error("LIMITE");
+  if(res.status===503)throw new Error("O leitor do Apotheca atingiu o limite deste mês. Volte no mês que vem — ou use a sua própria chave em Configurações → 📸 Leitor de rótulos.");
+  if(res.status===401||res.status===403)throw new Error("SEM_LOGIN");
+  if(!res.ok)throw new Error((res.j&&res.j.erro)||"O leitor está indisponível agora.");
+  return res.j;
+}
+
+async function analisarComServidor(b64){
+  let j;
+  try{ j=await chamarLeitorServidor({imagem:b64},30) }
+  catch(e){ if(e.message==="LIMITE")scanRestantes=0; throw e }
+  if(typeof j.restantes==="number")scanRestantes=j.restantes;
+  return j.vinho||j;
+}
+
+async function buscarVinhoNoServidor(q){
+  let j;
+  try{ j=await chamarLeitorServidor({texto:q},30) }
+  catch(e){ if(e.message==="LIMITE")buscaRestantes=0; throw e }
+  if(typeof j.restantes==="number")buscaRestantes=j.restantes;
+  return j;
+}
+
 async function analisarComIA(b64){
+  /* sem chave própria: usa o leitor do Apotheca (nada para configurar) */
+  if(!getIaKey())return analisarComServidor(b64);
+  /* com chave própria: tenta a dela primeiro; se falhar (chave vencida,
+     cota estourada, formato antigo AIza que o Google desliga em setembro),
+     cai no leitor do Apotheca em vez de deixar o usuário na mão. */
+  try{
+    return await analisarComChavePropria(b64);
+  }catch(e){
+    try{
+      const r=await analisarComServidor(b64);
+      toast("A sua chave falhou — usei o leitor do Apotheca. 📸");
+      return r;
+    }catch(e2){
+      throw (e2.message==="SEM_LOGIN"||e2.message==="LIMITE")?e2:e;
+    }
+  }
+}
+async function analisarComChavePropria(b64){
   const key=getIaKey();
   const modelos=["gemini-3.6-flash","gemini-3.5-flash-lite","gemini-2.5-flash","gemini-flash-latest"];
   const prompt='Você é um sommelier experiente. Identifique o vinho deste rótulo e descreva seu perfil. Responda SOMENTE um JSON válido, sem markdown, no formato: {"nome":"","vinicola":"","pais":"","regiao":"","safra":"","tipo":"","uvas":[],"corpo":3,"acidez":3,"taninos":3,"notas":"","janela_inicio":0,"janela_fim":0,"confianca":0}. Regras: tipo deve ser exatamente um de Tinto, Branco, Rosé, Espumante, Fortificado; pais em português (França, Itália, Portugal, Espanha, Argentina, Chile, Brasil, etc.); safra apenas se visível no rótulo; corpo, acidez e taninos de 1 a 5 conforme o perfil típico deste vinho; notas = notas de degustação em português, 1 a 2 frases (aromas e paladar típicos deste vinho); janela_inicio e janela_fim = anos estimados da janela ideal de consumo desta safra (0 se não souber); confianca de 0 a 100. Se a imagem não for um rótulo de vinho ou for ilegível, retorne confianca 0.';
@@ -4477,19 +4859,37 @@ async function capturarRotulo(){
   const ec=Math.min(1,1024/v.videoWidth);
   cc.width=Math.round(v.videoWidth*ec);cc.height=Math.round(v.videoHeight*ec);
   cc.getContext("2d").drawImage(v,0,0,cc.width,cc.height);
-  if(getIaKey()){
-    setScan("🧠 IA de visão analisando o rótulo…");
+  /* v0.57: o reconhecimento SEMPRE tenta a IA primeiro — com a chave do
+     Apotheca (padrão) ou com a do próprio usuário (modo avançado). */
+  {
+    setScan(getIaKey()?"🧠 IA de visão analisando o rótulo…":"🧠 Lendo o rótulo…");
     try{
       const o=await analisarComIA(cc.toDataURL("image/jpeg",0.85).split(",")[1]);
-      if(o&&o.nome&&(+o.confianca||0)>=25){aplicarIA(o);ocrBusy=false;$("#btn-capturar").disabled=false;return}
-      setScan("A IA não reconheceu um vinho nesta foto — enquadre o rótulo de frente e tente de novo.");
+      if(o&&o.nome&&(+o.confianca||0)>=25){
+        aplicarIA(o);ocrBusy=false;$("#btn-capturar").disabled=false;
+        if(scanRestantes!==null&&scanRestantes<=SCAN_LIMITE_AVISO)
+          setTimeout(()=>toast(scanRestantes>0
+            ?`📸 Restam ${scanRestantes} leituras neste mês.`
+            :"📸 Esta foi a última leitura do mês."),1200);
+        return;
+      }
+      setScan("Não reconheci um vinho nesta foto — enquadre o rótulo de frente, com boa luz, e tente de novo.<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
       ocrBusy=false;$("#btn-capturar").disabled=false;return;
     }catch(e){
-      /* falha da IA agora é VISÍVEL — nada de despejar leitura ruim por cima */
-      setScan("❌ <b>A IA não conseguiu responder:</b> "+e.message+"<br>Confira sua chave no menu ☰ → 🔑 IA de visão (botão Testar conexão).<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+      const m=e.message||"";
+      if(m==="SEM_LOGIN"){
+        setScan("🔑 <b>A sua sessão expirou</b> — entre de novo para usar o leitor de rótulos.<br>É o que garante as leituras gratuitas de cada pessoa."
+          +'<br><button class="btn btn-gold btn-sm" style="margin-top:10px" onclick="entrarGoogleReal()">Entrar com o Google</button>'
+          +"<br><span style=\"font-size:12px\">Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.</span>");
+      }else if(m==="LIMITE"){
+        setScan("📸 <b>Você usou as suas leituras deste mês.</b><br>Elas voltam no dia 1º. Enquanto isso, use <b>⌨️ Prefiro digitar</b> (base de 100 mil vinhos) — ou, se quiser leituras ilimitadas, configure a sua própria chave em ☰ → 🔑 IA de visão.");
+      }else{
+        setScan("❌ <b>Não consegui ler agora:</b> "+m+"<br>Tente de novo em instantes, ou use <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+      }
       ocrBusy=false;$("#btn-capturar").disabled=false;return;
     }
   }
+  /* eslint-disable-next-line no-unreachable */
   try{
     const c=prepararQuadro(v);
     setScan("📸 Foto capturada — lendo o rótulo…");
@@ -4531,8 +4931,8 @@ function fillForm(w){
 function scoreWine(v,p){
   let pts=0;const why=[];
   const wt=p.tipos[v.tipo]||0;pts+=wt;
-  if(wt>=34)why.push(`O tipo <b>${v.tipo.toLowerCase()}</b> é a escolha clássica para este prato.`);
-  else if(wt>=24)why.push(`${v.tipo} é uma alternativa muito bem-vinda aqui.`);
+  if(wt>=34)why.push(`O tipo <b>${esc(String(v.tipo||"").toLowerCase())}</b> é a escolha clássica para este prato.`);
+  else if(wt>=24)why.push(`${esc(v.tipo)} é uma alternativa muito bem-vinda aqui.`);
   const dc=Math.abs(v.corpo-p.corpo);pts+=Math.max(0,20-6*dc);
   if(dc<=1)why.push(`O corpo do vinho (${v.corpo}/5) está na medida da intensidade do prato.`);
   const dt=Math.abs(v.tanino-p.tanino);pts+=Math.max(0,15-5*dt);
@@ -4542,7 +4942,7 @@ function scoreWine(v,p){
   if(p.docMin){if(v.doc>=p.docMin){pts+=8;why.push(`A doçura do vinho equilibra o prato — regra clássica de harmonização.`)}}
   else if(v.doc>=3)pts-=8;
   const uvaHit=v.uvas.find(u=>p.uvasBonus.some(b=>u.toLowerCase().includes(b.toLowerCase())));
-  if(uvaHit){pts+=10;why.push(`A uva <b>${uvaHit}</b> é referência mundial de harmonização com este prato.`)}
+  if(uvaHit){pts+=10;why.push(`A uva <b>${esc(uvaHit)}</b> é referência mundial de harmonização com este prato.`)}
   const regHit=p.regioesBonus.find(r=>v.regiao.toLowerCase().includes(r.toLowerCase()));
   if(regHit){pts+=6;why.push(`Harmonização regional: <b>${regHit}</b> é o par histórico deste prato.`)}
   const s=status(v);
@@ -4557,20 +4957,20 @@ function harmonizar(pratoId,rotulo){
   document.querySelectorAll(".dish").forEach(d=>d.classList.toggle("sel",d.dataset.id===pratoId));
   const ranking=vinhosAtivos().map(v=>({v,...scoreWine(v,p)})).sort((a,b)=>b.pts-a.pts).slice(0,3);
   const medals=["🥇","🥈","🥉"];
-  const escopo=adegaAtiva==="todas"?"buscando em <b>todas as suas adegas</b>":`buscando apenas na <b>${adegaDe(adegaAtiva).icone} ${adegaDe(adegaAtiva).nome}</b>`;
+  const escopo=adegaAtiva==="todas"?"buscando em <b>todas as suas adegas</b>":`buscando apenas na <b>${esc(adegaDe(adegaAtiva).icone)} ${esc(adegaDe(adegaAtiva).nome)}</b>`;
   $("#pair-results").innerHTML=`
-    <div class="explain-box"><b>${p.em} ${rotulo||p.nome}</b> — ${p.ctx}<br><span style="font-size:12px">📍 Sugestões ${escopo}. Para trocar, use o seletor na tela Minha Adega.</span></div>
+    <div class="explain-box"><b>${p.em} ${esc(rotulo||p.nome)}</b> — ${p.ctx}<br><span style="font-size:12px">📍 Sugestões ${escopo}. Para trocar, use o seletor na tela Minha Adega.</span></div>
     ${ranking.map((r,i)=>`
       <div class="pair-card ${i===0?"first":""}">
         <div class="medal">${medals[i]}</div>
         <div style="flex:1">
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
-            <div><h4 class="serif">${r.v.nome} ${safraTxt(r.v)}</h4><div class="vin">${r.v.vinicola} · ${r.v.regiao} · ${r.v.pais} — <b>${r.v.qtd} gf. em ${adegaDe(r.v.adega).icone} ${adegaDe(r.v.adega).nome}${posTexto(r.v)}</b></div></div>
+            <div><h4 class="serif">${esc(r.v.nome)} ${safraTxt(r.v)}</h4><div class="vin">${esc(r.v.vinicola)} · ${esc(r.v.regiao)} · ${esc(r.v.pais)} — <b>${r.v.qtd} gf. em ${esc(adegaDe(r.v.adega).icone)} ${esc(adegaDe(r.v.adega).nome)}${posTexto(r.v)}</b></div></div>
             <span class="match">${Math.min(99,Math.round(r.pts/110*100))}% match</span>
           </div>
           <ul class="why">${r.why.slice(0,4).map(w=>`<li>${w}</li>`).join("")||"<li>Boa opção geral dentro da sua adega para este prato.</li>"}</ul>
           <div class="pair-actions">
-            <button class="btn btn-primary btn-sm" onclick="openConsume(${r.v.id},'${(rotulo||p.nome).replace(/'/g,"")}')">🍷 Abrir esta garrafa</button>
+            <button class="btn btn-primary btn-sm" onclick="openConsume(${r.v.id},'${escJS(rotulo||p.nome)}')">🍷 Abrir esta garrafa</button>
             <button class="btn btn-ghost btn-sm" onclick="openDetail(${r.v.id})">Ver ficha</button>
           </div>
         </div>
@@ -4585,7 +4985,7 @@ async function freeSearch(){
   if(hit){harmonizar(hit[1],q);return}
   /* prato desconhecido: o sommelier-IA classifica na categoria certa */
   if(getIaKey()){
-    $("#pair-results").innerHTML=`<div class="explain-box">🧠 Consultando o sommelier-IA sobre <b>“${q}”</b>…</div>`;
+    $("#pair-results").innerHTML=`<div class="explain-box">🧠 Consultando o sommelier-IA sobre <b>“${esc(q)}”</b>…</div>`;
     try{
       const cats=PRATOS.map(p=>`"${p.id}" (${p.nome})`).join(", ");
       const prompt=`Você é um sommelier. Classifique o prato "${q}" na categoria de harmonização mais adequada entre estas: ${cats}. Responda SOMENTE um JSON válido, sem markdown: {"categoria":"id_da_categoria"}. Escolha sempre a mais próxima.`;
@@ -4612,12 +5012,12 @@ async function freeSearch(){
         toast("🧠 Sommelier-IA classificou como: "+PRATOS.find(p=>p.id===cat).nome);
         return;
       }
-      $("#pair-results").innerHTML=`<div class="empty"><div class="big">🤔</div>A IA não conseguiu classificar “${q}” agora (${ultimo||"resposta inesperada"}). Tente reformular ou escolha uma categoria acima.</div>`;
+      $("#pair-results").innerHTML=`<div class="empty"><div class="big">🤔</div>A IA não conseguiu classificar “${esc(q)}” agora (${esc(ultimo||"resposta inesperada")}). Tente reformular ou escolha uma categoria acima.</div>`;
     }catch(e){
-      $("#pair-results").innerHTML=`<div class="empty"><div class="big">🤔</div>IA indisponível (${e.message}). Escolha uma categoria acima.</div>`;
+      $("#pair-results").innerHTML=`<div class="empty"><div class="big">🤔</div>IA indisponível (${esc(e.message)}). Escolha uma categoria acima.</div>`;
     }
   }else{
-    $("#pair-results").innerHTML=`<div class="empty"><div class="big">🤔</div>Ainda não conheço “${q}”.<br>💡 <b>Ative a IA de visão no menu ☰</b> e eu passarei a classificar qualquer prato do mundo — ou escolha uma categoria acima.</div>`;
+    $("#pair-results").innerHTML=`<div class="empty"><div class="big">🤔</div>Ainda não conheço “${esc(q)}”.<br>💡 <b>Ative a IA de visão no menu ☰</b> e eu passarei a classificar qualquer prato do mundo — ou escolha uma categoria acima.</div>`;
   }
 }
 function renderDishes(){
@@ -4631,7 +5031,7 @@ function avatarDe(user,px){
   const u=USUARIOS_APP.find(x=>x.user===user);
   const nome=u?u.nome:(user||"?");
   let h=0;for(const c of (user||""))h=(h*31+c.charCodeAt(0))>>>0;
-  return `<span style="width:${t}px;height:${t}px;border-radius:50%;background:${CORAVATAR[h%CORAVATAR.length]};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:${Math.round(t*.42)}px;flex:none">${nome[0].toUpperCase()}</span>`;
+  return `<span style="width:${t}px;height:${t}px;border-radius:50%;background:${CORAVATAR[h%CORAVATAR.length]};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:${Math.round(t*.42)}px;flex:none">${esc(String(nome||"?")[0].toUpperCase())}</span>`;
 }
 function tempoRel(ts){
   const m=Math.max(1,Math.round((Date.now()-ts)/60000));
@@ -5581,7 +5981,7 @@ function irNotificacoes(){go("comunidade");abaComunidade("notif")}
 function calcularBadges(){
   const paises=new Set(vinhos.map(v=>v.pais)).size;
   const tot=vinhos.reduce((s,v)=>s+v.qtd,0);
-  const comFoto=vinhos.some(v=>v.foto);
+  const comFoto=vinhos.some(v=>v.fotoId||v.foto);
   const aval=historico.filter(h=>h.estrelas>0).length;
   return [
     {em:"🍾",nome:"Primeira Garrafa",desc:"Tem vinhos na adega",ok:tot>0},
@@ -5624,21 +6024,21 @@ function abrirPerfil(user){
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
       <span style="flex:none">${avatarDe(user,60)}</span>
-      <div><h3 class="serif" style="font-size:22px">${sou?"Você":u.nome}${!sou&&jaSigo&&segMe?' <span class="tag auge" style="font-size:10.5px;padding:2px 8px;vertical-align:middle">🤝 amigo próximo</span>':""}</h3>
-      <div style="font-size:13px;color:var(--ink-2)">@${user} · 📍 ${sou?perfil.cidade:u.cidade}</div>
+      <div><h3 class="serif" style="font-size:22px">${sou?"Você":esc(u.nome)}${!sou&&jaSigo&&segMe?' <span class="tag auge" style="font-size:10.5px;padding:2px 8px;vertical-align:middle">🤝 amigo próximo</span>':""}</h3>
+      <div style="font-size:13px;color:var(--ink-2)">@${esc(user)} · 📍 ${esc(sou?perfil.cidade:u.cidade)}</div>
       <div style="font-size:12px;color:var(--ink-2);margin-top:2px"><b>${nSeguidores}</b> ${nSeguidores===1?"seguidor":"seguidores"} · segue <b>${nSeguindoEle}</b>${!sou&&segMe?" · segue você":""}</div></div>
     </div>
-    ${confrariasDele.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${confrariasDele.map(c=>`<span class="adega-chip" style="cursor:pointer" onclick="closeModal('modal-detail');abrirConfraria('${escJS(c.id)}')">${c.brasao||"🏛️"} ${esc(c.nome)}</span>`).join("")}</div>`:""}
+    ${confrariasDele.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${confrariasDele.map(c=>`<span class="adega-chip" style="cursor:pointer" onclick="closeModal('modal-detail');abrirConfraria('${escJS(c.id)}')">${esc(c.brasao||"🏛️")} ${esc(c.nome)}</span>`).join("")}</div>`:""}
     ${stats?`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
-      ${stats.map(([l,v])=>`<div style="background:var(--cream);border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:19px;font-weight:800">${v}</div><div style="font-size:10.5px;color:var(--ink-2)">${l}</div></div>`).join("")}
+      ${stats.map(([l,v])=>`<div style="background:var(--cream);border-radius:10px;padding:10px 6px;text-align:center"><div style="font-size:19px;font-weight:800">${esc(v)}</div><div style="font-size:10.5px;color:var(--ink-2)">${esc(l)}</div></div>`).join("")}
     </div>`:`<div class="explain-box" style="margin-bottom:14px">🔒 <b>Adega reservada.</b> ${esc(u?u.nome:user)} escolheu não mostrar os números da coleção${!jaSigo||!segMe?" — adegas assim ficam visíveis só entre amigos próximos (quando vocês dois se seguem)":""}.</div>`}
     ${badges.length?`<div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin-bottom:8px">CONQUISTAS</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-      ${badges.map(b=>`<span class="adega-chip" style="cursor:default;${sou&&!b.ok?"opacity:.35":""}" title="${esc(b.desc||b.nome)}">${b.em} ${esc(b.nome)}</span>`).join("")}
+      ${badges.map(b=>`<span class="adega-chip" style="cursor:default;${sou&&!b.ok?"opacity:.35":""}" title="${esc(b.desc||b.nome)}">${esc(b.em)} ${esc(b.nome)}</span>`).join("")}
     </div>`:""}
     ${sou?`<div class="explain-box">Selos apagados são metas a conquistar — cada um vira uma atividade no feed da comunidade quando desbloqueado.</div>
       <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="closeModal('modal-detail');abrirPrivacidadeAdega()">🔒 Quem pode ver minha adega</button>`:
-      jaSigo?`<button class="btn btn-ghost" style="width:100%" onclick="closeModal('modal-detail');deixarDeSeguir(seguindo.findIndex(a=>a.user==='${user}'))">✓ Seguindo — deixar de seguir</button>`:
+      jaSigo?`<button class="btn btn-ghost" style="width:100%" onclick="closeModal('modal-detail');deixarDeSeguir(seguindo.findIndex(a=>a.user==='${escJS(user)}'))">✓ Seguindo — deixar de seguir</button>`:
       `<button class="btn btn-gold" style="width:100%" onclick="closeModal('modal-detail');seguir('${escJS(user)}')">＋ Seguir${segMe?" de volta":""}</button>`}
   `;
   $("#modal-detail").classList.add("open");
@@ -5649,8 +6049,8 @@ function histRowsHtml(limit){
   const lista=limit?historico.slice(0,limit):historico;
   return lista.map(h=>`
     <div class="hist-row"><div class="em">🍷</div>
-      <div class="info"><h4>${h.nome}</h4><p>${h.prato} · ${h.data}</p></div>
-      <div class="stars" title="${h.estrelas} de 5 estrelas">${"★".repeat(h.estrelas)}${"☆".repeat(5-h.estrelas)}</div>
+      <div class="info"><h4>${esc(h.nome)}</h4><p>${esc(h.prato)} · ${esc(h.data)}</p></div>
+      <div class="stars" title="${esc(h.estrelas)} de 5 estrelas">${"★".repeat(Math.max(0,Math.min(5,h.estrelas|0)))}${"☆".repeat(5-Math.max(0,Math.min(5,h.estrelas|0)))}</div>
     </div>`).join("")||`<div class="empty"><div class="big">📜</div>Nenhuma garrafa consumida ainda.</div>`;
 }
 function renderHist(){$("#hist-list").innerHTML=histRowsHtml()}
@@ -5688,6 +6088,8 @@ document.addEventListener("visibilitychange",()=>{
   if(document.hidden){saiuEm=Date.now();return}
   if(saiuEm&&Date.now()-saiuEm>120000&&perfil)mostrarTrava();
   saiuEm=0;
+  /* o relógio de renovação não corre com o app congelado: acerta ao voltar */
+  garantirSessaoValida().catch(()=>{});
 });
 setInterval(sincronizarComunidade,60000);
 setInterval(garantirSessaoValida,10*60*1000);
