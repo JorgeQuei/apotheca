@@ -269,6 +269,10 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   background:#fbf3ea;border:1px solid var(--gold);border-left-width:4px;border-radius:0 10px 10px 0;
   padding:11px 14px;font-size:13px;color:var(--ink-2);line-height:1.45}
 .faixa-demo b{color:var(--ink)}
+.faixa-bk{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px;
+  background:#f3f6f2;border:1px solid #cfe0d2;border-left:4px solid var(--ok,#2f7d4f);border-radius:0 10px 10px 0;
+  padding:11px 14px;font-size:13px;color:var(--ink-2);line-height:1.45}
+.faixa-bk b{color:var(--ink)}
 .faixa-demo .sair{margin-left:auto;background:var(--wine);color:#fdf3e7;border:0;border-radius:9px;
   padding:7px 12px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap}
 /* ===== Mapa da Adega (v0.50) — a adega desenhada, garrafa por garrafa ===== */
@@ -402,6 +406,9 @@ button.foto-vinho.vazia span{font-size:26px}
       <!-- v0.49: aviso permanente enquanto a vitrine estiver carregada. Sem ele,
            a pessoa só descobre a limitação ao esbarrar nela. -->
       <div id="faixa-demo" class="faixa-demo hidden"></div>
+      <!-- v0.60: lembrete de backup. A adega mora no aparelho; sem cópia,
+           trocar de celular apaga a coleção. Aparece só quando faz diferença. -->
+      <div id="faixa-backup" class="faixa-bk hidden"></div>
       <div class="kpis">
         <div class="kpi hero"><div class="lbl">Garrafas na adega</div><div class="val" id="kpi-garrafas">—</div><div class="sub" id="kpi-rotulos">—</div></div>
         <div class="kpi"><div class="lbl">Valor estimado</div><div class="val" id="kpi-valor">—</div><div class="sub">soma dos preços de aquisição</div></div>
@@ -721,7 +728,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.59"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.60"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2441,6 +2448,306 @@ function linhaConfig(icone,titulo,estado,acao,detalhe){
 function ehFundador(){
   return !!((perfil&&perfil.user==="Jorge.Queiroz")||(sessao&&sessao.email==="wp7jorge@gmail.com"));
 }
+
+/* ====================== BACKUP DA ADEGA (v0.60) ======================
+   A adega mora NESTE aparelho — é o que permite prometer que ela nunca é
+   enviada a servidor nenhum. O preço disso seria perder tudo ao trocar de
+   celular. A saída não é subir a adega para a nossa nuvem: é o Apotheca
+   PRODUZIR o arquivo e entregar na mão do dono, que escolhe onde guardar —
+   Drive, iCloud, Dropbox, OneDrive, e-mail, pendrive, o que quiser.
+   Nós não escolhemos por ele e não ficamos com cópia nenhuma.
+
+   Dois arquivos, com propósitos diferentes:
+     · .json — restaura o Apotheca exatamente como estava (mapa, seções,
+               histórico, avaliações). É a rede de segurança.
+     · .csv  — abre no Excel e entra em outros aplicativos de adega. É a
+               liberdade de ir embora, que é o que torna seguro entrar. */
+
+const BK_MARCA="apotheca_backup";     /* {ts, garrafas, rotulos} do último backup */
+const BK_DIAS=21;                      /* tempo sem cópia que já incomoda */
+const BK_GARRAFAS=10;                  /* garrafas novas que já valem um aviso */
+let bkPend=null;                       /* backup lido, à espera de confirmação */
+
+function bkTotalGarrafas(){return vinhos.reduce((s,v)=>s+(+v.qtd||0),0)}
+function bkMarcaLer(){try{return JSON.parse(localStorage.getItem(BK_MARCA))||null}catch(e){return null}}
+function bkMarcaGravar(){
+  try{localStorage.setItem(BK_MARCA,JSON.stringify({ts:Date.now(),garrafas:bkTotalGarrafas(),rotulos:vinhos.length}))}catch(e){}
+  renderFaixaBackup();
+}
+function bkQuando(){
+  const m=bkMarcaLer();if(!m)return null;
+  const d=Math.floor((Date.now()-m.ts)/86400000);
+  return d<=0?"hoje":d===1?"ontem":"há "+d+" dias";
+}
+
+/* Só avisa quando o aviso muda alguma coisa: adega de verdade, com novidade
+   suficiente para doer se sumisse. Demonstração e adega vazia nunca avisam. */
+function bkPendencia(){
+  if(adegaDemo||!vinhos.length)return null;
+  const g=bkTotalGarrafas(), m=bkMarcaLer();
+  if(!m)return {primeiro:true,garrafas:g};
+  const dias=Math.floor((Date.now()-m.ts)/86400000);
+  const novas=g-(+m.garrafas||0);
+  if(novas>=BK_GARRAFAS)return {primeiro:false,novas};
+  if(dias>=BK_DIAS)return {primeiro:false,dias};
+  return null;
+}
+
+function renderFaixaBackup(){
+  const el=$("#faixa-backup");if(!el)return;
+  const p=bkPendencia();
+  if(!p){el.classList.add("hidden");el.innerHTML="";return}
+  const txt=p.primeiro
+    ? `<b>A sua adega existe só neste aparelho.</b> Guarde uma cópia onde você quiser — leva dez segundos e protege as ${fmt(p.garrafas)} garrafas.`
+    : p.novas
+      ? `<b>${p.novas} garrafa${p.novas===1?"":"s"}</b> desde o seu último backup. Vale atualizar a cópia.`
+      : `O seu último backup foi <b>há ${p.dias} dias</b>. Vale atualizar a cópia.`;
+  el.innerHTML=`<span style="font-size:17px;flex:none">🛟</span><div style="flex:1;min-width:160px">${txt}</div>
+    <button class="btn btn-gold btn-sm" style="flex:none" onclick="abrirBackup()">Fazer backup</button>`;
+  el.classList.remove("hidden");
+}
+
+/* ---------- o conteúdo ---------- */
+async function bkMontar(comFotos){
+  const p={
+    aplicativo:"Apotheca", formato:1, versao:APP_VERSION,
+    gerado_em:new Date().toISOString(),
+    conta:perfil?perfil.user:null,
+    totais:{rotulos:vinhos.length,garrafas:bkTotalGarrafas(),adegas:ADEGAS.length},
+    adegas:ADEGAS, vinhos:vinhos, historico:historico
+  };
+  if(comFotos){
+    p.fotos={};
+    for(const v of vinhos){
+      if(!v.fotoId)continue;
+      try{const d=await fotoLer(v.fotoId);if(d)p.fotos[v.fotoId]=d}catch(e){}
+    }
+  }
+  return p;
+}
+
+/* Cabeçalhos em português e sem acento de propósito: são os mesmos nomes que
+   o nosso importador reconhece, então o CSV do backup volta para dentro do
+   Apotheca pelo mesmo caminho de uma planilha do CellarTracker. */
+const BK_CSV=["Nome","Vinicola","Safra","Tipo","Uvas","Pais","Regiao","Quantidade","Preco",
+              "Adega","Posicao","JanelaInicio","JanelaFim","Corpo","Acidez","Taninos","Docura","Notas"];
+function bkCampo(x){const t=String(x==null?"":x);return /[",;\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t}
+function bkCSVTexto(){
+  const l=[BK_CSV.join(",")];
+  vinhos.forEach(v=>{
+    const a=adegaDe(v.adega);
+    l.push([v.nome,v.vinicola,v.safra||"",v.tipo,(v.uvas||[]).join(" / "),v.pais,v.regiao,v.qtd,v.preco,
+      a?a.nome:"",(Array.isArray(v.pos)?v.pos:[]).map(x=>posNome(a,x)).join(" / "),
+      (v.jan||[])[0]||"",(v.jan||[])[1]||"",v.corpo,v.acidez,v.tanino,v.doc,v.notas||""
+    ].map(bkCampo).join(","));
+  });
+  /* o BOM faz o Excel abrir com os acentos certos, em vez de "Fran├ºa" */
+  return "﻿"+l.join("\r\n")+"\r\n";
+}
+
+/* ---------- a entrega: quem escolhe o destino é o dono ---------- */
+async function entregarArquivo(nome,texto,mime){
+  /* APK: a ponte abre o seletor do Android, onde aparecem Drive, Dropbox,
+     OneDrive e o que mais estiver instalado. Vai em pedaços para não estourar
+     a memória quando o backup levar as fotos junto. */
+  if(window.Apk&&Apk.arqInicio){
+    try{
+      const bytes=new TextEncoder().encode(texto);
+      Apk.arqInicio(nome,mime);
+      const P=48*1024;
+      for(let i=0;i<bytes.length;i+=P){
+        const f=bytes.subarray(i,i+P);
+        let b="";for(let j=0;j<f.length;j++)b+=String.fromCharCode(f[j]);
+        Apk.arqPedaco(btoa(b));
+      }
+      Apk.arqFim();
+      return "aparelho";
+    }catch(e){}
+  }
+  /* celular no navegador: bandeja do próprio sistema */
+  try{
+    const arq=new File([texto],nome,{type:mime});
+    if(navigator.canShare&&navigator.canShare({files:[arq]})&&navigator.share){
+      await navigator.share({files:[arq],title:nome});
+      return "compartilhado";
+    }
+  }catch(e){ if(e&&e.name==="AbortError")return "cancelado" }
+  /* computador: download comum */
+  try{
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([texto],{type:mime}));
+    a.download=nome;document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+    return "baixado";
+  }catch(e){return "falhou"}
+}
+
+function bkNomeArquivo(ext){
+  const d=new Date(),z=n=>String(n).padStart(2,"0");
+  return "apotheca-adega-"+d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+"-"+z(d.getHours())+z(d.getMinutes())+"."+ext;
+}
+
+async function bkSalvar(tipo){
+  if(!vinhos.length){toast("A sua adega está vazia — não há o que salvar. 🍾");return}
+  const comFotos=!!($("#bk-fotos")&&$("#bk-fotos").checked);
+  toast("Preparando o arquivo… 🛟");
+  let nome,texto,mime;
+  if(tipo==="csv"){ nome=bkNomeArquivo("csv"); texto=bkCSVTexto(); mime="text/csv"; }
+  else{ nome=bkNomeArquivo("json"); texto=JSON.stringify(await bkMontar(comFotos)); mime="application/json"; }
+  const r=await entregarArquivo(nome,texto,mime);
+  if(r==="cancelado")return;
+  if(r==="falhou"){toast("Este aparelho não deixou salvar o arquivo. 😕");return}
+  /* No APK quem confirma é o Android, depois que o usuário escolher o destino:
+     marcar antes seria mentir sobre um backup que ele ainda pode cancelar. */
+  if(r==="aparelho"){bkTipoPendente=tipo;closeModal("modal-detail");return}
+  if(tipo!=="csv")bkMarcaGravar();
+  closeModal("modal-detail");
+  toast(r==="baixado"?"Backup salvo nos downloads. 🛟":"Backup pronto — escolha onde guardar. 🛟");
+}
+
+/* chamada pelo Android quando o usuário termina (ou desiste) no seletor */
+let bkTipoPendente=null;
+function avisoArquivoAndroid(estado){
+  const tipo=bkTipoPendente;bkTipoPendente=null;
+  if(estado!=="salvo")return;
+  if(tipo!=="csv")bkMarcaGravar();
+  toast("Backup guardado. 🛟");
+}
+
+/* ---------- a volta ---------- */
+function bkEscolherArquivo(){
+  let inp=document.getElementById("bk-arquivo");
+  if(!inp){
+    inp=document.createElement("input");
+    inp.type="file";inp.id="bk-arquivo";inp.accept=".json,.csv,application/json,text/csv";
+    inp.style.display="none";inp.addEventListener("change",()=>bkLerArquivo(inp));
+    document.body.appendChild(inp);
+  }
+  inp.click();
+}
+
+function bkLerArquivo(inp){
+  const f=inp.files&&inp.files[0];inp.value="";if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const txt=String(r.result||"").trim();
+    if(txt.charAt(0)!=="{"){                       /* não é backup nosso: é planilha */
+      closeModal("modal-detail");
+      impProcessarTexto(txt);
+      return;
+    }
+    let p;try{p=JSON.parse(txt)}catch(e){toast("Esse arquivo não parece um backup do Apotheca.");return}
+    if(p&&p.neste_aparelho&&Array.isArray(p.neste_aparelho.adega)){
+      /* aceita também o pacote de "Baixar meus dados", que tem a adega dentro */
+      p={aplicativo:"Apotheca",gerado_em:p.gerado_em,versao:p.versao,
+         adegas:p.neste_aparelho.adegas,vinhos:p.neste_aparelho.adega,historico:p.neste_aparelho.historico};
+    }
+    if(!p||p.aplicativo!=="Apotheca"||!Array.isArray(p.vinhos)){
+      toast("Esse arquivo não parece um backup do Apotheca.");return;
+    }
+    bkPend=p;bkPreviaRestauro();
+  };
+  r.onerror=()=>toast("Não consegui abrir esse arquivo.");
+  r.readAsText(f);
+}
+
+function bkPreviaRestauro(){
+  const p=bkPend;if(!p)return;
+  const g=p.vinhos.reduce((s,v)=>s+(+v.qtd||0),0);
+  const nFotos=p.fotos?Object.keys(p.fotos).length:0;
+  const quando=p.gerado_em?new Date(p.gerado_em).toLocaleString("pt-BR"):"data desconhecida";
+  const atualG=bkTotalGarrafas();
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="abrirBackup()">✕</button>
+    <h3 class="serif">📂 Restaurar a adega</h3>
+    <div class="sub">Confira antes: isto substitui a adega deste aparelho.</div>
+    <div class="explain-box" style="margin-top:12px">
+      <b>Backup de ${esc(quando)}</b><br>
+      ${p.vinhos.length} rótulo${p.vinhos.length===1?"":"s"} · <b>${fmt(g)} garrafas</b> ·
+      ${(p.adegas||[]).length||1} adega${((p.adegas||[]).length||1)===1?"":"s"}
+      ${nFotos?` · ${nFotos} foto${nFotos===1?"":"s"}`:" · sem fotos"}
+      ${p.versao?`<br><span style="font-size:12px;color:var(--ink-3)">gerado pelo Apotheca v${esc(p.versao)}</span>`:""}
+    </div>
+    <div class="explain-box" style="border-left-color:var(--wine)">
+      ${atualG?`Neste aparelho existem agora <b>${fmt(atualG)} garrafas</b> em ${vinhos.length} rótulos.
+        Restaurar <b>troca</b> essas por as do arquivo — o que estiver só aqui se perde.`
+      :`Este aparelho está com a adega vazia, então nada se perde.`}
+      <br><br>Seguidores, conversas e encontros não são tocados: eles vivem na nuvem, não no backup.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="bkRestaurarConfirmado()">Restaurar esta adega</button>
+      <button class="btn btn-ghost" onclick="abrirBackup()">Cancelar</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+
+async function bkRestaurarConfirmado(){
+  const p=bkPend;if(!p)return;
+  bkPend=null;
+  if(Array.isArray(p.adegas)&&p.adegas.length)ADEGAS=p.adegas;
+  vinhos=p.vinhos.filter(v=>v&&v.nome);
+  historico=Array.isArray(p.historico)?p.historico:[];
+  adegaDemo=false;adegaAtiva="todas";
+  NEXT_ID=Math.max(NEXT_ID,...vinhos.map(v=>(+v.id||0)))+1;
+  if(p.fotos){
+    for(const id in p.fotos){try{await fotoSalvar(id,p.fotos[id])}catch(e){}}
+  }
+  persist();bkMarcaGravar();
+  closeModal("modal-detail");
+  renderAdegaBar();renderDash();renderColecao();renderMenu();
+  go("dashboard");
+  toast(`Adega restaurada: ${fmt(bkTotalGarrafas())} garrafas. 🛟`);
+}
+
+/* ---------- a tela ---------- */
+function abrirBackup(){
+  const m=bkMarcaLer(), quando=bkQuando();
+  const g=bkTotalGarrafas();
+  const comFotos=vinhos.filter(v=>v.fotoId).length;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🛟 Backup da adega</h3>
+    <div class="sub">O Apotheca prepara o arquivo. Onde guardar é você quem decide.</div>
+
+    <div class="explain-box" style="margin-top:12px">
+      A sua adega mora <b>neste aparelho</b> e nunca foi enviada a servidor nenhum —
+      nem ao nosso. Por isso ela também não volta sozinha se você trocar de celular.
+      Salve o arquivo no <b>Drive, iCloud, Dropbox, OneDrive</b>, no e-mail, onde preferir:
+      nós não escolhemos por você e não ficamos com cópia.
+    </div>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SITUAÇÃO</div>
+    <div class="pessoa" style="cursor:default">
+      <span style="font-size:19px;flex:none">${m?"✅":"⚠️"}</span>
+      <div class="inf"><b>${m?"Último backup "+quando:"Você ainda não fez backup"}</b>
+      <small>${m?`${m.rotulos||0} rótulos · ${fmt(m.garrafas||0)} garrafas naquele momento`
+                :"a adega existe apenas neste aparelho"}</small></div>
+      <span style="flex:none;font-size:11px;background:var(--cream);padding:3px 9px;border-radius:99px;color:var(--ink-2)">${fmt(g)} agora</span>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SALVAR</div>
+    ${comFotos?`<label style="display:flex;gap:9px;align-items:flex-start;font-size:13px;margin-bottom:10px;cursor:pointer">
+      <input type="checkbox" id="bk-fotos" style="margin-top:3px">
+      <span>Incluir as <b>${comFotos} foto${comFotos===1?"":"s"}</b> dos vinhos
+      <small style="display:block;color:var(--ink-3)">o arquivo fica bem maior — bom para o Drive, ruim para o WhatsApp</small></span>
+    </label>`:""}
+    <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="bkSalvar('json')">
+      💾 Salvar backup completo
+    </button>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 12px">Restaura o Apotheca exatamente como está: adegas, mapa, seções, histórico e avaliações.</div>
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="bkSalvar('csv')">
+      📊 Salvar planilha (Excel)
+    </button>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 4px">Abre no Excel e entra em outros aplicativos de adega. É a sua garantia de poder ir embora quando quiser.</div>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">RESTAURAR</div>
+    <button class="btn btn-ghost" style="width:100%" onclick="bkEscolherArquivo()">
+      📂 Restaurar de um arquivo
+    </button>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:6px 0 0">Aceita o backup do Apotheca e também planilhas de outros aplicativos.</div>`;
+  $("#modal-detail").classList.add("open");
+}
+
 function abrirConfiguracoes(){
   const tv=travaLer().modo;
   const permissao=(window.Apk&&Apk.notificar)?"granted":permissaoNotif();
@@ -2465,6 +2772,9 @@ function abrirConfiguracoes(){
       (n=>n?n+" com mapa":"nenhum ainda")(ADEGAS.filter(a=>a.grade).length),
       "closeModal('modal-detail');abrirMapaEscolha()",
       "Cada garrafa no seu lugar físico — prateleira e casa")}
+    ${linhaConfig("🛟","Backup da adega",(q=>q?q:"nunca")(bkQuando()),
+      "abrirBackup()",
+      "Salve uma cópia onde você quiser — Drive, iCloud, Dropbox, e-mail")}
     ${linhaConfig("📥","Importar de outro aplicativo","CSV",
       "abrirImportador()",
       "Traga a sua adega do CellarTracker, Vivino, VinoCell ou de planilha")}
@@ -2874,9 +3184,16 @@ function impDetectar(colunas){
 
 /* acha o valor da primeira coluna cujo nome bate com um dos candidatos */
 function impPegar(linha,colunas,candidatos){
-  for(const cand of candidatos){
-    const col=colunas.find(c=>impNorm(c)===cand)||colunas.find(c=>impNorm(c).includes(cand));
-    if(col&&linha[col]!==undefined&&String(linha[col]).trim()!=="")return String(linha[col]).trim();
+  /* v0.60: primeiro TODAS as correspondências exatas, só depois as parciais.
+     Antes bastava o candidato francês "vin" para o campo NOME casar por
+     semelhança com a coluna "Vinicola" — e o vinho entrava na adega com o
+     nome do produtor. Exato sempre tem que ganhar de parecido. */
+  for(let modo=0;modo<2;modo++){
+    for(const cand of candidatos){
+      const col=modo===0?colunas.find(c=>impNorm(c)===cand)
+                        :colunas.find(c=>impNorm(c).includes(cand));
+      if(col&&linha[col]!==undefined&&String(linha[col]).trim()!=="")return String(linha[col]).trim();
+    }
   }
   return "";
 }
@@ -2890,8 +3207,8 @@ const IMP_CANDIDATOS={
   regiao:["region","regiao","appellation","locale"],
   qtd:["quantity","quantite","qty","stock","nombre","quantidade","qtd","garrafas","bottles","amount"],
   preco:["price","prix","valuation","preco","valor","cost"],
-  janIni:["beginconsume","apogee debut","a boire de","drink from","janela inicio"],
-  janFim:["endconsume","apogee fin","a boire jusqu","drink to","drink until","janela fim"],
+  janIni:["beginconsume","apogee debut","a boire de","drink from","janela inicio","janelainicio"],
+  janFim:["endconsume","apogee fin","a boire jusqu","drink to","drink until","janela fim","janelafim"],
   notas:["mynotes","your review","private note","tasting note","notes","notas","observacoes","commentaire"],
   local:["location","bin","emplacement","casier"]
 };
@@ -2979,24 +3296,27 @@ function abrirImportador(){
 function impLerArquivo(inp){
   const f=inp.files&&inp.files[0];inp.value="";if(!f)return;
   const r=new FileReader();
-  r.onload=()=>{
-    try{
-      const {colunas,linhas}=impLerTabela(String(r.result||""));
-      if(!colunas.length||!linhas.length){toast("Não encontrei dados nesse arquivo. É um CSV mesmo?");return}
-      const origem=impDetectar(colunas);
-      if(origem){
-        const registros=impNormalizar(linhas,colunas,null);
-        if(!registros.length){toast("Reconheci o "+origem+", mas nenhuma linha tinha nome de vinho.");return}
-        impPend={registros,origem};
-        impMostrarPrevia();
-      }else{
-        impPend={colunas,linhas,origem:"Planilha"};
-        impAbrirMapeador();
-      }
-    }catch(e){toast("Não consegui ler esse arquivo.")}
-  };
+  r.onload=()=>impProcessarTexto(String(r.result||""));
   r.onerror=()=>toast("Não consegui abrir esse arquivo.");
   r.readAsText(f);
+}
+/* v0.60: separado de impLerArquivo para a restauração de backup poder cair
+   aqui também — um CSV nosso volta pelo mesmo caminho de qualquer planilha. */
+function impProcessarTexto(txt){
+  try{
+    const {colunas,linhas}=impLerTabela(txt);
+    if(!colunas.length||!linhas.length){toast("Não encontrei dados nesse arquivo. É um CSV mesmo?");return}
+    const origem=impDetectar(colunas);
+    if(origem){
+      const registros=impNormalizar(linhas,colunas,null);
+      if(!registros.length){toast("Reconheci o "+origem+", mas nenhuma linha tinha nome de vinho.");return}
+      impPend={registros,origem};
+      impMostrarPrevia();
+    }else{
+      impPend={colunas,linhas,origem:"Planilha"};
+      impAbrirMapeador();
+    }
+  }catch(e){toast("Não consegui ler esse arquivo.")}
 }
 
 /* porta genérica: o usuário aponta qual coluna é o quê (com palpite automático) */
@@ -4127,6 +4447,7 @@ function renderDash(){
   renderHarmResumo();
   const dh=$("#dash-hist");
   if(typeof renderFeed==="function")renderFeed();
+  renderFaixaBackup();
   if(dh)dh.innerHTML=histRowsHtml(3)+(historico.length>3?`<div style="text-align:center;margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="abrirTodoHistorico()">📜 Ver as ${historico.length} garrafas abertas →</button></div>`:"");
 }
 
