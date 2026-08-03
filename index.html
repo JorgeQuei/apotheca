@@ -273,6 +273,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   background:#f3f6f2;border:1px solid #cfe0d2;border-left:4px solid var(--ok,#2f7d4f);border-radius:0 10px 10px 0;
   padding:11px 14px;font-size:13px;color:var(--ink-2);line-height:1.45}
 .faixa-bk b{color:var(--ink)}
+.faixa-bk.novo{background:#fbf3ea;border-color:var(--gold);border-left-color:var(--gold)}
 .faixa-demo .sair{margin-left:auto;background:var(--wine);color:#fdf3e7;border:0;border-radius:9px;
   padding:7px 12px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap}
 /* ===== Mapa da Adega (v0.50) — a adega desenhada, garrafa por garrafa ===== */
@@ -728,7 +729,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.60"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.61"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2495,6 +2496,29 @@ function bkPendencia(){
 
 function renderFaixaBackup(){
   const el=$("#faixa-backup");if(!el)return;
+  el.classList.remove("novo");
+
+  /* prioridade máxima: existe um backup MAIS NOVO que esta adega */
+  if(bkArquivoNovo){
+    const g=bkArquivoNovo.vinhos.reduce((s,v)=>s+(+v.qtd||0),0);
+    const quando=bkArquivoNovo.gerado_em?new Date(bkArquivoNovo.gerado_em).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"";
+    el.className="faixa-bk novo";
+    el.innerHTML=`<span style="font-size:17px;flex:none">🔄</span>
+      <div style="flex:1;min-width:170px"><b>Há um backup mais novo</b> (${esc(quando)}) com
+      <b>${fmt(g)} garrafas</b> — aqui estão ${fmt(bkTotalGarrafas())}.</div>
+      <button class="btn btn-gold btn-sm" style="flex:none" onclick="bkRestaurarDoArquivo()">Atualizar</button>
+      <button class="btn btn-ghost btn-sm" style="flex:none" onclick="bkDispensarArquivo()">agora não</button>`;
+    el.classList.remove("hidden");return;
+  }
+
+  /* o arquivo existe mas o navegador quer um toque para reler */
+  if(bkPrecisaPermissao){
+    el.innerHTML=`<span style="font-size:17px;flex:none">🔎</span>
+      <div style="flex:1;min-width:170px">Posso conferir se o seu backup tem novidades deste ou de outro aparelho.</div>
+      <button class="btn btn-ghost btn-sm" style="flex:none" onclick="bkConferirArquivo(true)">Conferir</button>`;
+    el.classList.remove("hidden");return;
+  }
+
   const p=bkPendencia();
   if(!p){el.classList.add("hidden");el.innerHTML="";return}
   const txt=p.primeiro
@@ -2594,6 +2618,17 @@ async function bkSalvar(tipo){
   let nome,texto,mime;
   if(tipo==="csv"){ nome=bkNomeArquivo("csv"); texto=bkCSVTexto(); mime="text/csv"; }
   else{ nome=bkNomeArquivo("json"); texto=JSON.stringify(await bkMontar(comFotos)); mime="application/json"; }
+  /* onde o navegador deixa, guardamos o ponteiro para o arquivo escolhido —
+     é o que permite regravar depois com um clique e perceber novidades. */
+  if(podeLembrarArquivo()){
+    try{
+      await bkSalvarLembrando(nome,texto,mime);
+      if(tipo!=="csv")bkMarcaGravar();
+      closeModal("modal-detail");
+      toast("Backup guardado. Da próxima vez, um clique atualiza este mesmo arquivo. 🛟");
+      return;
+    }catch(e){ if(e&&e.name==="AbortError")return; /* sem suporte real: segue no caminho comum */ }
+  }
   const r=await entregarArquivo(nome,texto,mime);
   if(r==="cancelado")return;
   if(r==="falhou"){toast("Este aparelho não deixou salvar o arquivo. 😕");return}
@@ -2725,6 +2760,21 @@ function abrirBackup(){
       <span style="flex:none;font-size:11px;background:var(--cream);padding:3px 9px;border-radius:99px;color:var(--ink-2)">${fmt(g)} agora</span>
     </div>
 
+    ${podeLembrarArquivo()&&arqNomeLembrado()?`
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">ARQUIVO LEMBRADO</div>
+    <div class="pessoa" style="cursor:default">
+      <span style="font-size:19px;flex:none">📎</span>
+      <div class="inf"><b>${esc(arqNomeLembrado())}</b>
+      <small>o Apotheca sabe onde ele está e avisa se tiver versão mais nova</small></div>
+    </div>
+    <button class="btn btn-gold" style="width:100%;margin:8px 0 4px" onclick="bkRegravar()">
+      🔄 Atualizar este arquivo agora
+    </button>
+    <div style="display:flex;gap:8px;margin-bottom:4px">
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="bkConferirComAviso()">🔎 Conferir novidades</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="bkEsquecerArquivo()">Esquecer</button>
+    </div>`:""}
+
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SALVAR</div>
     ${comFotos?`<label style="display:flex;gap:9px;align-items:flex-start;font-size:13px;margin-bottom:10px;cursor:pointer">
       <input type="checkbox" id="bk-fotos" style="margin-top:3px">
@@ -2747,6 +2797,148 @@ function abrirBackup(){
     <div style="font-size:11.5px;color:var(--ink-3);margin:6px 0 0">Aceita o backup do Apotheca e também planilhas de outros aplicativos.</div>`;
   $("#modal-detail").classList.add("open");
 }
+
+
+/* ============== O ARQUIVO LEMBRADO (v0.61) ==============
+   O passo seguinte do backup. Onde o aparelho deixa, o Apotheca guarda um
+   PONTEIRO para o arquivo que o usuário escolheu — não uma cópia, não o
+   conteúdo: só o endereço dele. Com isso duas coisas passam a acontecer:
+
+     1) regravar o backup vira um clique, sem escolher a pasta de novo;
+     2) se o arquivo estiver MAIS NOVO que esta adega — porque o celular
+        exportou para o Drive e o Drive baixou no computador — o Apotheca
+        percebe e oferece atualizar.
+
+   Isso fecha o ciclo de sincronização usando a nuvem do próprio usuário,
+   sem um byte da adega passar pelo nosso servidor. Só funciona onde o
+   aparelho permite: Chrome e Edge no computador, e o nosso app Android.
+   No iPhone o Safari não oferece esse recurso — lá segue manual, e por isso
+   a decisão é sempre por CAPACIDADE, nunca pela marca do aparelho. */
+
+const ARQ_DB="apotheca_arquivo", ARQ_LOJA="ponteiros";
+const BK_IGNORADO="apotheca_backup_ignorado";
+let bkArquivoNovo=null;      /* backup mais novo esperando resposta do usuário */
+let bkPrecisaPermissao=false;
+
+function podeLembrarArquivo(){
+  return typeof window!=="undefined" && typeof window.showSaveFilePicker==="function";
+}
+
+function arqDB(){
+  return new Promise((ok,err)=>{
+    const r=indexedDB.open(ARQ_DB,1);
+    r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains(ARQ_LOJA))d.createObjectStore(ARQ_LOJA)};
+    r.onsuccess=()=>ok(r.result);r.onerror=()=>err(r.error);
+  });
+}
+async function arqGuardar(h){
+  try{const d=await arqDB();await new Promise(ok=>{
+    const t=d.transaction(ARQ_LOJA,"readwrite");t.objectStore(ARQ_LOJA).put(h,"backup");
+    t.oncomplete=ok;t.onerror=ok});}catch(e){}
+}
+async function arqPegar(){
+  try{const d=await arqDB();return await new Promise(ok=>{
+    const t=d.transaction(ARQ_LOJA,"readonly");const r=t.objectStore(ARQ_LOJA).get("backup");
+    r.onsuccess=()=>ok(r.result||null);r.onerror=()=>ok(null)});}catch(e){return null}
+}
+async function arqEsquecer(){
+  try{const d=await arqDB();await new Promise(ok=>{
+    const t=d.transaction(ARQ_LOJA,"readwrite");t.objectStore(ARQ_LOJA).delete("backup");
+    t.oncomplete=ok;t.onerror=ok});}catch(e){}
+  try{localStorage.removeItem("apotheca_arquivo_nome")}catch(e){}
+  bkArquivoNovo=null;renderFaixaBackup();
+}
+function arqNomeLembrado(){try{return localStorage.getItem("apotheca_arquivo_nome")||null}catch(e){return null}}
+
+/* Guarda o arquivo pelo seletor do sistema e memoriza o ponteiro. */
+async function bkSalvarLembrando(nome,texto,mime){
+  const ext=nome.slice(nome.lastIndexOf("."));
+  const h=await window.showSaveFilePicker({
+    suggestedName:nome,
+    types:[{description:ext===".csv"?"Planilha":"Backup do Apotheca",accept:{[mime]:[ext]}}]
+  });
+  const w=await h.createWritable();await w.write(texto);await w.close();
+  if(ext!==".csv"){
+    await arqGuardar(h);
+    try{localStorage.setItem("apotheca_arquivo_nome",h.name||nome)}catch(e){}
+  }
+  return h;
+}
+
+/* Regrava no MESMO arquivo, sem perguntar a pasta de novo. */
+async function bkRegravar(){
+  const h=await arqPegar();
+  if(!h){toast("Ainda não há um arquivo lembrado. 🛟");return false}
+  try{
+    let p=await h.queryPermission({mode:"readwrite"});
+    if(p!=="granted")p=await h.requestPermission({mode:"readwrite"});
+    if(p!=="granted"){toast("Sem permissão para escrever nesse arquivo.");return false}
+    const comFotos=!!($("#bk-fotos")&&$("#bk-fotos").checked);
+    const texto=JSON.stringify(await bkMontar(comFotos));
+    const w=await h.createWritable();await w.write(texto);await w.close();
+    bkArquivoNovo=null;bkMarcaGravar();
+    closeModal("modal-detail");
+    toast("Backup atualizado no mesmo arquivo. 🛟");
+    return true;
+  }catch(e){toast("Não consegui escrever nesse arquivo — ele pode ter sido movido.");return false}
+}
+
+/* Confere se o arquivo tem uma adega mais nova do que a deste aparelho.
+   Silencioso na abertura; com pedido de permissão quando o usuário clica. */
+async function bkConferirArquivo(podePedir){
+  if(!podeLembrarArquivo())return "nao-suportado";
+  const h=await arqPegar();if(!h)return "sem-arquivo";
+  let perm;
+  try{perm=await h.queryPermission({mode:"read"})}catch(e){return "sem-arquivo"}
+  if(perm!=="granted"){
+    if(!podePedir){bkPrecisaPermissao=true;renderFaixaBackup();return "precisa-permissao"}
+    try{perm=await h.requestPermission({mode:"read"})}catch(e){return "negado"}
+    if(perm!=="granted")return "negado";
+  }
+  bkPrecisaPermissao=false;
+  let p;
+  try{const f=await h.getFile();p=JSON.parse(await f.text())}catch(e){return "ilegivel"}
+  if(!p||p.aplicativo!=="Apotheca"||!Array.isArray(p.vinhos))return "ilegivel";
+  const doArquivo=Date.parse(p.gerado_em||"")||0;
+  const m=bkMarcaLer();
+  const daqui=(m&&m.ts)||0;
+  /* margem de um minuto: o arquivo que ESTE aparelho acabou de gravar não
+     pode se anunciar como novidade vinda de fora */
+  if(doArquivo<=daqui+60000){bkArquivoNovo=null;renderFaixaBackup();return "em-dia"}
+  let ignorado=null;try{ignorado=localStorage.getItem(BK_IGNORADO)}catch(e){}
+  if(ignorado===p.gerado_em)return "dispensado";
+  bkArquivoNovo=p;renderFaixaBackup();
+  return "novo";
+}
+
+/* atalhos da tela: aspas complicadas não moram dentro de onclick */
+async function bkConferirComAviso(){
+  const r=await bkConferirArquivo(true);
+  if(r==="novo"){closeModal("modal-detail");toast("Achei um backup mais novo. 🔄");return}
+  if(r==="em-dia"){toast("O arquivo está em dia. ✅");return}
+  if(r==="dispensado"){toast("Esse backup mais novo você já dispensou. 🔄");return}
+  if(r==="sem-arquivo"){toast("Ainda não há um arquivo lembrado. 📎");return}
+  toast("Não consegui ler o arquivo agora — ele pode ter sido movido.");
+}
+async function bkEsquecerArquivo(){
+  await arqEsquecer();
+  abrirBackup();
+  toast("Esqueci o arquivo. 📎");
+}
+
+function bkDispensarArquivo(){
+  if(bkArquivoNovo){try{localStorage.setItem(BK_IGNORADO,bkArquivoNovo.gerado_em)}catch(e){}}
+  bkArquivoNovo=null;renderFaixaBackup();
+}
+function bkRestaurarDoArquivo(){
+  if(!bkArquivoNovo)return;
+  bkPend=bkArquivoNovo;bkArquivoNovo=null;
+  bkPreviaRestauro();
+}
+
+/* Alguns segundos depois de abrir, como o aviso de versão nova: nunca no
+   arranque, para não atrasar a primeira tela. */
+setTimeout(()=>{ if(podeLembrarArquivo())bkConferirArquivo(false).catch(()=>{}) },6000);
 
 function abrirConfiguracoes(){
   const tv=travaLer().modo;
