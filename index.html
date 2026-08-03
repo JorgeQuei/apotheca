@@ -385,7 +385,7 @@ button.foto-vinho.vazia span{font-size:26px}
     <button class="nav-btn" data-view="encontros"><span class="ico">🥂</span> Encontros</button>
     <button class="nav-btn" data-view="comunidade"><span class="ico">🌐</span> Comunidade</button>
     <button class="nav-btn" data-view="historico"><span class="ico">📜</span> Histórico</button>
-    <div class="foot">Protótipo <span id="ver-badge"></span> · <span id="persist-badge"></span><br>Adega de <b id="foot-user">Jorge</b><br>
+    <div class="foot">Apotheca <span id="ver-badge"></span> · <span id="persist-badge"></span><br>Adega de <b id="foot-user">Jorge</b><br>
       <a href="#" onclick="resetDemo();return false" style="color:var(--gold-soft);font-size:11px">↺ Restaurar dados de demonstração</a></div>
   </aside>
 
@@ -729,7 +729,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.61"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.62"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -3064,7 +3064,7 @@ function abrirSobre(){
     <h3 class="serif" style="font-size:26px">Apotheca</h3>
     <div style="color:var(--gold);font-size:13px;letter-spacing:1px">SUA ADEGA, INTELIGENTE</div></div>
     <div style="font-size:13.5px;line-height:1.65;margin-top:14px">
-      <p style="margin-bottom:10px">Protótipo <b>v${APP_VERSION}</b> · julho de 2026<br>Idealizador: <b>Jorge Queiroz</b></p>\n      <p style="margin-bottom:10px">Conta: <b>${perfil?"@"+perfil.user+" · 📍 "+perfil.cidade+" (via "+perfil.provedor+")":"não conectada"}</b></p>
+      <p style="margin-bottom:10px">Apotheca <b>v${APP_VERSION}</b> · agosto de 2026<br>Idealizador: <b>Jorge Queiroz</b></p>\n      <p style="margin-bottom:10px">Conta: <b>${perfil?"@"+perfil.user+" · 📍 "+perfil.cidade+" (via "+perfil.provedor+")":"não conectada"}</b></p>
       <p style="margin-bottom:10px">Sua adega hoje: <b>${vinhos.length} rótulos · ${tot} garrafas · ${ADEGAS.length} adegas</b></p>
       <p style="margin-bottom:10px">Base mundial offline <b>X-Wines</b> (licença CC BY-NC-SA): <b>${baseMundialPronta.length.toLocaleString("pt-BR")} vinhos</b> ${baseMundialPronta.length>1000?"— base completa carregada ✓":"— amostra (a base completa vive no APK)"}</p>
       <p style="margin-bottom:10px">Comunidade na nuvem: <b>${nuvemOK?"conectada ✅ (banco real Supabase)":"offline — modo local ⚪"}</b></p>\n      <p style="margin-bottom:10px">Leitor de rótulos: <b>${getIaKey()?"chave própria ✅ (ilimitado)":"pronto ✅ (leitor do Apotheca)"}</b></p>
