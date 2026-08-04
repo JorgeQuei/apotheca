@@ -514,8 +514,15 @@ button.foto-vinho.vazia span{font-size:26px}
           <div class="field"><label>Safra</label><input id="a-safra" type="number" min="1900" max="2026" placeholder="2020"></div>
           <div class="field"><label>Tipo</label><select id="a-tipo"></select></div>
           <div class="field"><label>Uvas (separe por vírgula)</label><input id="a-uvas" placeholder="Merlot, Cabernet Sauvignon"></div>
-          <div class="field"><label>Guardar em qual adega?</label><select id="a-adega" onchange="document.getElementById('nova-adega-wrap').classList.toggle('hidden',this.value!=='__nova')"></select></div>
-          <div class="field hidden" id="nova-adega-wrap"><label>Nome da nova adega</label><input id="a-nova-adega" placeholder="Ex.: Casa de Campo"></div>
+          <div class="field"><label>Guardar em qual adega?</label><select id="a-adega" onfocus="lembrarAdegaAtual(this)" onchange="onAdegaChange(this)"></select></div>
+          <div class="field hidden" id="nova-adega-wrap"><label>Nome da nova adega</label>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select id="a-nova-adega-ico" style="width:72px;flex:none;padding:9px 6px" title="Tipo da adega"></select>
+              <input id="a-nova-adega" placeholder="Ex.: Casa de Campo" style="flex:1;min-width:120px">
+              <button type="button" class="btn btn-ghost hidden" id="btn-cancelar-nova-adega" style="padding:9px 12px;white-space:nowrap;font-size:13px" onclick="cancelarNovaAdega()">✕ Cancelar</button>
+            </div>
+            <div id="nova-adega-nota" style="font-size:11.5px;color:var(--ink-2);margin-top:6px;line-height:1.4"></div>
+          </div>
           <div class="field"><label>Quantidade de garrafas</label><input id="a-qtd" type="number" min="1" value="1"></div>
           <div class="field"><label>Preço pago (<span class="lbl-moeda">R$</span>/garrafa)</label><input id="a-preco" type="number" min="0" placeholder="120"></div>
           <div class="field"><label>Corpo <span class="slider-val" id="v-corpo">3</span></label><input type="range" id="a-corpo" min="1" max="5" value="3" oninput="v_corpo.textContent=this.value"></div>
@@ -742,7 +749,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.65"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.66"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -4187,7 +4194,8 @@ function renderMapaModal(){
       ${colocando?`<button class="btn btn-primary" onclick="concluirColocacao()">✓ Concluir</button>`
                  :`<button class="btn btn-ghost btn-sm" onclick="abrirRedimensionar()">📐 Ajustar tamanho</button>
       <button class="btn btn-ghost btn-sm" onclick="abrirFundoMapa()">🖼️ Fundo</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirSecoes()">🧱 Seções</button>`}
+      <button class="btn btn-ghost btn-sm" onclick="abrirSecoes()">🧱 Seções</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirRecomecarMapa()" title="Apagar o desenho e escolher de novo">↺ Recomeçar</button>`}
       <button class="btn btn-ghost" onclick="fecharMapa()">Fechar</button>
     </div>`;
   $("#modal-detail").classList.add("open");
@@ -4432,26 +4440,124 @@ function carregarFotoAdega(inp){
   img.src=URL.createObjectURL(f);
 }
 
+/* ---------- v0.66: escolher errado não pode ser irreversível ----------
+   Relato do Jorge: entrou para criar o mapa, escolheu um modelo do catálogo
+   por engano e ficou preso — não havia cancelar, e a tela inicial ("quantas
+   prateleiras?") nunca mais voltava, porque ela só aparece quando a adega
+   ainda não tem grade. Uma escolha de um toque que não se desfaz é uma
+   armadilha, ainda mais num catálogo onde os modelos se parecem.
+   Duas saídas: um DESFAZER imediato, que devolve exatamente o estado anterior
+   (inclusive "nenhum mapa"), e um RECOMEÇAR permanente, para quem só percebe o
+   engano depois. Nenhum dos dois apaga garrafa: as posições marcadas voltam a
+   ser "sem lugar definido", e o vinho continua na adega. */
+let mapaDesfazer=null;   /* {adegaId, secId, grade, modeloTxt, rotulo} */
+
+function guardarDesfazerMapa(rotulo){
+  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  const secs=secoesDe(a), sec=secs.find(x=>x.id===mapaSecaoAtiva)||secs[0]||null;
+  mapaDesfazer={
+    adegaId:a.id,
+    secId:sec?(sec._virtual?"__unica":sec.id):"__unica",
+    grade:sec&&sec.grade?{linhas:sec.grade.linhas,colunas:sec.grade.colunas}:null,
+    modeloTxt:a.modeloTxt||null,
+    rotulo:rotulo||""
+  };
+}
+function ofereceDesfazer(texto){
+  const el=$("#mapa-info");if(!el||!mapaDesfazer)return;
+  el.innerHTML=`<div class="mapa-info" style="border-left:4px solid var(--gold)">
+    ${esc(texto)}
+    <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="desfazerUltimoMapa()">↩︎ Desfazer</button>
+  </div>`;
+}
+function desfazerUltimoMapa(){
+  const d=mapaDesfazer;if(!d)return;
+  const a=adegaDe(d.adegaId);if(!a){mapaDesfazer=null;return}
+  if(d._completo){   /* veio de "recomeçar": devolve a adega inteira */
+    if(d._completo.grade)a.grade=d._completo.grade; else delete a.grade;
+    if(d._completo.secoes)a.secoes=d._completo.secoes; else delete a.secoes;
+    if(d._completo.modeloTxt)a.modeloTxt=d._completo.modeloTxt; else delete a.modeloTxt;
+    mapaDesfazer=null;mapaCelSel=null;
+    persist();renderMapaModal();
+    toast("Mapa restaurado. As garrafas precisam ser marcadas de novo. ↩︎");
+    return;
+  }
+  if(d.modeloTxt)a.modeloTxt=d.modeloTxt; else delete a.modeloTxt;
+  if(d.secId==="__unica"||!Array.isArray(a.secoes)){
+    if(d.grade)a.grade={...d.grade}; else delete a.grade;
+  }else{
+    const sec=(a.secoes||[]).find(x=>x.id===d.secId);
+    if(sec){ if(d.grade)sec.grade={...d.grade}; else delete sec.grade }
+  }
+  mapaDesfazer=null;mapaCelSel=null;
+  persist();renderMapaModal();
+  toast("Desfeito — o mapa voltou como estava. ↩︎");
+}
+
+/* recomeçar do zero: volta à tela inicial de "quantas prateleiras?" */
+function abrirRecomecarMapa(){
+  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  const marcadas=vinhos.filter(v=>v.adega===a.id&&Array.isArray(v.pos)&&v.pos.length);
+  const gf=marcadas.reduce((s,v)=>s+v.pos.length,0);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="renderMapaModal()">✕</button>
+    <h3 class="serif">↺ Recomeçar o mapa</h3>
+    <div class="sub">${a.icone} ${esc(a.nome)}</div>
+    <div class="explain-box" style="margin-top:12px">
+      O desenho da adega é apagado e você volta à pergunta do começo — quantas
+      prateleiras e quantas casas, ou o modelo do catálogo.
+      ${gf?`<br><br><b>${gf} garrafa${gf===1?"":"s"}</b> ${gf===1?"está marcada":"estão marcadas"} no mapa e
+        ${gf===1?"volta":"voltam"} a ficar <b>sem lugar definido</b>.
+        <b>Nenhuma garrafa é excluída</b> — elas continuam na sua adega, é só o endereço que se perde.`
+        :`<br><br>Não há nenhuma garrafa marcada, então nada se perde.`}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" style="background:var(--wine)" onclick="recomecarMapaConfirmado()">↺ Recomeçar do zero</button>
+      <button class="btn btn-ghost" onclick="renderMapaModal()">Cancelar</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+function recomecarMapaConfirmado(){
+  const a=adegaDe(mapaAdegaAberta);if(!a)return;
+  guardarDesfazerMapa("recomeçar");
+  const antes={grade:a.grade?{...a.grade}:null,secoes:a.secoes?JSON.parse(JSON.stringify(a.secoes)):null,
+               modeloTxt:a.modeloTxt||null};
+  mapaDesfazer={adegaId:a.id,_completo:antes};
+  delete a.grade;delete a.secoes;delete a.modeloTxt;delete a.foto;delete a.fotoOn;
+  vinhos.forEach(v=>{if(v.adega===a.id&&Array.isArray(v.pos))delete v.pos});
+  mapaSecaoAtiva=null;mapaCelSel=null;
+  persist();renderMapaModal();
+  toast("Mapa apagado. Desenhe do jeito certo. ↺");
+}
+
 function definirGrade(){
   const a=adegaDe(mapaAdegaAberta);if(!a)return;
   const l=Math.min(MAPA_MAX_LINHAS,Math.max(1,+$("#mapa-linhas").value||6));
   const c=Math.min(MAPA_MAX_COLUNAS,Math.max(1,+$("#mapa-colunas").value||8));
+  guardarDesfazerMapa("grade manual");
   a.grade={linhas:l,colunas:c};
   persist();
-  toast(`🗺️ Mapa criado: ${l} prateleira${l===1?"":"s"} × ${c} casas.`);
   renderMapaModal();
+  ofereceDesfazer(`🗺️ Mapa criado: ${l} prateleira${l===1?"":"s"} × ${c} casas.`);
 }
 /* ===== v0.53: CATÁLOGO DE ADEGAS CLIMATIZADAS =====
    Ideia do Jorge: o usuário escolhe o MODELO da adega que comprou e o mapa
    nasce com a estrutura exata — zero configuração. Ilustração estilizada
    NOSSA (moldura + grade), nunca foto de fabricante: sem risco de direitos
    autorais. Capacidades e prateleiras dos modelos mais vendidos no Brasil;
-   a grade é aproximada e o 📐 ajusta qualquer diferença. */
+   a grade é aproximada e o 📐 ajusta qualquer diferença.
+   v0.66: linha Elettromec a pedido do Jorge. Prateleiras conferidas no manual
+   oficial do fabricante (14/34/77) e na ficha técnica do 45 — não chutadas.
+   Onde capacidade ÷ prateleiras não dá inteiro, a grade arredonda para cima
+   (34 em 6×6=36, 77 em 10×8=80), como já era com o Electrolux WSF34. */
 const CATALOGO_ADEGAS=[
   {marca:"Electrolux",modelo:"ACB08",cap:8,linhas:4,colunas:2},
   {marca:"Electrolux",modelo:"ACB12",cap:12,linhas:6,colunas:2},
   {marca:"Philco",modelo:"PAD12E",cap:12,linhas:5,colunas:3},
-  {marca:"Brastemp",modelo:"BZC12B",cap:12,linhas:5,colunas:3},
+  /* BZC12B: o manual da Brastemp descreve 5 prateleiras de 2 garrafas + 2 no
+     fundo = 12. São 6 fileiras de 2, não 5×3 (que inventava 3 casas). */
+  {marca:"Brastemp",modelo:"BZC12B",cap:12,linhas:6,colunas:2},
+  {marca:"Elettromec",modelo:"CV-1FS-14-XV",cap:14,linhas:2,colunas:7},
   {marca:"Electrolux",modelo:"WSF24",cap:24,linhas:4,colunas:6},
   {marca:"Midea",modelo:"WBB242",cap:24,linhas:4,colunas:6},
   {marca:"EOS",modelo:"EAC24G Sommelier",cap:24,linhas:5,colunas:5},
@@ -4461,6 +4567,9 @@ const CATALOGO_ADEGAS=[
   {marca:"Brastemp",modelo:"BZB33BE Dual Zone",cap:33,linhas:5,colunas:7},
   {marca:"EOS",modelo:"EAC33D Dual Zone",cap:33,linhas:5,colunas:7},
   {marca:"Electrolux",modelo:"WSF34",cap:34,linhas:6,colunas:6},
+  {marca:"Elettromec",modelo:"CV-1FS-34-XV",cap:34,linhas:6,colunas:6},
+  {marca:"Elettromec",modelo:"CV-2BI-45-XV Dual Zone",cap:45,linhas:5,colunas:9},
+  {marca:"Elettromec",modelo:"CV-2FS-77-XV Dual Zone",cap:77,linhas:10,colunas:8},
   {marca:"EOS",modelo:"EAC78D Premium",cap:78,linhas:8,colunas:10}
 ];
 function ilustracaoModelo(m){
@@ -4494,11 +4603,12 @@ function abrirCatalogoAdegas(){
 }
 function usarModeloCatalogo(i){
   const a=adegaDe(mapaAdegaAberta), m=CATALOGO_ADEGAS[i];if(!a||!m)return;
+  guardarDesfazerMapa("catálogo");
   const alvo=Array.isArray(a.secoes)?secaoAtivaDe(a):a;
   alvo.grade={linhas:m.linhas,colunas:m.colunas};
   a.modeloTxt=m.marca+" "+m.modelo;
   persist();renderMapaModal();
-  toast(`🗄️ ${m.marca} ${m.modelo}: ${m.linhas} prateleiras prontas. Ajuste em 📐 se a sua for diferente.`);
+  ofereceDesfazer(`🗄️ ${m.marca} ${m.modelo}: ${m.linhas} prateleiras × ${m.colunas} casas.`);
 }
 
 /* v0.53: o ajuste de tamanho vale para a SEÇÃO ativa */
@@ -5207,14 +5317,38 @@ function openAdegasManager(){
         <select id="adg-ico-${i}" style="width:70px;padding:9px 6px">${ICONES.map(ic=>`<option ${ic===a.icone?"selected":""}>${ic}</option>`).join("")}</select>
         <input id="adg-nome-${i}" value="${a.nome.replace(/"/g,"&quot;")}" style="flex:1;min-width:150px">
         <span style="font-size:12px;color:var(--ink-2);white-space:nowrap">${gfs(a.id)} gf.</span>
-        <button class="btn btn-ghost btn-sm" style="${gfs(a.id)>0?"opacity:.35;cursor:not-allowed":""}" onclick="deleteAdega(${i})" title="${gfs(a.id)>0?"Só é possível excluir adegas vazias":"Excluir adega"}">🗑️</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteAdega(${i})" title="${gfs(a.id)>0?"Excluir — as garrafas são movidas para outra adega":"Excluir adega"}">🗑️</button>
       </div>`).join("")}
+    <div style="display:flex;gap:8px;align-items:center;margin:14px 0 4px;flex-wrap:wrap">
+      <select id="adg-nova-ico" style="width:70px;padding:9px 6px">${ICONES.map(ic=>`<option ${ic==="🏠"?"selected":""}>${ic}</option>`).join("")}</select>
+      <input id="adg-nova-nome" placeholder="Nome da nova adega" style="flex:1;min-width:150px" onkeydown="if(event.key==='Enter')criarAdegaVazia()">
+      <button class="btn btn-gold btn-sm" style="flex:none" onclick="criarAdegaVazia()">➕ Criar</button>
+    </div>
     <div class="modal-actions" style="margin-top:16px">
       <button class="btn btn-primary" onclick="saveAdegas()">Salvar alterações</button>
       <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cancelar</button>
     </div>
-    <div class="explain-box" style="margin-top:14px">💡 Para criar uma adega nova, use "➕ Criar nova adega…" na tela de Adicionar vinho. Adegas com garrafas não podem ser excluídas — mova as garrafas antes.</div>`;
+    <div class="explain-box" style="margin-top:14px">💡 Ao excluir uma adega que ainda tem garrafas, o app pergunta para onde levá-las — nenhuma garrafa é apagada.</div>`;
   $("#modal-detail").classList.add("open");
+}
+/* ---------- v0.66: criar adega VAZIA, para povoar depois ----------
+   "Adega" significava duas coisas no Apotheca: o agrupamento das garrafas, que
+   só nascia junto com um vinho, e o mapa do móvel, que nasce vazio. Quem
+   esperava desenhar a casa antes de guardar as garrafas não tinha por onde
+   começar. Agora tem. */
+function criarAdegaVazia(){
+  const nome=($("#adg-nova-nome")?.value||"").trim();
+  if(!nome){toast("Dê um nome à nova adega. 🏠");return}
+  const id=nome.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||("adega"+Date.now());
+  if(ADEGAS.find(a=>impNorm(a.nome)===impNorm(nome))){
+    toast(`Você já tem uma adega chamada "${nome}". Escolha outro nome. 🏠`);return;
+  }
+  const idUnico=ADEGAS.find(a=>a.id===id)?id+"-"+Date.now().toString(36):id;
+  ADEGAS.push({id:idUnico,nome,icone:$("#adg-nova-ico")?.value||"🏠"});
+  persist();refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();
+  openAdegasManager();
+  toast(`Adega "${nome}" criada — ainda vazia, pronta para receber garrafas. 🏠`);
 }
 function saveAdegas(){
   ADEGAS.forEach((a,i)=>{
@@ -5225,15 +5359,64 @@ function saveAdegas(){
   closeModal("modal-detail");persist();refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();
   toast("Adegas atualizadas do seu jeito. ✏️");
 }
+/* ---------- v0.66: a adega criada por engano era eterna ----------
+   O botão da lixeira recusava excluir adega com garrafa dentro — e no Apotheca
+   NÃO EXISTIA jeito de criar adega vazia: os dois caminhos que criam (a ficha
+   do vinho e a importação) nascem sempre com garrafa. Ou seja, toda adega
+   criada além da primeira já nascia impossível de apagar. Agora, em vez de
+   recusar, o app pergunta para onde levar as garrafas. Nenhuma é apagada. */
 function deleteAdega(i){
-  const a=ADEGAS[i];
-  if(vinhos.some(v=>v.adega===a.id)){toast(`${a.nome} tem garrafas — mova-as antes de excluir.`);return}
-  if(ADEGAS.length<=1){toast("Você precisa de ao menos uma adega.");return}
+  const a=ADEGAS[i];if(!a)return;
+  if(ADEGAS.length<=1){toast("Você precisa de ao menos uma adega. Crie a certa antes de excluir esta. 🏠");return}
+  if(vinhos.some(v=>v.adega===a.id)){perguntarDestinoAdega(a.id);return}
+  removerAdega(i);
+}
+function perguntarDestinoAdega(id){
+  const a=ADEGAS.find(x=>x.id===id);if(!a)return;
+  const n=vinhos.filter(v=>v.adega===id).reduce((s,v)=>s+v.qtd,0);
+  const outras=ADEGAS.filter(x=>x.id!==id);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="openAdegasManager()">✕</button>
+    <h3 class="serif">🗑️ Excluir ${esc(a.icone)} ${esc(a.nome)}</h3>
+    <div class="sub">Esta adega guarda ${fmt(n)} garrafa${n===1?"":"s"}. Diga para onde elas vão e eu excluo a adega em seguida.</div>
+    <div class="field" style="margin-top:14px"><label>Mover as garrafas para</label>
+      <select id="adg-destino" style="width:100%">${outras.map(o=>`<option value="${esc(o.id)}">${esc(o.icone)} ${esc(o.nome)}</option>`).join("")}</select></div>
+    <div class="explain-box" style="margin-top:12px;font-size:12px">Nenhuma garrafa é apagada — todas mudam de adega.
+      As posições marcadas no mapa antigo são liberadas; remarque-as no mapa da adega de destino. 📍</div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-primary" onclick="moverEExcluirAdega('${escJS(id)}')">Mover e excluir</button>
+      <button class="btn btn-ghost" onclick="openAdegasManager()">Cancelar</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+function moverEExcluirAdega(id){
+  const destino=$("#adg-destino")?.value;const i=ADEGAS.findIndex(a=>a.id===id);
+  if(i<0||!destino||destino===id)return;
+  /* v0.66: se o mesmo rótulo/safra já existe no destino, SOMA as quantidades em
+     vez de deixar duas linhas iguais na mesma adega — é o que o importador já
+     faz. Sem isso, mudar de adega criava sósias silenciosos na coleção. */
+  let n=0,fundidos=0;
+  const mudando=vinhos.filter(v=>v.adega===id);
+  mudando.forEach(v=>{
+    const gemeo=vinhos.find(x=>x.adega===destino&&x!==v
+      &&impNorm(x.nome)===impNorm(v.nome)&&(x.safra||null)===(v.safra||null));
+    n+=v.qtd;
+    if(gemeo){ gemeo.qtd+=v.qtd; vinhos=vinhos.filter(x=>x!==v); fundidos++; }
+    else { v.adega=destino; delete v.pos; }
+  });
+  const d=ADEGAS.find(a=>a.id===destino);
+  removerAdega(i,`${fmt(n)} garrafa${n===1?"":"s"} movida${n===1?"":"s"} para ${d?d.icone+" "+d.nome:"outra adega"}`
+    +(fundidos?` (${fundidos} rótulo${fundidos===1?"":"s"} somado${fundidos===1?"":"s"} a ${fundidos===1?"um igual":"iguais"})`:"")
+    +" — adega excluída. 🗑️");
+}
+function removerAdega(i,msg){
+  const a=ADEGAS[i];if(!a)return;
   ADEGAS.splice(i,1);
   if(adegaAtiva===a.id)adegaAtiva="todas";
+  if(adegaAnterior===a.id)adegaAnterior=null;
   persist();refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();
   openAdegasManager();
-  toast(`Adega "${a.nome}" excluída.`);
+  toast(msg||`Adega "${a.nome}" excluída.`);
 }
 /* Excluir com confirmação em dois toques — cadastros errados saem sem virar "consumo" */
 function excluirVinho(id,btn){
@@ -5294,10 +5477,42 @@ function refreshAdegaSelect(){
 }
 function initSelects(){
   refreshAdegaSelect();
+  $("#a-nova-adega-ico").innerHTML=ICONES.map(ic=>`<option>${ic}</option>`).join("");
   $("#a-pais").innerHTML=PAISES.map(p=>`<option>${p}</option>`).join("");
   $("#a-tipo").innerHTML=TIPOS.map(t=>`<option>${t}</option>`).join("");
   $("#f-tipo").innerHTML+=TIPOS.map(t=>`<option>${t}</option>`).join("");
   $("#f-pais").innerHTML+=[...new Set(vinhos.map(v=>v.pais))].sort().map(p=>`<option>${p}</option>`).join("");
+}
+/* ---------- v0.66: escolher "Criar nova adega…" por engano tinha que ter volta ----------
+   O seletor revelava o campo de nome e travava ali: sem cancelar, e o saveWine
+   se recusa a salvar sem nome. A adega anterior é memorizada no onfocus — no
+   instante em que o dedo toca para abrir a lista, antes de qualquer troca. Com
+   zero adegas o botão SOME, porque oferecer um cancelar que não tem para onde
+   voltar seria mentira de interface. */
+let adegaAnterior=null;
+function lembrarAdegaAtual(sel){if(sel&&sel.value!=="__nova")adegaAnterior=sel.value}
+function onAdegaChange(sel){
+  const criando=sel.value==="__nova";
+  $("#nova-adega-wrap").classList.toggle("hidden",!criando);
+  if(criando){
+    const temOutras=ADEGAS.length>0;
+    $("#btn-cancelar-nova-adega").classList.toggle("hidden",!temOutras);
+    $("#nova-adega-nota").textContent=temOutras
+      ?"Escolha o tipo, dê o nome e pronto. Errou? ✕ Cancelar volta à adega anterior — e depois dá para renomear, trocar o tipo ou excluir em ✏️ Gerenciar."
+      :"Você ainda não tem nenhuma adega — dê um nome à primeira para continuar.";
+    setTimeout(()=>{try{$("#a-nova-adega").focus()}catch(e){}},60);
+  }else{
+    adegaAnterior=sel.value;$("#a-nova-adega").value="";
+  }
+}
+function cancelarNovaAdega(){
+  const volta=(adegaAnterior&&ADEGAS.find(a=>a.id===adegaAnterior))?adegaAnterior:(ADEGAS[0]?ADEGAS[0].id:null);
+  $("#a-nova-adega").value="";
+  if(!volta){toast("Crie ao menos uma adega para guardar o vinho. 🏠");return}
+  $("#a-adega").value=volta;
+  $("#nova-adega-wrap").classList.add("hidden");
+  const d=ADEGAS.find(a=>a.id===volta);
+  toast("Cancelado — o vinho vai para "+(d?d.icone+" "+d.nome:"a adega atual")+". 🍷");
 }
 function clearForm(){
   ["a-nome","a-vinicola","a-regiao","a-safra","a-uvas","a-preco","a-jan1","a-jan2","a-notas"].forEach(i=>$("#"+i).value="");
@@ -5305,7 +5520,8 @@ function clearForm(){
   /* zera também os seletores — antes eles guardavam o valor do cadastro anterior */
   $("#a-pais").value=PAISES[0];$("#a-tipo").value=TIPOS[0];
   if(ADEGAS.length)$("#a-adega").value=(adegaAtiva!=="todas"&&ADEGAS.find(a=>a.id===adegaAtiva))?adegaAtiva:ADEGAS[0].id;
-  $("#nova-adega-wrap").classList.add("hidden");
+  $("#nova-adega-wrap").classList.add("hidden");$("#a-nova-adega").value="";
+  adegaAnterior=($("#a-adega").value&&$("#a-adega").value!=="__nova")?$("#a-adega").value:null;
   $("#form-title").textContent="Ficha do vinho";lastEan=null;lastFotoRotulo=null;editandoId=null;
 }
 function saveWine(){
@@ -5316,8 +5532,8 @@ function saveWine(){
     const nomeAdega=($("#a-nova-adega").value||"").trim();
     if(!nomeAdega){toast("Dê um nome à nova adega. 🏠");return}
     adegaSel=nomeAdega.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||("adega"+NEXT_ID);
-    if(!ADEGAS.find(a=>a.id===adegaSel))ADEGAS.push({id:adegaSel,nome:nomeAdega,icone:"🍇"});
-    refreshAdegaSelect();$("#a-adega").value=adegaSel;
+    if(!ADEGAS.find(a=>a.id===adegaSel))ADEGAS.push({id:adegaSel,nome:nomeAdega,icone:($("#a-nova-adega-ico")?.value||"🏠")});
+    refreshAdegaSelect();$("#a-adega").value=adegaSel;adegaAnterior=adegaSel;
     $("#nova-adega-wrap").classList.add("hidden");$("#a-nova-adega").value="";
   }
   if(editandoId){
