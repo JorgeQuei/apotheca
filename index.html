@@ -729,7 +729,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.63"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.64"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -3481,6 +3481,11 @@ const IMP_CANDIDATOS={
   pais:["country","pays","pais","origem"],
   regiao:["region","regiao","appellation","locale"],
   qtd:["quantity","quantite","qty","stock","nombre","quantidade","qtd","garrafas","bottles","amount"],
+  /* v0.63: o CellarTracker separa a COR (Red/White/Rosé) da CATEGORIA
+     (Dry/Sparkling/Fortified/Sweet). Um champanhe é "White" + "Sparkling", e um
+     Porto é "Red" + "Fortified" — só com a cor, os sete champanhes do arquivo
+     viravam vinho branco e os quatro Portos, tinto comum. */
+  categoria:["category","categoria","style","estilo"],
   preco:["price","prix","preco","cost","prix d achat"],
   /* v0.63: valor de mercado é OUTRA coisa que preço pago. O CellarTracker traz
      as duas colunas e, em boa parte das linhas, só a de mercado está
@@ -3493,12 +3498,47 @@ const IMP_CANDIDATOS={
   local:["location","bin","emplacement","casier"]
 };
 
+/* v0.63: cor e categoria juntas. A categoria só ganha quando ela diz algo que a
+   cor não sabe dizer — espumante e fortificado. Nas demais ("Dry", "Sweet"), a
+   cor é quem manda: um Sauternes continua sendo um branco. */
+function impTipoDe(cor,categoria){
+  const c=impTraduzTipo(categoria);
+  if(c==="Espumante"||c==="Fortificado")return c;
+  return impTraduzTipo(cor)||c;
+}
 function impTraduzTipo(v){
   const t=impNorm(v);
   for(const [re,pt] of IMP_TIPOS)if(re.test(t))return pt;
   return "Tinto";
 }
 function impTraduzPais(v){ if(!v)return ""; return IMP_PAISES[impNorm(v)]||v }
+
+/* ---------- v0.63: "Portugal, Alentejano, Alentejo, Évora" é um endereço inteiro ----------
+   O CellarTracker não tem coluna de país: tem uma coluna "Locale" com a
+   hierarquia completa, do país até a denominação, separada por vírgulas. O
+   nosso importador casava "locale" com região e engolia a linha toda — as 99
+   garrafas do primeiro usuário entraram sem país nenhum e com a região escrita
+   como um endereço postal.
+   A regra é simples e vale para todos os arquivos assim: o primeiro pedaço é o
+   país, o último é a região — e o último é justamente o mais específico e o mais
+   reconhecível ("Barolo", "Champagne", "Rioja", "Napa Valley"). Os do meio são
+   camadas administrativas que não ajudam ninguém a achar a garrafa.
+   Só entra em ação quando o país está vazio: se a planilha tem coluna própria de
+   país, ela é quem manda, e a região fica como veio. */
+function impOrigem(pais,regiao){
+  pais=String(pais||"").trim(); regiao=String(regiao||"").trim();
+  if(!pais&&regiao.includes(",")){
+    const partes=regiao.split(",").map(x=>x.trim()).filter(Boolean);
+    if(partes.length>=2){
+      const traduzido=impTraduzPais(partes[0]);
+      /* só aceitamos a primeira parte como país se ela for um país que
+         conhecemos — senão é uma região com vírgula, e não mexemos nela */
+      if(IMP_PAISES[impNorm(partes[0])])
+        return {pais:traduzido, regiao:partes[partes.length-1]};
+    }
+  }
+  return {pais:impTraduzPais(pais), regiao};
+}
 /* ---------- v0.63: "71.555" são setenta e um dólares ou setenta e um mil? ----------
    Depende do país que escreveu a planilha, e não dá para saber olhando o valor
    sozinho. A regra antiga chutava: ponto seguido de exatamente três dígitos era
@@ -3564,10 +3604,9 @@ function impNormalizar(linhas,colunas,mapa){
     regs.push({
       nome, vinicola:vinicola||"—",
       safra:impSafra(pega(l,"safra")),
-      tipo:impTraduzTipo(pega(l,"tipo")),
+      tipo:impTipoDe(pega(l,"tipo"),pega(l,"categoria")),
       uvas:pega(l,"uvas")?pega(l,"uvas").split(/[,;\/]+/).map(x=>x.trim()).filter(Boolean):[],
-      pais:impTraduzPais(pega(l,"pais")),
-      regiao:pega(l,"regiao"),
+      ...impOrigem(pega(l,"pais"),pega(l,"regiao")),
       qtd:Math.max(1,parseInt(pega(l,"qtd"),10)||1),
       preco:(p=>p||impNumero(pega(l,"valorMercado"),convencao)||0)(impNumero(pega(l,"preco"),convencao)),
       precoDeMercado:!impNumero(pega(l,"preco"),convencao)&&!!impNumero(pega(l,"valorMercado"),convencao),
