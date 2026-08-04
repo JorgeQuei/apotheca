@@ -273,6 +273,15 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
   background:#f3f6f2;border:1px solid #cfe0d2;border-left:4px solid var(--ok,#2f7d4f);border-radius:0 10px 10px 0;
   padding:11px 14px;font-size:13px;color:var(--ink-2);line-height:1.45}
 .faixa-bk b{color:var(--ink)}
+.faixa-inst{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px;
+  background:#fbf3ea;border:1px solid var(--gold-soft);border-left:4px solid var(--gold);
+  border-radius:0 10px 10px 0;padding:11px 14px;font-size:13px;color:var(--ink-2);line-height:1.45}
+.faixa-inst b{color:var(--ink)}
+.passo-ios{display:flex;gap:12px;align-items:flex-start;margin-bottom:13px}
+.passo-ios .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--wine);color:#fdf6ec;
+  font-size:13.5px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.passo-ios .t{flex:1;font-size:13.5px;line-height:1.5}
+.icone-share{display:inline-flex;vertical-align:-5px;margin:0 2px}
 .faixa-bk.novo{background:#fbf3ea;border-color:var(--gold);border-left-color:var(--gold)}
 .faixa-demo .sair{margin-left:auto;background:var(--wine);color:#fdf3e7;border:0;border-radius:9px;
   padding:7px 12px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap}
@@ -410,6 +419,10 @@ button.foto-vinho.vazia span{font-size:26px}
       <!-- v0.60: lembrete de backup. A adega mora no aparelho; sem cópia,
            trocar de celular apaga a coleção. Aparece só quando faz diferença. -->
       <div id="faixa-backup" class="faixa-bk hidden"></div>
+      <!-- v0.65: no iPhone não existe loja para o Apotheca, mas existe a tela de
+           início. O convite morava escondido dentro das configurações de avisos,
+           onde quase ninguém entra — e nove em cada dez usuários são de iPhone. -->
+      <div id="faixa-instalar" class="faixa-inst hidden"></div>
       <div class="kpis">
         <div class="kpi hero"><div class="lbl">Garrafas na adega</div><div class="val" id="kpi-garrafas">—</div><div class="sub" id="kpi-rotulos">—</div></div>
         <div class="kpi"><div class="lbl">Valor estimado</div><div class="val" id="kpi-valor">—</div><div class="sub">soma dos preços de aquisição</div></div>
@@ -729,7 +742,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.64"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.65"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2515,8 +2528,92 @@ function bkPendencia(){
   return null;
 }
 
+/* ============================================================================
+   v0.65 — INSTALAR NA TELA DE INÍCIO (iPhone e iPad)
+   Descoberta desconfortável: quase 90% dos primeiros usuários usam iPhone, e
+   para eles não existe loja onde baixar o Apotheca. Existe coisa melhor do que
+   parece: o app já tem manifesto e service worker, então "Adicionar à Tela de
+   Início" entrega ícone próprio, tela cheia sem as barras do Safari,
+   funcionamento offline e — só assim — os avisos que a Apple exige.
+   Tudo isso já funcionava. O que faltava era alguém contar. A instrução morava
+   enterrada dentro das configurações de AVISOS, uma tela em que quase ninguém
+   entra. Agora é um convite no painel, com os passos desenhados.
+   Regras de boa educação, as mesmas da faixa de backup: só aparece para quem é
+   iPhone/iPad, só para quem ainda não instalou, nunca por cima do aviso de
+   backup (perder a adega é mais grave que ficar sem ícone) e some por 30 dias
+   quando a pessoa diz "agora não". ========================================== */
+const INST_DISPENSADO="apotheca_instalar_dispensado";
+const ehIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)
+  ||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);   /* iPad moderno se diz Mac */
+const jaInstalado=()=>!!(navigator.standalone
+  ||(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches));
+const podeInstalarNaTela=()=>ehIOS()&&!jaInstalado()&&!(window.Apk&&Apk.notificar);
+
+function instDispensar(){
+  try{localStorage.setItem(INST_DISPENSADO,String(Date.now()))}catch(e){}
+  renderFaixaInstalar();
+  toast("Sem problema — o passo a passo fica nas Configurações. 📱");
+}
+function instDispensadoAgora(){
+  try{
+    const t=parseInt(localStorage.getItem(INST_DISPENSADO)||"0",10);
+    return t&&(Date.now()-t)<30*24*3600*1000;
+  }catch(e){return false}
+}
+function renderFaixaInstalar(){
+  const el=$("#faixa-instalar");if(!el)return;
+  const backupFalando=$("#faixa-backup")&&!$("#faixa-backup").classList.contains("hidden");
+  if(!podeInstalarNaTela()||instDispensadoAgora()||backupFalando||adegaDemo){
+    el.classList.add("hidden");el.innerHTML="";return;
+  }
+  el.innerHTML=`<span style="font-size:17px;flex:none">📱</span>
+    <div style="flex:1;min-width:170px"><b>O Apotheca cabe na sua tela de início.</b>
+      Ícone próprio, tela cheia e funcionando sem internet — leva quinze segundos.</div>
+    <button class="btn btn-gold btn-sm" style="flex:none" onclick="abrirInstalarIOS()">Como faço</button>
+    <button class="btn btn-ghost btn-sm" style="flex:none" onclick="instDispensar()">agora não</button>`;
+  el.classList.remove("hidden");
+}
+
+/* o ícone de Compartilhar do iOS, desenhado aqui para não depender de imagem */
+const ICONE_SHARE=`<svg class="icone-share" width="19" height="19" viewBox="0 0 24 24" fill="none"
+  stroke="#0a7cff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M12 15V3"/><path d="M8.5 6.5 12 3l3.5 3.5"/>
+  <path d="M6 12H4.8A1.8 1.8 0 0 0 3 13.8v5.4A1.8 1.8 0 0 0 4.8 21h14.4a1.8 1.8 0 0 0 1.8-1.8v-5.4A1.8 1.8 0 0 0 19.2 12H18"/></svg>`;
+
+function abrirInstalarIOS(){
+  const safari=/Safari/.test(navigator.userAgent)&&!/CriOS|FxiOS|EdgiOS|OPiOS/.test(navigator.userAgent);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">📱 Apotheca na tela de início</h3>
+    <div class="sub">No iPhone e no iPad, o Apotheca se instala pelo próprio Safari — sem loja, sem cadastro, sem ocupar espaço.</div>
+    <div class="explain-box" style="margin:14px 0">
+      O que muda depois de instalar: <b>ícone próprio</b> na tela, <b>tela cheia</b> sem as
+      barras do navegador, <b>funciona sem internet</b> e os <b>avisos</b> passam a ser
+      permitidos — a Apple só os libera para apps instalados.
+      <br><br>A sua adega continua a mesma: ela já mora neste aparelho e não se move.
+    </div>
+    ${safari?"":`<div class="explain-box" style="border-left-color:var(--warn)">
+      Você parece estar em outro navegador. No iPhone, quem instala na tela de início é o
+      <b>Safari</b> — abra <b>apotheca.app.br</b> nele e volte aqui.</div>`}
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 10px">TRÊS TOQUES</div>
+    <div class="passo-ios"><div class="n">1</div><div class="t">Toque no botão
+      <b>Compartilhar</b> ${ICONE_SHARE} — o quadradinho com a seta para cima, na barra de baixo do Safari.</div></div>
+    <div class="passo-ios"><div class="n">2</div><div class="t">Deslize a lista e escolha
+      <b>“Adicionar à Tela de Início”</b>.</div></div>
+    <div class="passo-ios"><div class="n">3</div><div class="t">Toque em <b>Adicionar</b>, no canto superior direito.
+      Pronto: o ícone 🍷 aparece junto dos seus outros aplicativos.</div></div>
+    <div class="explain-box" style="margin-top:6px">
+      Daí em diante, abra sempre pelo ícone. É o mesmo Apotheca — só que com cara de aplicativo.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('modal-detail')">Entendi</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+
 function renderFaixaBackup(){
   const el=$("#faixa-backup");if(!el)return;
+  setTimeout(renderFaixaInstalar,0);   /* a de instalar só fala quando a de backup se cala */
   el.classList.remove("novo");
 
   /* prioridade máxima: existe um backup MAIS NOVO que esta adega */
@@ -3044,6 +3141,8 @@ function abrirConfiguracoes(){
       (n=>n?n+" com mapa":"nenhum ainda")(ADEGAS.filter(a=>a.grade).length),
       "closeModal('modal-detail');abrirMapaEscolha()",
       "Cada garrafa no seu lugar físico — prateleira e casa")}
+    ${podeInstalarNaTela()?linhaConfig("📱","Instalar na tela de início","iPhone e iPad",
+      "abrirInstalarIOS()","Ícone próprio, tela cheia e avisos — em três toques"):""}
     ${linhaConfig("💱","Moeda da adega",simboloMoeda()+" · "+(MOEDAS[MOEDA]||MOEDAS.BRL).nome,
       "abrirMoeda()",
       "Comprou fora? Guarde os preços na moeda em que você pagou")}
