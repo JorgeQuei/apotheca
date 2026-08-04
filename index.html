@@ -504,7 +504,7 @@ button.foto-vinho.vazia span{font-size:26px}
           <div class="field"><label>Guardar em qual adega?</label><select id="a-adega" onchange="document.getElementById('nova-adega-wrap').classList.toggle('hidden',this.value!=='__nova')"></select></div>
           <div class="field hidden" id="nova-adega-wrap"><label>Nome da nova adega</label><input id="a-nova-adega" placeholder="Ex.: Casa de Campo"></div>
           <div class="field"><label>Quantidade de garrafas</label><input id="a-qtd" type="number" min="1" value="1"></div>
-          <div class="field"><label>Preço pago (R$/garrafa)</label><input id="a-preco" type="number" min="0" placeholder="120"></div>
+          <div class="field"><label>Preço pago (<span class="lbl-moeda">R$</span>/garrafa)</label><input id="a-preco" type="number" min="0" placeholder="120"></div>
           <div class="field"><label>Corpo <span class="slider-val" id="v-corpo">3</span></label><input type="range" id="a-corpo" min="1" max="5" value="3" oninput="v_corpo.textContent=this.value"></div>
           <div class="field"><label>Acidez <span class="slider-val" id="v-acidez">3</span></label><input type="range" id="a-acidez" min="1" max="5" value="3" oninput="v_acidez.textContent=this.value"></div>
           <div class="field"><label>Taninos <span class="slider-val" id="v-tanino">3</span></label><input type="range" id="a-tanino" min="1" max="5" value="3" oninput="v_tanino.textContent=this.value"></div>
@@ -729,7 +729,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.62"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.63"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2225,11 +2225,32 @@ function limparAdegaLocal(){
 let MSGS=[];               /* {id,de,para,texto,ts,lida} */
 let BLOQUEADOS=[];         /* @usuários que EU bloqueei */
 let conversaAberta=null;
+/* ---------- v0.63: a adega tem uma moeda, e ela é do dono ----------
+   Quem compra fora pensa a coleção em dólar ou em euro. O Apotheca nasceu
+   falando só real, e a primeira migração de verdade — um CellarTracker inteiro
+   em USD — chegou com os valores lidos como se fossem reais. Não convertemos:
+   inventar cotação é escrever no lugar do usuário um número que ele nunca
+   digitou e que envelhece no dia seguinte. Guardamos a moeda dele e a exibimos.
+   Os números continuam sendo escritos à brasileira (1.234,56), porque a pessoa
+   é brasileira mesmo quando a garrafa foi comprada lá fora. */
+const MOEDAS={
+  BRL:{simbolo:"R$",nome:"Real brasileiro"},
+  USD:{simbolo:"US$",nome:"Dólar americano"},
+  EUR:{simbolo:"€",nome:"Euro"},
+  GBP:{simbolo:"£",nome:"Libra esterlina"},
+  CLP:{simbolo:"CLP$",nome:"Peso chileno"},
+  ARS:{simbolo:"ARS$",nome:"Peso argentino"}
+};
+let MOEDA="BRL";
+const simboloMoeda=()=>(MOEDAS[MOEDA]||MOEDAS.BRL).simbolo;
+const dinheiro=n=>simboloMoeda()+" "+Math.round(n||0).toLocaleString("pt-BR");
+const brl=dinheiro;   /* nome antigo mantido para não quebrar nada esquecido */
+
 const STORE_KEY="apotheca_dados_v1";
 let PERSISTE=false;
 function persist(){
   try{
-    localStorage.setItem(STORE_KEY,JSON.stringify({dono:perfil?perfil.user:null,adegaDemo,vinhos,ADEGAS,historico,eventos,seguindo,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,MURAL,meusBrindes,NEXT_ID,NEXT_EV,MSGS,BLOQUEADOS}));
+    localStorage.setItem(STORE_KEY,JSON.stringify({dono:perfil?perfil.user:null,adegaDemo,MOEDA,vinhos,ADEGAS,historico,eventos,seguindo,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,MURAL,meusBrindes,NEXT_ID,NEXT_EV,MSGS,BLOQUEADOS}));
     PERSISTE=true;
   }catch(e){PERSISTE=false}
 }
@@ -2240,6 +2261,7 @@ function persist(){
       /* a adega guardada só volta se for do mesmo dono — em aparelho compartilhado
          ninguém abre a coleção do outro por engano */
       vinhos=s.vinhos;adegaDemo=(s.adegaDemo!==undefined?s.adegaDemo:false);
+      if(s.MOEDA&&MOEDAS[s.MOEDA])MOEDA=s.MOEDA;
       ADEGAS=s.ADEGAS||ADEGAS;historico=s.historico||historico;
       eventos=s.eventos||eventos;seguindo=s.seguindo||s.amigos||seguindo;perfil=s.perfil||null;if(Array.isArray(s.USUARIOS_APP)&&s.USUARIOS_APP.length)USUARIOS_APP=s.USUARIOS_APP;if(Array.isArray(s.feed)&&s.feed.length)feed=s.feed;NEXT_FEED=s.NEXT_FEED||NEXT_FEED;minhasConfrarias=s.minhasConfrarias||[];
       /* migração v0.38: expurga as confrarias-demo antigas do cache e normaliza o tipo */
@@ -2268,7 +2290,6 @@ function resetDemo(){
 /* ================== UTIL ================== */
 const $=s=>document.querySelector(s);
 const fmt=n=>n.toLocaleString("pt-BR");
-const brl=n=>"R$ "+Math.round(n).toLocaleString("pt-BR");
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2800)}
 function safraTxt(v){return v.safra?esc(v.safra):"NV"}
 /* Nota da comunidade Apotheca (simulada de forma estável por rótulo no protótipo) */
@@ -2538,6 +2559,7 @@ async function bkMontar(comFotos){
     gerado_em:new Date().toISOString(),
     conta:perfil?perfil.user:null,
     totais:{rotulos:vinhos.length,garrafas:bkTotalGarrafas(),adegas:ADEGAS.length},
+    moeda:MOEDA,                       /* v0.63: a moeda viaja com a adega */
     adegas:ADEGAS, vinhos:vinhos, historico:historico
   };
   if(comFotos){
@@ -2663,9 +2685,10 @@ function bkEscolherArquivo(){
 
 function bkLerArquivo(inp){
   const f=inp.files&&inp.files[0];inp.value="";if(!f)return;
-  const r=new FileReader();
-  r.onload=()=>{
-    const txt=String(r.result||"").trim();
+  /* v0.63: a mesma farejada de alfabeto do importador — por aqui entram tanto
+     o nosso backup (sempre UTF-8) quanto planilhas de qualquer procedência. */
+  lerTextoDoArquivo(f,bruto=>{
+    const txt=String(bruto||"").trim();
     if(txt.charAt(0)!=="{"){                       /* não é backup nosso: é planilha */
       closeModal("modal-detail");
       impProcessarTexto(txt);
@@ -2681,9 +2704,7 @@ function bkLerArquivo(inp){
       toast("Esse arquivo não parece um backup do Apotheca.");return;
     }
     bkPend=p;bkPreviaRestauro();
-  };
-  r.onerror=()=>toast("Não consegui abrir esse arquivo.");
-  r.readAsText(f);
+  });
 }
 
 function bkPreviaRestauro(){
@@ -2716,13 +2737,30 @@ function bkPreviaRestauro(){
   $("#modal-detail").classList.add("open");
 }
 
+/* garante os campos que as telas assumem existir */
+function normalizarVinho(v){
+  return {...v,
+    nome:String(v.nome||""), vinicola:v.vinicola||"—",
+    tipo:v.tipo||"Tinto", pais:v.pais||"", regiao:v.regiao||"",
+    uvas:Array.isArray(v.uvas)?v.uvas:(v.uvas?String(v.uvas).split(/[,;\/]+/).map(x=>x.trim()).filter(Boolean):[]),
+    qtd:Math.max(0,parseInt(v.qtd,10)||0), preco:+v.preco||0,
+    pos:Array.isArray(v.pos)?v.pos:[], notas:v.notas||"",
+    jan:(Array.isArray(v.jan)&&v.jan.length===2)?v.jan:null,
+    id:+v.id||(NEXT_ID++)};
+}
+
 async function bkRestaurarConfirmado(){
   const p=bkPend;if(!p)return;
   bkPend=null;
   if(Array.isArray(p.adegas)&&p.adegas.length)ADEGAS=p.adegas;
-  vinhos=p.vinhos.filter(v=>v&&v.nome);
+  /* v0.63: um backup antigo, editado à mão ou vindo de outra versão pode chegar
+     sem algum campo. Antes disso, um vinho sem "uvas" derrubava a Coleção
+     inteira num erro de JavaScript — a pessoa restaurava e ficava com a tela
+     branca. Restaurar nunca pode ser mais frágil que importar. */
+  vinhos=p.vinhos.filter(v=>v&&v.nome).map(normalizarVinho);
   historico=Array.isArray(p.historico)?p.historico:[];
   adegaDemo=false;adegaAtiva="todas";
+  if(p.moeda&&MOEDAS[p.moeda]){MOEDA=p.moeda;aplicarMoedaUI()}
   NEXT_ID=Math.max(NEXT_ID,...vinhos.map(v=>(+v.id||0)))+1;
   if(p.fotos){
     for(const id in p.fotos){try{await fotoSalvar(id,p.fotos[id])}catch(e){}}
@@ -2940,6 +2978,48 @@ function bkRestaurarDoArquivo(){
    arranque, para não atrasar a primeira tela. */
 setTimeout(()=>{ if(podeLembrarArquivo())bkConferirArquivo(false).catch(()=>{}) },6000);
 
+/* ---------- v0.63: escolher a moeda da adega ----------
+   Não há conversão nenhuma aqui, e é de propósito. Trocar a moeda muda o
+   símbolo na frente dos números; os números continuam os que o dono digitou
+   ou importou. Quem pagou US$ 136 numa garrafa continua vendo US$ 136 — e a
+   tela diz isso com todas as letras, para ninguém achar que houve câmbio. */
+function abrirMoeda(){
+  const total=vinhos.reduce((s,v)=>s+(+v.preco||0)*(+v.qtd||0),0);
+  const opcoes=Object.keys(MOEDAS).map(k=>`
+    <button class="pessoa" style="width:100%;text-align:left;border:1px solid ${k===MOEDA?"var(--wine)":"var(--line)"};
+            background:${k===MOEDA?"var(--cream)":"var(--card)"};margin-bottom:8px;cursor:pointer"
+            onclick="definirMoeda('${k}')">
+      <span style="font-size:19px;flex:none;width:52px;font-weight:700;color:var(--wine)">${esc(MOEDAS[k].simbolo)}</span>
+      <div class="inf"><b>${esc(MOEDAS[k].nome)}</b><small>${esc(k)}</small></div>
+      ${k===MOEDA?'<span style="flex:none;color:var(--ok);font-size:17px">✓</span>':""}
+    </button>`).join("");
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="abrirConfiguracoes()">✕</button>
+    <h3 class="serif">💱 Moeda da adega</h3>
+    <div class="sub">Em que moeda você pensa a sua coleção.</div>
+    <div class="explain-box" style="margin:14px 0">
+      Trocar a moeda <b>não converte nada</b>. Os preços continuam exatamente os
+      números que você cadastrou — só muda o símbolo na frente deles. É assim de
+      propósito: uma cotação inventada hoje estaria errada amanhã.
+      ${total?`<br><br>A sua adega soma <b>${esc(dinheiro(total))}</b> hoje e passaria a
+        ser lida como esse mesmo número na moeda que você escolher.`:""}
+    </div>
+    ${opcoes}
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="abrirConfiguracoes()">Voltar</button></div>`;
+  $("#modal-detail").classList.add("open");
+}
+function definirMoeda(k){
+  if(!MOEDAS[k])return;
+  MOEDA=k;persist();aplicarMoedaUI();
+  if($("#view-dashboard"))renderDash();
+  toast("Moeda da adega: "+MOEDAS[k].simbolo+" "+MOEDAS[k].nome);
+  abrirMoeda();
+}
+/* o símbolo aparece em rótulos de formulário espalhados pelo app */
+function aplicarMoedaUI(){
+  document.querySelectorAll(".lbl-moeda").forEach(e=>e.textContent=simboloMoeda());
+}
+
 function abrirConfiguracoes(){
   const tv=travaLer().modo;
   const permissao=(window.Apk&&Apk.notificar)?"granted":permissaoNotif();
@@ -2964,6 +3044,9 @@ function abrirConfiguracoes(){
       (n=>n?n+" com mapa":"nenhum ainda")(ADEGAS.filter(a=>a.grade).length),
       "closeModal('modal-detail');abrirMapaEscolha()",
       "Cada garrafa no seu lugar físico — prateleira e casa")}
+    ${linhaConfig("💱","Moeda da adega",simboloMoeda()+" · "+(MOEDAS[MOEDA]||MOEDAS.BRL).nome,
+      "abrirMoeda()",
+      "Comprou fora? Guarde os preços na moeda em que você pagou")}
     ${linhaConfig("🛟","Backup da adega",(q=>q?q:"nunca")(bkQuando()),
       "abrirBackup()",
       "Salve uma cópia onde você quiser — Drive, iCloud, Dropbox, e-mail")}
@@ -3398,7 +3481,12 @@ const IMP_CANDIDATOS={
   pais:["country","pays","pais","origem"],
   regiao:["region","regiao","appellation","locale"],
   qtd:["quantity","quantite","qty","stock","nombre","quantidade","qtd","garrafas","bottles","amount"],
-  preco:["price","prix","valuation","preco","valor","cost"],
+  preco:["price","prix","preco","cost","prix d achat"],
+  /* v0.63: valor de mercado é OUTRA coisa que preço pago. O CellarTracker traz
+     as duas colunas e, em boa parte das linhas, só a de mercado está
+     preenchida — o dono nunca registrou quanto desembolsou. Sem esta segunda
+     porta, a adega importada aparecia valendo zero. */
+  valorMercado:["value","valuation","valor","market value"],
   janIni:["beginconsume","apogee debut","a boire de","drink from","janela inicio","janelainicio"],
   janFim:["endconsume","apogee fin","a boire jusqu","drink to","drink until","janela fim","janelafim"],
   notas:["mynotes","your review","private note","tasting note","notes","notas","observacoes","commentaire"],
@@ -3411,7 +3499,39 @@ function impTraduzTipo(v){
   return "Tinto";
 }
 function impTraduzPais(v){ if(!v)return ""; return IMP_PAISES[impNorm(v)]||v }
-function impNumero(v){ const s=String(v||"").replace(/[^\d.,-]/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",",".");
+/* ---------- v0.63: "71.555" são setenta e um dólares ou setenta e um mil? ----------
+   Depende do país que escreveu a planilha, e não dá para saber olhando o valor
+   sozinho. A regra antiga chutava: ponto seguido de exatamente três dígitos era
+   separador de milhar. Funciona para o Brasil e destrói o CellarTracker, onde
+   71.555 é o preço de uma garrafa. A saída é olhar a COLUNA inteira antes: se em
+   algum lugar dela aparece ponto com um, dois ou quatro-e-tantos decimais
+   (103.4 · 136.0684), então neste arquivo o ponto é decimal, e passa a ser
+   decimal em todas as linhas. Só quando a coluna não dá nenhuma pista é que
+   voltamos ao palpite brasileiro. */
+function impConvencaoDecimal(linhas,colunas){
+  const alvo=colunas.filter(c=>{
+    const n=impNorm(c);
+    return IMP_CANDIDATOS.preco.some(x=>n===x||n.includes(x))
+        || IMP_CANDIDATOS.valorMercado.some(x=>n===x||n.includes(x));
+  });
+  let ponto=0,virgula=0;
+  linhas.forEach(l=>alvo.forEach(c=>{
+    const v=String(l[c]||"").trim();
+    if(!v)return;
+    const temP=v.includes("."),temV=v.includes(",");
+    if(temP&&temV){ (v.lastIndexOf(".")>v.lastIndexOf(",")?ponto++:virgula++); return }
+    if(temP&&/\.\d{1,2}$|\.\d{4,}$/.test(v))ponto++;
+    if(temV&&/,\d{1,2}$|,\d{4,}$/.test(v))virgula++;
+  }));
+  if(ponto>virgula)return "ponto";
+  if(virgula>ponto)return "virgula";
+  return null;
+}
+function impNumero(v,convencao){
+  let s=String(v||"").replace(/[^\d.,-]/g,"");
+  if(convencao==="ponto")      s=s.replace(/,/g,"");                     /* vírgula = milhar */
+  else if(convencao==="virgula")s=s.replace(/\./g,"").replace(",",".");  /* ponto = milhar */
+  else                          s=s.replace(/\.(?=\d{3}(\D|$))/g,"").replace(",",".");
   const n=parseFloat(s); return isFinite(n)?n:null }
 function impSafra(v){ const n=parseInt(String(v||"").replace(/\D/g,""),10);
   return (n>=1900&&n<=2100)?n:null } /* 1001 do CellarTracker = sem safra */
@@ -3420,6 +3540,19 @@ function impNormalizar(linhas,colunas,mapa){
   const pega=mapa
     ?(l,campo)=>{const col=mapa[campo];return col?String(l[col]||"").trim():""}
     :(l,campo)=>impPegar(l,colunas,IMP_CANDIDATOS[campo]);
+  /* v0.63: planilhas de fora costumam dizer em que moeda estão os preços.
+     O CellarTracker traz uma coluna "Currency" com USD em toda linha. Se ela
+     existir e discordar da moeda da adega, avisamos — nunca convertemos por
+     conta própria. */
+  const moedaArquivo=(()=>{
+    const col=colunas.find(c=>/^(currency|moeda|devise|divisa)$/i.test(String(c).trim()));
+    if(!col)return null;
+    const vistas={};
+    linhas.forEach(l=>{const v=String(l[col]||"").trim().toUpperCase();if(MOEDAS[v])vistas[v]=(vistas[v]||0)+1});
+    const ordem=Object.keys(vistas).sort((x,y)=>vistas[y]-vistas[x]);
+    return ordem.length===1?ordem[0]:null;   /* planilha com moedas misturadas: não palpitamos */
+  })();
+  const convencao=impConvencaoDecimal(linhas,colunas);
   const regs=[];
   linhas.forEach(l=>{
     const nome=pega(l,"nome");if(!nome)return;
@@ -3436,7 +3569,8 @@ function impNormalizar(linhas,colunas,mapa){
       pais:impTraduzPais(pega(l,"pais")),
       regiao:pega(l,"regiao"),
       qtd:Math.max(1,parseInt(pega(l,"qtd"),10)||1),
-      preco:impNumero(pega(l,"preco"))||0,
+      preco:(p=>p||impNumero(pega(l,"valorMercado"),convencao)||0)(impNumero(pega(l,"preco"),convencao)),
+      precoDeMercado:!impNumero(pega(l,"preco"),convencao)&&!!impNumero(pega(l,"valorMercado"),convencao),
       jan:(ji&&jf&&jf>=ji)?[ji,jf]:null,
       notas
     });
@@ -3447,10 +3581,24 @@ function impNormalizar(linhas,colunas,mapa){
     const k=impNorm(r.nome)+"|"+(r.safra||"")+"|"+impNorm(r.vinicola);
     if(porChave[k])porChave[k].qtd+=r.qtd; else porChave[k]=r;
   });
-  return Object.values(porChave);
+  const saida=Object.values(porChave);
+  saida.moedaArquivo=moedaArquivo;
+  return saida;
 }
 
 let impPend=null; /* {registros, origem, colunas, linhas} entre as telas */
+/* v0.63: adotar a moeda que a planilha declarou, sem tocar nos números */
+function impAdotarMoeda(k){
+  if(!MOEDAS[k])return;
+  MOEDA=k;persist();aplicarMoedaUI();
+  if(impPend&&impPend.registros)impPend.registros.moedaArquivo=null;
+  toast("Moeda da adega: "+MOEDAS[k].simbolo+" "+MOEDAS[k].nome);
+  impMostrarPrevia();
+}
+function impIgnorarMoeda(){
+  if(impPend&&impPend.registros)impPend.registros.moedaArquivo=null;
+  impMostrarPrevia();
+}
 
 function abrirImportador(){
   if(adegaDemo){
@@ -3485,12 +3633,45 @@ function abrirImportador(){
   $("#modal-detail").classList.add("open");
 }
 
+/* ---------- v0.63: descobrir em que alfabeto a planilha foi escrita ----------
+   Nem todo mundo exporta em UTF-8. O CellarTracker manda Windows-1252, e ler
+   aqueles bytes como UTF-8 transformava "Pêra-Manca" em "P?ra-Manca" e "Évora"
+   em "?vora" — o acento virava um losango preto na adega do usuário.
+   A ordem importa: a marca de ordem de bytes (BOM), quando existe, é palavra
+   final. Sem BOM, um monte de zeros no começo denuncia UTF-16 (cada letra
+   ocidental vem seguida de um byte nulo). Só então tentamos UTF-8 no modo
+   severo: se ele recusar algum byte, o arquivo não é UTF-8, e caímos para
+   Windows-1252 — que aceita qualquer byte e cobre todo o mundo latino. */
+function decodificarTexto(bytes){
+  if(bytes[0]===0xEF&&bytes[1]===0xBB&&bytes[2]===0xBF)
+    return new TextDecoder("utf-8").decode(bytes.subarray(3));
+  if(bytes[0]===0xFF&&bytes[1]===0xFE)
+    return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  if(bytes[0]===0xFE&&bytes[1]===0xFF)
+    return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+  const olhada=bytes.subarray(0,400);
+  let zerosPar=0,zerosImpar=0;
+  for(let i=0;i<olhada.length;i++)if(olhada[i]===0)(i%2?zerosImpar++:zerosPar++);
+  if(zerosImpar>olhada.length/8&&zerosPar<3)return new TextDecoder("utf-16le").decode(bytes);
+  if(zerosPar>olhada.length/8&&zerosImpar<3)return new TextDecoder("utf-16be").decode(bytes);
+  try{return new TextDecoder("utf-8",{fatal:true}).decode(bytes)}
+  catch(e){return new TextDecoder("windows-1252").decode(bytes)}
+}
+function lerTextoDoArquivo(f,pronto){
+  const r=new FileReader();
+  r.onload=()=>{
+    let txt;
+    try{txt=decodificarTexto(new Uint8Array(r.result))}
+    catch(e){toast("Não consegui ler esse arquivo.");return}
+    pronto(txt);
+  };
+  r.onerror=()=>toast("Não consegui abrir esse arquivo.");
+  r.readAsArrayBuffer(f);
+}
+
 function impLerArquivo(inp){
   const f=inp.files&&inp.files[0];inp.value="";if(!f)return;
-  const r=new FileReader();
-  r.onload=()=>impProcessarTexto(String(r.result||""));
-  r.onerror=()=>toast("Não consegui abrir esse arquivo.");
-  r.readAsText(f);
+  lerTextoDoArquivo(f,txt=>impProcessarTexto(txt));
 }
 /* v0.60: separado de impLerArquivo para a restauração de backup poder cair
    aqui também — um CSV nosso volta pelo mesmo caminho de qualquer planilha. */
@@ -3555,6 +3736,8 @@ function impMostrarPrevia(){
   const garrafas=registros.reduce((s,r)=>s+r.qtd,0);
   const semPais=registros.filter(r=>!r.pais).length;
   const semSafra=registros.filter(r=>!r.safra).length;
+  const deMercado=registros.filter(r=>r.precoDeMercado).length;
+  const outraMoeda=registros.moedaArquivo&&registros.moedaArquivo!==MOEDA?registros.moedaArquivo:null;
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
     <h3 class="serif">📥 Prévia da importação</h3>
@@ -3564,6 +3747,19 @@ function impMostrarPrevia(){
       <b>${garrafas} garrafa${garrafas===1?"":"s"}</b>
       ${semPais||semSafra?`<br><small>${semSafra?semSafra+" sem safra (ficam como NV)":""}${semPais&&semSafra?" · ":""}${semPais?semPais+" sem país":""} — dá para completar depois, na ficha.</small>`:""}
     </div>
+    ${outraMoeda?`<div class="explain-box" style="margin-top:10px;border-left-color:var(--wine)">
+      💱 Esta planilha diz que os preços estão em <b>${esc(MOEDAS[outraMoeda].simbolo)} ${esc(MOEDAS[outraMoeda].nome)}</b>,
+      e a sua adega hoje está em <b>${esc(simboloMoeda())}</b>.
+      <b>Não vou converter nada</b> — os números entram como estão. Quer que a adega
+      passe a ser lida em ${esc(MOEDAS[outraMoeda].simbolo)}?
+      <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-primary" onclick="impAdotarMoeda('${esc(outraMoeda)}')">Sim, usar ${esc(MOEDAS[outraMoeda].simbolo)}</button>
+        <button class="btn btn-sm btn-ghost" onclick="impIgnorarMoeda()">Manter ${esc(simboloMoeda())}</button>
+      </div></div>`:""}
+    ${deMercado?`<div class="explain-box" style="margin-top:10px">
+      Em <b>${deMercado} ${deMercado===1?"vinho":"vinhos"}</b> não havia preço de compra registrado,
+      então aproveitei o <b>valor de mercado</b> da planilha. É melhor que zero, mas não é o que
+      você desembolsou — vale conferir na ficha quando puder.</div>`:""}
     <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px">
       <tr style="color:var(--ink-3);text-align:left"><th>Vinho</th><th>Safra</th><th>Tipo</th><th style="text-align:right">Qtd</th></tr>
       ${registros.slice(0,6).map(r=>`<tr style="border-top:1px solid var(--line)">
@@ -6569,7 +6765,7 @@ function histRowsHtml(limit){
 function renderHist(){$("#hist-list").innerHTML=histRowsHtml()}
 
 /* ================== INIT ================== */
-initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();renderHist();renderFeed();aplicarPerfilUI();
+initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();renderHist();renderFeed();aplicarPerfilUI();aplicarMoedaUI();
 (async function(){
   /* 1) se a página voltou do Google com tokens no endereço, captura a sessão */
   let veioDoGoogle=false;
