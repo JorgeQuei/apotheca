@@ -732,6 +732,8 @@ button.foto-vinho.vazia span{font-size:26px}
   </div>
   <div class="scan-status" id="scan-status">Iniciando câmera…</div>
   <button id="btn-capturar" class="btn btn-primary" onclick="capturarRotulo()">📸 Fotografar rótulo</button>
+  <input id="scan-arquivo" type="file" accept="image/*" class="hidden" onchange="rotuloDoArquivo(this)">
+  <button id="btn-galeria" class="btn btn-gold" onclick="document.getElementById('scan-arquivo').click()">🖼️ Usar uma foto do aparelho</button>
   <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
     <button class="btn btn-ghost" style="color:#f0e2d0;border-color:#f0e2d0" onclick="closeScanner();document.getElementById('a-nome').focus();toast('Digite 3+ letras do nome — a base mundial completa o resto. 🌍')">⌨️ Prefiro digitar</button>
     <button class="btn btn-ghost" style="color:#f0e2d0;border-color:#f0e2d0" onclick="scanDemo()">🎬 Demo</button>
@@ -749,7 +751,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.66"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.67"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -5592,7 +5594,9 @@ async function openScanner(){
     setScan("Enquadre o <b>rótulo</b> com boa luz e toque em <b>📸 Fotografar</b>");
   }catch(e){
     temCamera=false;$("#btn-capturar").classList.add("hidden");
-    setScan("Câmera indisponível neste ambiente.<br>Use o modo demonstração para conhecer o fluxo.");
+    /* v0.67: sem câmera o leitor deixou de ser um beco sem saída — a foto do
+       aparelho passa pelo mesmo reconhecimento. */
+    setScan("Câmera indisponível neste aparelho.<br>Toque em <b>🖼️ Usar uma foto do aparelho</b> — o reconhecimento é o mesmo.");
   }
 }
 /* ===== Modo rótulo: OCR contínuo no aparelho — sem precisar tirar foto =====
@@ -5910,61 +5914,100 @@ async function capturarRotulo(){
   if(ocrBusy)return;
   const v=$("#scan-video");
   if(!v.videoWidth){toast("Câmera ainda carregando…");return}
-  ocrBusy=true;$("#btn-capturar").disabled=true;
+  ocrBusy=true;travarBotoesScan(true);
   /* miniatura colorida do rótulo — vai para a ficha do vinho */
   const t=document.createElement("canvas");
   const et=300/Math.max(v.videoWidth,v.videoHeight);
   t.width=Math.round(v.videoWidth*et);t.height=Math.round(v.videoHeight*et);
   t.getContext("2d").drawImage(v,0,0,t.width,t.height);
-  lastFotoRotulo=t.toDataURL("image/jpeg",0.72);
   /* foto colorida em alta para a IA */
   const cc=document.createElement("canvas");
   const ec=Math.min(1,1024/v.videoWidth);
   cc.width=Math.round(v.videoWidth*ec);cc.height=Math.round(v.videoHeight*ec);
   cc.getContext("2d").drawImage(v,0,0,cc.width,cc.height);
-  /* v0.57: o reconhecimento SEMPRE tenta a IA primeiro — com a chave do
-     Apotheca (padrão) ou com a do próprio usuário (modo avançado). */
-  {
-    setScan(getIaKey()?"🧠 IA de visão analisando o rótulo…":"🧠 Lendo o rótulo…");
-    try{
-      const o=await analisarComIA(cc.toDataURL("image/jpeg",0.85).split(",")[1]);
-      if(o&&o.nome&&(+o.confianca||0)>=25){
-        aplicarIA(o);ocrBusy=false;$("#btn-capturar").disabled=false;
-        if(scanRestantes!==null&&scanRestantes<=SCAN_LIMITE_AVISO)
-          setTimeout(()=>toast(scanRestantes>0
-            ?`📸 Restam ${scanRestantes} leituras neste mês.`
-            :"📸 Esta foi a última leitura do mês."),1200);
-        return;
-      }
-      setScan("Não reconheci um vinho nesta foto — enquadre o rótulo de frente, com boa luz, e tente de novo.<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
-      ocrBusy=false;$("#btn-capturar").disabled=false;return;
-    }catch(e){
-      const m=e.message||"";
-      if(m==="SEM_LOGIN"){
-        setScan("🔑 <b>A sua sessão expirou</b> — entre de novo para usar o leitor de rótulos.<br>É o que garante as leituras gratuitas de cada pessoa."
-          +'<br><button class="btn btn-gold btn-sm" style="margin-top:10px" onclick="entrarGoogleReal()">Entrar com o Google</button>'
-          +"<br><span style=\"font-size:12px\">Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.</span>");
-      }else if(m==="LIMITE"){
-        setScan("📸 <b>Você usou as suas leituras deste mês.</b><br>Elas voltam no dia 1º. Enquanto isso, use <b>⌨️ Prefiro digitar</b> (base de 100 mil vinhos) — ou, se quiser leituras ilimitadas, configure a sua própria chave em ☰ → 🔑 IA de visão.");
-      }else{
-        setScan("❌ <b>Não consegui ler agora:</b> "+m+"<br>Tente de novo em instantes, ou use <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
-      }
-      ocrBusy=false;$("#btn-capturar").disabled=false;return;
-    }
+  await analisarRotuloDeCanvas(cc,t,
+    "Não reconheci um vinho nesta foto — enquadre o rótulo de frente, com boa luz, e tente de novo.<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+  ocrBusy=false;travarBotoesScan(false);
+}
+/* ---------- v0.67: ler o rótulo de uma foto que já está no aparelho ----------
+   O leitor só aceitava a câmera ao vivo, e isso deixava de fora três situações
+   corriqueiras: a foto que o amigo mandou no WhatsApp, a garrafa fotografada no
+   restaurante para cadastrar em casa, e o computador sem câmera nenhuma. O
+   reconhecimento é exatamente o mesmo — muda só de onde vêm os pixels. */
+function travarBotoesScan(t){
+  const b=$("#btn-capturar"),g=$("#btn-galeria");
+  if(b)b.disabled=t;
+  if(g)g.disabled=t;
+}
+function canvasDe(img,maxLado){
+  const w=img.width,h=img.height;
+  const e=Math.min(1,maxLado/Math.max(w,h));
+  const c=document.createElement("canvas");
+  c.width=Math.max(1,Math.round(w*e));c.height=Math.max(1,Math.round(h*e));
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  return c;
+}
+/* Foto de celular guarda a orientação no EXIF. Sem "from-image" o rótulo chega
+   deitado à IA — e rótulo deitado é rótulo não reconhecido. */
+async function imagemDoArquivo(f){
+  if(window.createImageBitmap){
+    try{return await createImageBitmap(f,{imageOrientation:"from-image"})}catch(e){}
+    try{return await createImageBitmap(f)}catch(e){}
   }
-  /* eslint-disable-next-line no-unreachable */
+  return await new Promise((ok,err)=>{
+    const u=URL.createObjectURL(f),im=new Image();
+    im.onload=()=>{URL.revokeObjectURL(u);ok(im)};
+    im.onerror=()=>{URL.revokeObjectURL(u);err(new Error("imagem ilegível"))};
+    im.src=u;
+  });
+}
+async function rotuloDoArquivo(inp){
+  const f=inp&&inp.files&&inp.files[0];
+  if(inp)inp.value="";          /* zera para aceitar a MESMA foto de novo */
+  if(!f||ocrBusy)return;
+  if(f.type&&!/^image\//.test(f.type)){toast("Escolha uma imagem do rótulo. 🖼️");return}
+  ocrBusy=true;travarBotoesScan(true);
+  setScan("🖼️ Abrindo a foto…");
+  let img;
+  try{img=await imagemDoArquivo(f)}
+  catch(e){
+    setScan("Não consegui abrir esta imagem.<br>Tente uma foto em <b>JPG</b> ou <b>PNG</b> — ou fotografe o rótulo agora.");
+    ocrBusy=false;travarBotoesScan(false);return;
+  }
+  await analisarRotuloDeCanvas(canvasDe(img,1024),canvasDe(img,300),
+    "Não reconheci um vinho nesta foto — escolha uma em que o rótulo apareça de frente e legível.<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+  if(img.close)img.close();
+  ocrBusy=false;travarBotoesScan(false);
+}
+/* O coração do reconhecimento, comum aos dois caminhos */
+async function analisarRotuloDeCanvas(alta,mini,recado){
+  lastFotoRotulo=mini.toDataURL("image/jpeg",0.72);
+  setScan(getIaKey()?"🧠 IA de visão analisando o rótulo…":"🧠 Lendo o rótulo…");
   try{
-    const c=prepararQuadro(v);
-    setScan("📸 Foto capturada — lendo o rótulo…");
-    await garantirOcr();
-    const {data}=await ocrWorker.recognize(c);
-    resetOcrAcc();parseFrame(data.text||"");
-    if(ocrAcc.nome){finalizarRotulo()}
-    else setScan("Não achei texto legível nesta foto."+(getIaKey()?"":"<br>💡 <b>Ative a IA de visão no menu ☰</b> para reconhecimento de verdade — inclusive de rótulos artísticos.")+"<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+    const o=await analisarComIA(alta.toDataURL("image/jpeg",0.85).split(",")[1]);
+    if(o&&o.nome&&(+o.confianca||0)>=25){
+      aplicarIA(o);
+      if(scanRestantes!==null&&scanRestantes<=SCAN_LIMITE_AVISO)
+        setTimeout(()=>toast(scanRestantes>0
+          ?`📸 Restam ${scanRestantes} leituras neste mês.`
+          :"📸 Esta foi a última leitura do mês."),1200);
+      return true;
+    }
+    setScan(recado);
+    return false;
   }catch(e){
-    setScan("Não consegui carregar o leitor óptico (exige internet na 1ª vez).<br>Use o modo demonstração ou o cadastro manual.");
+    const m=e.message||"";
+    if(m==="SEM_LOGIN"){
+      setScan("🔑 <b>A sua sessão expirou</b> — entre de novo para usar o leitor de rótulos.<br>É o que garante as leituras gratuitas de cada pessoa."
+        +'<br><button class="btn btn-gold btn-sm" style="margin-top:10px" onclick="entrarGoogleReal()">Entrar com o Google</button>'
+        +"<br><span style=\"font-size:12px\">Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.</span>");
+    }else if(m==="LIMITE"){
+      setScan("📸 <b>Você usou as suas leituras deste mês.</b><br>Elas voltam no dia 1º. Enquanto isso, use <b>⌨️ Prefiro digitar</b> (base de 100 mil vinhos) — ou, se quiser leituras ilimitadas, configure a sua própria chave em ☰ → 🔑 IA de visão.");
+    }else{
+      setScan("❌ <b>Não consegui ler agora:</b> "+m+"<br>Tente de novo em instantes, ou use <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+    }
+    return false;
   }
-  ocrBusy=false;$("#btn-capturar").disabled=false;
 }
 function scanDemo(){
   const w=BASE_SCANNER[Math.floor(Math.random()*BASE_SCANNER.length)];
