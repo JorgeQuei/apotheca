@@ -728,6 +728,7 @@ button.foto-vinho.vazia span{font-size:26px}
   <div class="scan-frame">
     <div class="bottle">🍾</div>
     <video id="scan-video" playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:16px"></video>
+    <img id="scan-previa" class="hidden" alt="Foto escolhida" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:16px;background:#1a1013">
     <div class="scan-line" id="scan-line"></div>
   </div>
   <div class="scan-status" id="scan-status">Iniciando câmera…</div>
@@ -751,7 +752,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.67"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.68"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -5934,6 +5935,41 @@ async function capturarRotulo(){
    corriqueiras: a foto que o amigo mandou no WhatsApp, a garrafa fotografada no
    restaurante para cadastrar em casa, e o computador sem câmera nenhuma. O
    reconhecimento é exatamente o mesmo — muda só de onde vêm os pixels. */
+/* ---------- v0.68: mostrar A FOTO ESCOLHIDA, não a câmera ----------
+   Relato do Jorge, com print: "quando vou procurar por uma foto no celular o
+   que aparece é o que a câmera mostra e não a foto do rótulo desejado".
+   Reproduzi: `rotuloDoArquivo` analisava o arquivo mas nunca tocava no vídeo,
+   então a câmera seguia ligada e ocupando o quadro. Se a leitura falhava, a
+   pessoa ficava olhando a câmera com uma mensagem de erro — e concluía, com
+   toda a razão, que o app tinha ignorado a foto dela.
+   Agora a foto escolhida ocupa o quadro, a câmera desliga, e o botão principal
+   vira "voltar à câmera". O que está na tela passa a ser o que foi analisado. */
+let previaAtiva=false;
+function mostrarPrevia(url){
+  pararCamera();
+  $("#scan-video").classList.add("hidden");
+  const im=$("#scan-previa");
+  im.src=url;im.classList.remove("hidden");
+  previaAtiva=true;
+  const b=$("#btn-capturar");
+  if(b){
+    b.classList.remove("hidden");
+    b.textContent="📷 Voltar à câmera";
+    b.setAttribute("onclick","voltarACamera()");
+  }
+}
+function resetarPrevia(){
+  const im=$("#scan-previa");
+  if(im){im.classList.add("hidden");im.removeAttribute("src")}
+  const v=$("#scan-video");if(v)v.classList.remove("hidden");
+  const b=$("#btn-capturar");
+  if(b){b.textContent="📸 Fotografar rótulo";b.setAttribute("onclick","capturarRotulo()")}
+  previaAtiva=false;
+}
+async function voltarACamera(){
+  resetarPrevia();
+  await openScanner();
+}
 function travarBotoesScan(t){
   const b=$("#btn-capturar"),g=$("#btn-galeria");
   if(b)b.disabled=t;
@@ -5974,17 +6010,23 @@ async function rotuloDoArquivo(inp){
     setScan("Não consegui abrir esta imagem.<br>Tente uma foto em <b>JPG</b> ou <b>PNG</b> — ou fotografe o rótulo agora.");
     ocrBusy=false;travarBotoesScan(false);return;
   }
-  await analisarRotuloDeCanvas(canvasDe(img,1024),canvasDe(img,300),
-    "Não reconheci um vinho nesta foto — escolha uma em que o rótulo apareça de frente e legível.<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+  const alta=canvasDe(img,1024), mini=canvasDe(img,300);
+  const dataAlta=alta.toDataURL("image/jpeg",0.85);
+  /* a foto aparece ANTES da análise: se a IA demorar ou falhar, a pessoa já
+     está vendo qual foto o app pegou */
+  mostrarPrevia(dataAlta);
+  await analisarRotuloDeCanvas(alta,mini,
+    "Não reconheci o vinho nesta foto.<br>Toque em <b>🖼️ Usar uma foto do aparelho</b> para tentar outra, ou em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.",
+    dataAlta);
   if(img.close)img.close();
   ocrBusy=false;travarBotoesScan(false);
 }
 /* O coração do reconhecimento, comum aos dois caminhos */
-async function analisarRotuloDeCanvas(alta,mini,recado){
+async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
   lastFotoRotulo=mini.toDataURL("image/jpeg",0.72);
   setScan(getIaKey()?"🧠 IA de visão analisando o rótulo…":"🧠 Lendo o rótulo…");
   try{
-    const o=await analisarComIA(alta.toDataURL("image/jpeg",0.85).split(",")[1]);
+    const o=await analisarComIA((dataAlta||alta.toDataURL("image/jpeg",0.85)).split(",")[1]);
     if(o&&o.nome&&(+o.confianca||0)>=25){
       aplicarIA(o);
       if(scanRestantes!==null&&scanRestantes<=SCAN_LIMITE_AVISO)
@@ -6020,7 +6062,7 @@ function pararCamera(){
   if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}
   const v=$("#scan-video");if(v){v.pause();v.srcObject=null}
 }
-function closeScanner(){scanAtivo=false;pararCamera();$("#scanner").classList.remove("open")}
+function closeScanner(){scanAtivo=false;pararCamera();resetarPrevia();$("#scanner").classList.remove("open")}
 function fillForm(w){
   $("#a-nome").value=w.nome;$("#a-vinicola").value=w.vinicola;$("#a-pais").value=w.pais;
   $("#a-regiao").value=w.regiao;$("#a-safra").value=w.safra;$("#a-tipo").value=w.tipo;
