@@ -752,7 +752,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.69"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.70"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -5530,6 +5530,38 @@ function observarCamadas(){
     }finally{ setTimeout(()=>{fechandoPeloVoltar=false},0) }
   });
 }
+/* ---------- v0.70: quem manda no Voltar é esta função ----------
+   A v0.69 apostou tudo no histórico do navegador, e no aparelho do Jorge o
+   Android nem chegava a consultar o histórico: a partir do targetSdk 36 ele
+   encerra a tela sem avisar o aplicativo. O conserto de verdade está no Java
+   (v0.70), mas ele precisa de alguém para perguntar — e é esta função.
+
+   Ela não confia em pilha nem em histórico: olha a tela como ela está agora e
+   fecha a camada de cima, na ordem em que as coisas se empilham na vista.
+   Devolve `true` se fechou alguma coisa (então o app FICA), `false` se não
+   havia nada aberto (aí sim o Android pode sair, como qualquer aplicativo).
+
+   O login e a trava ficam de fora de propósito: não existe "anterior" a eles,
+   e deixar o Voltar atravessá-los seria uma porta dos fundos. */
+function camadaDeCima(){
+  const lupa=document.querySelector(".foto-lupa");           /* foto ampliada  */
+  if(lupa)return ()=>lupa.remove();
+  const aberto=id=>{const e=document.getElementById(id);return e&&e.classList.contains("open")?e:null};
+  if(aberto("scanner"))return ()=>closeScanner();            /* leitor de rótulo */
+  if(aberto("menu-pop"))return ()=>fecharMenu();             /* menu do canto    */
+  for(const id of ["modal-consume","modal-detail"]){         /* janelas, de cima */
+    const el=aberto(id); if(el)return ()=>el.classList.remove("open");
+  }
+  return null;
+}
+window.apothecaVoltar=function(){
+  if(document.getElementById("trava-screen")?.classList.contains("open"))return false;
+  if(document.getElementById("login-screen")?.classList.contains("open"))return false;
+  const fechar=camadaDeCima();
+  if(!fechar)return false;
+  try{fechar()}catch(e){return false}
+  return true;
+};
 document.querySelectorAll(".modal-bg").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("open")}));
 
 /* ================== ADICIONAR ================== */
