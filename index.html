@@ -752,7 +752,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.68"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.69"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -5472,6 +5472,64 @@ function moveOne(id,destino){
   toast(`1 garrafa de ${v.nome} movida para ${d.icone} ${d.nome}.`);
 }
 function closeModal(id){$("#"+id).classList.remove("open")}
+/* ---------- v0.69: o botão Voltar do Android fechava o aplicativo ----------
+   Relato do Jorge: "toda vez que abrimos uma janela para qualquer coisa e
+   apertamos o botão de voltar do celular, ele força a sair do aplicativo".
+
+   A causa: o app é uma página só. O MainActivity já faz a coisa certa —
+   `if (wv.canGoBack()) wv.goBack() else sair` —, mas como nada nunca criava
+   entrada no histórico, `canGoBack()` era sempre falso e o Android fechava a
+   tela. O conserto é do lado do HTML, não do Java.
+
+   Cada janela que abre passa a empurrar uma entrada no histórico; o Voltar
+   consome essa entrada e fecha a janela de cima. Fechar pelo ✕ também consome
+   a entrada, senão o histórico acumularia lixo e o Voltar viraria loteria.
+
+   Serve para os três lugares ao mesmo tempo: aplicativo Android, navegador do
+   celular e o ícone na tela de início do iPhone — todos usam o mesmo gesto.
+   A tela de login fica de fora de propósito: não existe "anterior" ao login. */
+const CAMADAS_VOLTAR=["modal-detail","modal-consume","scanner"];
+let pilhaVoltar=[], ignorarPop=0, fechandoPeloVoltar=false;
+function empilharCamada(id){
+  pilhaVoltar.push(id);
+  /* No APK a página vem de file://, e alguns navegadores recusam pushState
+     nessa origem. Se recusar, desistimos em silêncio: o Voltar volta a ser o
+     que era, mas nada quebra. */
+  try{ history.pushState({apotheca:pilhaVoltar.length},"") }
+  catch(e){ pilhaVoltar.pop() }
+}
+function consumirEntradaVoltar(){
+  if(!pilhaVoltar.length)return;
+  pilhaVoltar.pop(); ignorarPop++;
+  try{ history.back() }catch(e){ ignorarPop-- }
+}
+function observarCamadas(){
+  if(typeof MutationObserver!=="function")return;
+  const obs=new MutationObserver(muts=>{
+    for(const m of muts){
+      const el=m.target, id=el.id;
+      if(CAMADAS_VOLTAR.indexOf(id)<0)continue;
+      const aberta=el.classList.contains("open");
+      if(aberta && pilhaVoltar.indexOf(id)<0) empilharCamada(id);
+      else if(!aberta && pilhaVoltar[pilhaVoltar.length-1]===id && !fechandoPeloVoltar)
+        consumirEntradaVoltar();
+    }
+  });
+  CAMADAS_VOLTAR.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)obs.observe(el,{attributes:true,attributeFilter:["class"]});
+  });
+  window.addEventListener("popstate",()=>{
+    if(ignorarPop>0){ ignorarPop--; return }
+    const id=pilhaVoltar.pop();
+    if(!id)return;                 /* entrada que não é nossa: não mexemos */
+    fechandoPeloVoltar=true;
+    try{
+      if(id==="scanner")closeScanner();
+      else{ const el=document.getElementById(id); if(el)el.classList.remove("open") }
+    }finally{ setTimeout(()=>{fechandoPeloVoltar=false},0) }
+  });
+}
 document.querySelectorAll(".modal-bg").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("open")}));
 
 /* ================== ADICIONAR ================== */
@@ -7204,7 +7262,7 @@ function histRowsHtml(limit){
 function renderHist(){$("#hist-list").innerHTML=histRowsHtml()}
 
 /* ================== INIT ================== */
-initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();renderHist();renderFeed();aplicarPerfilUI();aplicarMoedaUI();
+initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();renderHist();renderFeed();aplicarPerfilUI();aplicarMoedaUI();observarCamadas();
 (async function(){
   /* 1) se a página voltou do Google com tokens no endereço, captura a sessão */
   let veioDoGoogle=false;
