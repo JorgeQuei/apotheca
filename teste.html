@@ -752,7 +752,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.70"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.71.6"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1187,14 +1187,44 @@ async function processarTokensExternos(frag){
   }catch(e){sessao=null;salvarSessao();toast("Não consegui validar o login — verifique a internet e tente de novo. 📡")}
 }
 async function aposLoginGoogle(){
-  /* 1) esta conta Google já tem um usuário Apotheca? entra direto */
+  /* ---------- v0.71: por que esta função foi reescrita ----------
+     Ela terminava num `catch(e){}` vazio que engolia QUALQUER erro — internet
+     oscilando, token vencido, servidor lento — e a execução caía direto no
+     passo 3, que trata a pessoa como conta nova e pede um nome. Confirmar o
+     nome zerava a adega. Foi assim que um usuário perdeu 157 garrafas em
+     06/08/2026: ele não errou nada, só abriu o app com a rede ruim.
+
+     A correção é distinguir duas coisas que estavam misturadas:
+       · "o servidor respondeu e disse que esta conta não existe"  → cadastro
+       · "não consegui falar com o servidor"                        → PARAR
+     No segundo caso não se decide nada: avisa e devolve o usuário ao app com
+     a adega intacta. Não saber é motivo para esperar, nunca para apagar. */
+  let servidorRespondeu=false, achado=null;
   try{
-    const r=await sb("/usuarios?auth_id=eq."+sessao.uid+"&select=usuario,nome,cidade");
+    achado=await sb("/usuarios?auth_id=eq."+sessao.uid+"&select=usuario,nome,cidade");
+    servidorRespondeu=true;
+  }catch(e){ servidorRespondeu=false }
+
+  if(!servidorRespondeu){
+    $("#login-screen").classList.remove("open");
+    toast("Não consegui verificar a sua conta agora — a sua adega está intacta. Confira a internet e entre de novo. 📡");
+    return;
+  }
+
+  try{
+    const r=achado;
     if(r&&r.length){
       const guardado=(()=>{try{return JSON.parse(localStorage.getItem(STORE_KEY))||{}}catch(e){return {}}})();
-      /* a adega deste aparelho é minha mesmo? se for de outra pessoa — ou a de
-         demonstração que vem no app — começo com a adega vazia, que é a verdade. */
-      if(adegaDemo||(guardado.dono&&guardado.dono!==r[0].usuario))limparAdegaLocal();
+      /* A adega deste aparelho é minha mesmo? A vitrine de demonstração sai sem
+         cerimônia — não é de ninguém. Mas coleção de verdade com outro nome no
+         topo NÃO é apagada: guarda-se uma cópia de socorro e avisa-se. Apagar
+         a adega alheia é tão grave quanto apagar a própria. */
+      if(adegaDemo)limparAdegaLocal();
+      else if(guardado.dono&&guardado.dono!==r[0].usuario&&!vinhos.length)limparAdegaLocal();
+      else if(guardado.dono&&guardado.dono!==r[0].usuario){
+        socorroGuardar("login com adega de outro @usuário");
+        setTimeout(()=>toast("Esta adega estava guardada como @"+guardado.dono+". Ela continua aqui — confira antes de mexer. 🛟"),3200);
+      }
       perfil={user:r[0].usuario,cidade:r[0].cidade,provedor:"Google"};
       persist();aplicarPerfilUI();
       renderDash();renderColecao();renderHist();refreshAdegaSelect&&refreshAdegaSelect();
@@ -1221,8 +1251,19 @@ async function aposLoginGoogle(){
         /* o nome local nunca chegou à nuvem: segue para o cadastro normal */
       }
     }
-  }catch(e){}
-  /* 3) conta nova: falta só escolher o nome definitivo */
+  }catch(e){
+    /* v0.71: erro DEPOIS de o servidor já ter respondido (vínculo, render, etc.).
+       Continua não sendo motivo para tratar ninguém como conta nova. */
+    $("#login-screen").classList.remove("open");
+    toast("Deu um tropeço ao entrar — a sua adega está intacta. Tente de novo. 📡");
+    return;
+  }
+  /* 3) conta nova de verdade: o servidor respondeu e não conhece esta conta Google.
+     v0.71: com adega cheia no aparelho, avisa em vez de deixar zerar em silêncio. */
+  if(vinhos.length&&!adegaDemo){
+    socorroGuardar("tela de cadastro com adega cheia");
+    setTimeout(()=>toast("Atenção: há "+vinhos.length+" rótulos guardados neste aparelho. Eles NÃO serão apagados. 🛟"),1500);
+  }
   provPendente="Google";
   $("#login-screen").classList.add("open");
   $("#login-p1").classList.add("hidden");$("#login-p2").classList.remove("hidden");
@@ -2270,12 +2311,66 @@ const dinheiro=n=>simboloMoeda()+" "+Math.round(n||0).toLocaleString("pt-BR");
 const brl=dinheiro;   /* nome antigo mantido para não quebrar nada esquecido */
 
 const STORE_KEY="apotheca_dados_v1";
+const SOCORRO_KEY="apotheca_socorro_v1";
 let PERSISTE=false;
+
+/* ---------- v0.71: a cópia de socorro ----------
+   Em 06/08/2026 um usuário perdeu 157 garrafas. A adega dele foi zerada por um
+   caminho do próprio aplicativo e o `persist()` gravou por cima — e como o
+   armazenamento do navegador não guarda versão anterior, não havia de onde
+   voltar. Nenhuma trava é perfeita; esta existe justamente para o dia em que
+   outra falhar.
+
+   A regra é simples e conservadora: sempre que o aplicativo estiver prestes a
+   gravar uma adega VAZIA por cima de uma adega que tinha garrafas, a versão
+   cheia é copiada para um canto antes. Nunca sobrescreve uma cópia de socorro
+   com outra vazia, e nunca guarda a adega de demonstração — que não é de
+   ninguém. Fica só no aparelho, como todo o resto. */
+function socorroGuardar(motivo){
+  try{
+    const cru=localStorage.getItem(STORE_KEY);
+    if(!cru)return;
+    const s=JSON.parse(cru);
+    if(!s||!Array.isArray(s.vinhos)||!s.vinhos.length)return;  /* nada a proteger */
+    if(s.adegaDemo)return;                                      /* vitrine não é adega */
+    localStorage.setItem(SOCORRO_KEY,JSON.stringify({
+      quando:new Date().toISOString(), motivo:motivo||"desconhecido",
+      rotulos:s.vinhos.length, garrafas:s.vinhos.reduce((t,v)=>t+(v.qtd||0),0),
+      dados:cru
+    }));
+  }catch(e){}
+}
+function socorroDisponivel(){
+  try{
+    const c=JSON.parse(localStorage.getItem(SOCORRO_KEY));
+    return (c&&c.dados&&c.rotulos)?c:null;
+  }catch(e){return null}
+}
+
 function persist(){
   try{
+    /* Antes de gravar o vazio por cima do cheio, guarda o cheio. */
+    if(!vinhos.length)socorroGuardar("gravação com a adega vazia");
     localStorage.setItem(STORE_KEY,JSON.stringify({dono:perfil?perfil.user:null,adegaDemo,MOEDA,vinhos,ADEGAS,historico,eventos,seguindo,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,MURAL,meusBrindes,NEXT_ID,NEXT_EV,MSGS,BLOQUEADOS}));
     PERSISTE=true;
   }catch(e){PERSISTE=false}
+}
+
+/* Devolve a adega guardada pela cópia de socorro. Só o usuário manda nisso. */
+function socorroRestaurar(){
+  const c=socorroDisponivel();
+  if(!c){toast("Não há cópia de socorro neste aparelho.");return}
+  try{
+    const s=JSON.parse(c.dados);
+    vinhos=s.vinhos||[];ADEGAS=s.ADEGAS||ADEGAS;historico=s.historico||[];
+    eventos=s.eventos||[];adegaDemo=false;
+    if(s.MOEDA&&MOEDAS[s.MOEDA])MOEDA=s.MOEDA;
+    adegaAtiva="todas";
+    persist();
+    try{refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();renderHist()}catch(e){}
+    closeModal("modal-detail");
+    toast(`🛟 Adega recuperada: ${c.rotulos} rótulos, ${c.garrafas} garrafas.`);
+  }catch(e){toast("A cópia de socorro está ilegível. 😕")}
 }
 (function restore(){
   try{
@@ -2671,13 +2766,20 @@ async function bkMontar(comFotos){
   };
   if(comFotos){
     p.fotos={};
+    /* v0.71.4: cada foto tem prazo próprio e a conta de quantas ficaram de fora
+       volta com o pacote — quem faz backup precisa saber se ele saiu completo. */
+    bkFotosPuladas=0;
     for(const v of vinhos){
       if(!v.fotoId)continue;
-      try{const d=await fotoLer(v.fotoId);if(d)p.fotos[v.fotoId]=d}catch(e){}
+      try{
+        const d=await fotoLer(v.fotoId);
+        if(d)p.fotos[v.fotoId]=d; else bkFotosPuladas++;
+      }catch(e){ bkFotosPuladas++ }
     }
   }
   return p;
 }
+let bkFotosPuladas=0;
 
 /* Cabeçalhos em português e sem acento de propósito: são os mesmos nomes que
    o nosso importador reconhece, então o CSV do backup volta para dentro do
@@ -2698,6 +2800,43 @@ function bkCSVTexto(){
   return "﻿"+l.join("\r\n")+"\r\n";
 }
 
+/* ---------- v0.71.5: o backup passa a contar o que está fazendo ----------
+   Passei o dia consertando trechos que, descobri depois, nem chegavam a
+   executar. O motivo é sempre o mesmo: o aplicativo dizia "Preparando o
+   arquivo…" e emudecia, e daí em diante tudo era dedução minha.
+
+   Isto acaba com a dedução. Cada etapa do backup escreve o próprio nome na
+   tela, e o texto FICA — não é aviso que some em três segundos. Se travar de
+   novo, a última linha visível diz exatamente onde parou, e quem me contar isso
+   não precisa entender nada de programação. */
+let bkPassoAtual="";
+function bkPasso(txt){
+  bkPassoAtual=txt||"";
+  let el=document.getElementById("bk-passo");
+  if(!el){
+    el=document.createElement("div");
+    el.id="bk-passo";
+    el.style.cssText="position:fixed;left:12px;right:12px;bottom:96px;z-index:130;"
+      +"background:var(--wine);color:#fdf3e7;padding:11px 15px;border-radius:12px;"
+      +"font-size:13px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.35)";
+    document.body.appendChild(el);
+  }
+  el.textContent="🛟 "+txt+"…";
+  el.style.display="block";
+}
+function bkPassoFim(){
+  const el=document.getElementById("bk-passo");
+  if(el)el.style.display="none";
+  bkPassoAtual="";
+}
+
+/* Estamos rodando dentro do aplicativo Android? A página vem de file:// e a
+   ponte Apk existe. Serve para NUNCA cair no caminho de download do navegador
+   ali dentro — ele falha em silêncio, e silêncio aqui custou uma adega. */
+function dentroDoAplicativo(){
+  return location.protocol==="file:" || !!(window.Apk&&Apk.arqInicio);
+}
+
 /* ---------- a entrega: quem escolhe o destino é o dono ---------- */
 async function entregarArquivo(nome,texto,mime){
   /* APK: a ponte abre o seletor do Android, onde aparecem Drive, Dropbox,
@@ -2705,18 +2844,55 @@ async function entregarArquivo(nome,texto,mime){
      a memória quando o backup levar as fotos junto. */
   if(window.Apk&&Apk.arqInicio){
     try{
-      const bytes=new TextEncoder().encode(texto);
+      /* ---------- v0.71.5: a conversão deixou de ser feita a mão ----------
+         O laço antigo montava o base64 caractere por caractere: para um backup
+         com 4 fotos, são MILHÕES de concatenações de texto seguidas, tudo na
+         mesma linha de execução que desenha a tela. No computador isso passa
+         despercebido; num celular, o aplicativo simplesmente congela — sem
+         erro, sem aviso, sem nunca chegar a falar com o Android. Era compatível
+         com tudo o que o Jorge relatou: "para por aí, não abre mais nada".
+
+         Agora quem converte é o próprio navegador, de uma vez só e em código
+         nativo. O que levava minutos passa a levar instantes. */
+      bkPasso("empacotando o arquivo");
+      const b64=await new Promise((ok,err)=>{
+        const fr=new FileReader();
+        fr.onload=()=>ok(String(fr.result).split(",")[1]||"");
+        fr.onerror=()=>err(fr.error||new Error("não consegui empacotar"));
+        fr.readAsDataURL(new Blob([texto],{type:mime}));
+      });
+      bkPasso("entregando ao Android");
       Apk.arqInicio(nome,mime);
-      const P=48*1024;
-      for(let i=0;i<bytes.length;i+=P){
-        const f=bytes.subarray(i,i+P);
-        let b="";for(let j=0;j<f.length;j++)b+=String.fromCharCode(f[j]);
-        Apk.arqPedaco(btoa(b));
+      const P=64*1024;
+      for(let i=0;i<b64.length;i+=P) Apk.arqPedaco(b64.slice(i,i+P));
+      /* v0.71.2: dois destinos possíveis, e o arquivo já está pronto para os
+         dois. `arqFim` pede a janela de escolher onde guardar; `arqParaDownloads`
+         grava direto na pasta Download e devolve o endereço. O segundo existe
+         porque o primeiro não abriu no aparelho do Jorge nem na v0.71 nem na
+         v0.71.1 — e backup que depende de janela que talvez não abra não é
+         backup, é esperança. */
+      if(bkDestinoEscolhido==="downloads"&&Apk.arqParaDownloadsAgora){
+        /* v0.71.3: resposta na mesma linha. Nada de esperar aviso de volta —
+           foi o aviso de volta que não chegou no aparelho do Jorge e deixou o
+           app mudo depois de ele apertar o botão. */
+        const r=String(Apk.arqParaDownloadsAgora()||"");
+        if(r.indexOf("OK:")===0)return "downloads:"+r.slice(3);
+        return "erro:"+r.replace(/^ERRO:/,"");
       }
+      if(bkDestinoEscolhido==="downloads"&&Apk.arqParaDownloads){Apk.arqParaDownloads();return "aparelho"}
       Apk.arqFim();
       return "aparelho";
-    }catch(e){}
+    }catch(e){
+      /* v0.71: antes o erro era engolido e a execução seguia para o download do
+         navegador, que dentro do WebView não faz nada — e o app ainda anunciava
+         "Backup salvo nos downloads". Agora falha assumida é falha avisada. */
+      return "falhou";
+    }
   }
+  /* v0.71: dentro do aplicativo, sem ponte, não existe caminho que funcione.
+     Dizer "salvo" aqui é o defeito que deixou um usuário sem backup nenhum
+     achando que tinha um. É preferível a má notícia à notícia falsa. */
+  if(dentroDoAplicativo())return "semponte";
   /* celular no navegador: bandeja do próprio sistema */
   try{
     const arq=new File([texto],nome,{type:mime});
@@ -2740,42 +2916,230 @@ function bkNomeArquivo(ext){
   return "apotheca-adega-"+d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+"-"+z(d.getHours())+z(d.getMinutes())+"."+ext;
 }
 
-async function bkSalvar(tipo){
+async function bkSalvar(tipo,fotosForcadas){
   if(!vinhos.length){toast("A sua adega está vazia — não há o que salvar. 🍾");return}
-  const comFotos=!!($("#bk-fotos")&&$("#bk-fotos").checked);
+  /* v0.71: a caixinha das fotos mora na tela de trás, que já foi fechada quando
+     a escolha do formato acontece — por isso a preferência viaja como parâmetro. */
+  const comFotos=(fotosForcadas!==undefined)?!!fotosForcadas
+                 :!!($("#bk-fotos")&&$("#bk-fotos").checked);
   toast("Preparando o arquivo… 🛟");
   let nome,texto,mime;
-  if(tipo==="csv"){ nome=bkNomeArquivo("csv"); texto=bkCSVTexto(); mime="text/csv"; }
-  else{ nome=bkNomeArquivo("json"); texto=JSON.stringify(await bkMontar(comFotos)); mime="application/json"; }
+  /* v0.71: montar o arquivo pode falhar (foto ilegível, memória curta). Antes,
+     a falha deixava o aviso "Preparando o arquivo…" na tela para sempre e o
+     usuário ia embora achando que tinha backup. */
+  bkFotosPuladas=0;
+  bkPasso("montando a lista de vinhos");
+  await new Promise(r=>setTimeout(r,30));   /* deixa a tela desenhar o aviso */
+  try{
+    if(tipo==="csv"){ nome=bkNomeArquivo("csv"); texto=bkCSVTexto(); mime="text/csv"; }
+    else{
+      nome=bkNomeArquivo("json");
+      if(comFotos)bkPasso("lendo as fotos dos vinhos");
+      /* v0.71.4: prazo sobre a montagem INTEIRA. Mesmo com prazo em cada leitura
+         de foto, é aqui que fica a última garantia de que este botão jamais
+         deixa alguém olhando para "Preparando o arquivo…" sem resposta. */
+      texto=JSON.stringify(await comPrazo(bkMontar(comFotos),25000,
+        "a montagem do arquivo travou"));
+      mime="application/json";
+    }
+  }catch(e){
+    bkPassoFim();
+    alert("O backup NÃO foi feito.\n\nParou em: "+(bkPassoAtual||"início")
+        +"\nMotivo: "+((e&&e.message)||e)
+        +"\n\nTente de novo desmarcando a opção de incluir as fotos.");
+    return;
+  }
+  if(bkFotosPuladas){
+    toast("⚠️ "+bkFotosPuladas+" foto"+(bkFotosPuladas===1?"":"s")+" não pôde ser lida e ficou de fora — o resto da adega vai completo.");
+  }
   /* onde o navegador deixa, guardamos o ponteiro para o arquivo escolhido —
      é o que permite regravar depois com um clique e perceber novidades. */
   if(podeLembrarArquivo()){
+    bkPasso("abrindo a janela de salvar do navegador");
     try{
-      await bkSalvarLembrando(nome,texto,mime);
+      /* v0.71.6: cinto e suspensórios — mesmo no computador, esta espera passa a
+         ter prazo. Nenhuma etapa do backup pode durar para sempre. */
+      await comPrazo(bkSalvarLembrando(nome,texto,mime),120000,
+        "a janela de salvar não respondeu");
+      bkPassoFim();
       if(tipo!=="csv")bkMarcaGravar();
       closeModal("modal-detail");
       toast("Backup guardado. Da próxima vez, um clique atualiza este mesmo arquivo. 🛟");
       return;
-    }catch(e){ if(e&&e.name==="AbortError")return; /* sem suporte real: segue no caminho comum */ }
+    }catch(e){ if(e&&e.name==="AbortError"){bkPassoFim();return} /* sem suporte real: segue no caminho comum */ }
   }
   const r=await entregarArquivo(nome,texto,mime);
+  /* v0.71.3: gravação direta na pasta Download — resposta imediata, sem espera. */
+  bkPassoFim();
+  if(r.indexOf("downloads:")===0){
+    const onde=r.slice(10);
+    if(tipo!=="csv")bkMarcaGravar();
+    bkGuardarUltimoDestino(nome,onde);
+    closeModal("modal-detail");
+    alert("🛟 Backup salvo!\n\nO arquivo ficou em:\n"+onde
+        +"\n\nAbra o aplicativo Arquivos, vá em Download e mande esse arquivo para o Drive, o WhatsApp ou o seu e-mail.");
+    return;
+  }
+  if(r.indexOf("erro:")===0){
+    closeModal("modal-detail");
+    alert("O backup NÃO foi feito.\n\nMotivo informado pelo Android:\n"+r.slice(5)
+        +"\n\nMostre esta mensagem ao suporte.");
+    return;
+  }
   if(r==="cancelado")return;
-  if(r==="falhou"){toast("Este aparelho não deixou salvar o arquivo. 😕");return}
+  if(r==="falhou"){toast("Não consegui salvar o arquivo. O backup NÃO foi feito — tente de novo. ⚠️");return}
+  /* v0.71: aplicativo sem a ponte de arquivos (versão antiga). Antes daqui saía
+     um "salvo nos downloads" que não correspondia a arquivo nenhum. */
+  if(r==="semponte"){
+    toast("Esta versão do aplicativo não consegue salvar arquivos. O backup NÃO foi feito — atualize o Apotheca. ⚠️");
+    return;
+  }
   /* No APK quem confirma é o Android, depois que o usuário escolher o destino:
      marcar antes seria mentir sobre um backup que ele ainda pode cancelar. */
-  if(r==="aparelho"){bkTipoPendente=tipo;closeModal("modal-detail");return}
+  if(r==="aparelho"){bkTipoPendente=tipo;bkNomePendente=nome;closeModal("modal-detail");return}
   if(tipo!=="csv")bkMarcaGravar();
   closeModal("modal-detail");
   toast(r==="baixado"?"Backup salvo nos downloads. 🛟":"Backup pronto — escolha onde guardar. 🛟");
 }
 
 /* chamada pelo Android quando o usuário termina (ou desiste) no seletor */
-let bkTipoPendente=null;
-function avisoArquivoAndroid(estado){
-  const tipo=bkTipoPendente;bkTipoPendente=null;
-  if(estado!=="salvo")return;
+let bkTipoPendente=null, bkNomePendente=null;
+function avisoArquivoAndroid(estado,onde){
+  const tipo=bkTipoPendente, nome=bkNomePendente;
+  bkTipoPendente=null; bkNomePendente=null;
+  /* v0.71: "cancelado" deixou de ser silêncio. Quem desistiu precisa saber que
+     NÃO tem backup — era esse silêncio que fazia o usuário sair achando que
+     estava protegido. */
+  if(estado==="erro"){
+    /* v0.71.1: o Android não conseguiu nem abrir a janela. O motivo vem junto e
+       fica na tela — foi a falta disso que me fez chutar conserto três vezes. */
+    alert("O Apotheca não conseguiu abrir a janela de salvar deste aparelho.\n\n"
+        + "Motivo informado pelo Android:\n" + (onde||"(sem detalhe)")
+        + "\n\nO backup NÃO foi feito. Mostre esta mensagem ao suporte.");
+    return;
+  }
+  if(estado!=="salvo"){
+    toast("Backup não concluído — nenhum arquivo foi salvo. ⚠️");
+    return;
+  }
   if(tipo!=="csv")bkMarcaGravar();
-  toast("Backup guardado. 🛟");
+  /* v0.71: e agora o app diz ONDE ficou. A pergunta do usuário era literal:
+     "onde o aplicativo gravou isso?" — e não havia resposta em lugar nenhum. */
+  const destino=(onde&&String(onde).trim())||"";
+  bkGuardarUltimoDestino(nome,destino);
+  toast(destino ? ("🛟 Backup salvo em "+destino) : ("🛟 Backup salvo como "+(nome||"arquivo")));
+  try{if(document.getElementById("modal-detail").classList.contains("open"))abrirBackup()}catch(e){}
+}
+
+/* v0.71.1: o aparelho responde o que de fato existe nele. Depois de errar três
+   diagnósticos num dia por deduzir do código em vez de perguntar à máquina,
+   este botão passa a ser o primeiro passo de qualquer investigação de backup. */
+function bkDiagnosticar(){
+  if(!(window.Apk&&Apk.arqDiagnostico)){
+    alert("Este diagnóstico só existe dentro do aplicativo Android.");return;
+  }
+  let d={};
+  try{ d=JSON.parse(Apk.arqDiagnostico()||"{}") }catch(e){ d={erro:String(e)} }
+  const linhas=[
+    "DIAGNÓSTICO DO BACKUP",
+    "",
+    "Versão do Apotheca: "+APP_VERSION,
+    "Android (SDK): "+(d.sdk!==undefined?d.sdk:"?"),
+    "Ponte de arquivos: "+(d.ponte?"presente ✅":"AUSENTE ❌"),
+    "Janela de salvar (qualquer tipo): "+(d.seletorGenerico?"disponível ✅":"NÃO DISPONÍVEL ❌"),
+    "Janela de salvar (tipo .json): "+(d.seletorJson?"disponível ✅":"NÃO DISPONÍVEL ❌"),
+    "Bytes preparados na última tentativa: "+(d.bytesNoTemp!==undefined?d.bytesNoTemp:"?"),
+    "Último backup nesta sessão: "+(d.ultimoBackup||"?"),
+    d.erro?("Erro: "+d.erro):""
+  ].filter(Boolean);
+  alert(linhas.join("\n"));
+}
+
+/* Onde foi o último backup — fica escrito na tela, para nunca mais alguém
+   precisar adivinhar. Só no aparelho, como o resto. */
+const BK_DESTINO="apotheca_backup_destino";
+function bkGuardarUltimoDestino(nome,onde){
+  try{localStorage.setItem(BK_DESTINO,JSON.stringify({nome:nome||"",onde:onde||"",quando:Date.now()}))}catch(e){}
+}
+function bkUltimoDestino(){
+  try{return JSON.parse(localStorage.getItem(BK_DESTINO))||null}catch(e){return null}
+}
+
+/* ---------- v0.71: um rótulo só, e a escolha do formato numa janela ----------
+   Antes havia dois botões concorrendo — "Salvar backup completo" e "Salvar
+   planilha (Excel)" — e o usuário tinha de decidir a diferença entre eles antes
+   de entender que existia diferença. Agora o botão é um só: "Salvar backup".
+   A pergunta do formato vem depois, com a consequência de cada escolha escrita
+   ao lado, e a de restaurar tudo vem marcada como recomendada. */
+let bkDestinoEscolhido="perguntar";   /* "perguntar" | "downloads" */
+function bkPerguntarFormato(){
+  const comFotos=!!($("#bk-fotos")&&$("#bk-fotos").checked);
+  const el=document.getElementById("modal-consume-body");
+  if(!el){bkSalvar("json");return}
+  const noApk=!!(window.Apk&&Apk.arqParaDownloads);
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <h2 style="margin:0">💾 Como quer salvar?</h2>
+      <button class="fechar" onclick="closeModal('modal-consume')">✕</button>
+    </div>
+    <p style="color:var(--ink-2);font-size:13.5px;margin:8px 0 16px">
+      Primeiro o formato. ${noApk?"Depois você escolhe onde guardar.":"Depois o <b>seu aparelho</b> pergunta onde guardar."}</p>
+
+    <button class="btn btn-primary" style="width:100%;margin-bottom:6px"
+            onclick="bkEscolherDestino('json',${comFotos?"true":"false"})">
+      🛟 Backup completo <span style="opacity:.8;font-weight:400">(recomendado)</span>
+    </button>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:0 0 14px">
+      Devolve o Apotheca exatamente como está: adegas, mapa, seções, histórico, avaliações${comFotos?" e as fotos":""}.
+      É o único formato que restaura tudo.</div>
+
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:6px"
+            onclick="bkEscolherDestino('csv',false)">
+      📊 Planilha (Excel / CSV)
+    </button>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:0 0 4px">
+      Abre no Excel e entra em outros aplicativos de adega. Leva os vinhos, mas
+      <b>não</b> leva mapa, seções, histórico nem fotos.</div>`;
+  document.getElementById("modal-consume").classList.add("open");
+}
+
+/* ---------- v0.71.2: escolher o DESTINO, não só o formato ----------
+   No aparelho do Jorge a janela do Android de "onde guardar" não abriu em duas
+   versões seguidas. Em vez de insistir num caminho que talvez nunca funcione
+   naquele modelo, o aplicativo passa a oferecer os dois — e deixa claro o que
+   cada um faz. O da pasta Download vem primeiro porque é o que sempre funciona
+   e o que sempre diz onde o arquivo ficou. */
+function bkEscolherDestino(tipo,comFotos){
+  const el=document.getElementById("modal-consume-body");
+  if(!el||!(window.Apk&&Apk.arqParaDownloads)){
+    /* navegador, ou aplicativo antigo: segue o caminho de sempre */
+    bkDestinoEscolhido="perguntar";
+    closeModal("modal-consume");bkSalvar(tipo,comFotos);return;
+  }
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+      <h2 style="margin:0">📍 Onde guardar?</h2>
+      <button class="fechar" onclick="closeModal('modal-consume')">✕</button>
+    </div>
+    <p style="color:var(--ink-2);font-size:13.5px;margin:8px 0 16px">
+      ${tipo==="csv"?"Planilha":"Backup completo"} — falta só dizer onde o arquivo deve ficar.</p>
+
+    <button class="btn btn-primary" style="width:100%;margin-bottom:6px"
+            onclick="bkDestinoEscolhido='downloads';closeModal('modal-consume');bkSalvar('${tipo}',${comFotos?"true":"false"})">
+      📁 Na pasta Download do celular
+    </button>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:0 0 14px">
+      Sempre funciona, e o Apotheca diz o endereço exato ao terminar. Depois é só
+      abrir o aplicativo <b>Arquivos</b> e mandar para o Drive, o WhatsApp ou o
+      e-mail, como preferir.</div>
+
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:6px"
+            onclick="bkDestinoEscolhido='perguntar';closeModal('modal-consume');bkSalvar('${tipo}',${comFotos?"true":"false"})">
+      ☁️ Escolher agora (Drive, Dropbox, OneDrive…)
+    </button>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:0 0 4px">
+      Abre a janela do próprio Android. <b>Em alguns aparelhos essa janela não
+      abre</b> — se nada acontecer, volte e use a pasta Download.</div>`;
 }
 
 /* ---------- a volta ---------- */
@@ -2926,20 +3290,39 @@ function abrirBackup(){
       <span>Incluir as <b>${comFotos} foto${comFotos===1?"":"s"}</b> dos vinhos
       <small style="display:block;color:var(--ink-3)">o arquivo fica bem maior — bom para o Drive, ruim para o WhatsApp</small></span>
     </label>`:""}
-    <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="bkSalvar('json')">
-      💾 Salvar backup completo
+    <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="bkPerguntarFormato()">
+      💾 Salvar backup
     </button>
-    <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 12px">Restaura o Apotheca exatamente como está: adegas, mapa, seções, histórico e avaliações.</div>
-    <button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="bkSalvar('csv')">
-      📊 Salvar planilha (Excel)
+    <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 12px">O Apotheca prepara o arquivo e o <b>seu aparelho</b> pergunta onde guardar — Drive, Dropbox, iCloud, OneDrive, e-mail ou a memória do celular. Quem escolhe é você.</div>
+    ${(()=>{const d=bkUltimoDestino();return d&&d.nome?`
+    <div class="pessoa" style="cursor:default;margin-bottom:10px">
+      <span style="font-size:19px;flex:none">📍</span>
+      <div class="inf"><b>Último arquivo salvo</b>
+      <small>${esc(d.onde||d.nome)}</small></div>
+    </div>`:""})()}
+
+    ${(window.Apk&&Apk.arqDiagnostico)?`
+    <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:4px" onclick="bkDiagnosticar()">
+      🩺 Testar o salvamento neste aparelho
     </button>
-    <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 4px">Abre no Excel e entra em outros aplicativos de adega. É a sua garantia de poder ir embora quando quiser.</div>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:0 0 4px">Não salva nada — só confere se o seu aparelho oferece a janela de escolher onde guardar.</div>`:""}
 
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">RESTAURAR</div>
     <button class="btn btn-ghost" style="width:100%" onclick="bkEscolherArquivo()">
       📂 Restaurar de um arquivo
     </button>
-    <div style="font-size:11.5px;color:var(--ink-3);margin:6px 0 0">Aceita o backup do Apotheca e também planilhas de outros aplicativos.</div>`;
+    <div style="font-size:11.5px;color:var(--ink-3);margin:6px 0 0">Aceita o backup do Apotheca e também planilhas de outros aplicativos.</div>
+    ${(()=>{const c=socorroDisponivel();return c?`
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">CÓPIA DE SOCORRO</div>
+    <div class="pessoa" style="cursor:default">
+      <span style="font-size:19px;flex:none">🛟</span>
+      <div class="inf"><b>${c.rotulos} rótulos · ${fmt(c.garrafas)} garrafas</b>
+      <small>guardada automaticamente em ${new Date(c.quando).toLocaleString("pt-BR")}</small></div>
+    </div>
+    <button class="btn btn-gold" style="width:100%;margin-top:8px" onclick="socorroRestaurar()">
+      🛟 Devolver esta adega ao aplicativo
+    </button>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:6px 0 0">O Apotheca guarda sozinho a última adega cheia antes de qualquer operação que a esvazie. É a rede de segurança para quando algo der errado.</div>`:""})()}`;
   $("#modal-detail").classList.add("open");
 }
 
@@ -2965,7 +3348,26 @@ const BK_IGNORADO="apotheca_backup_ignorado";
 let bkArquivoNovo=null;      /* backup mais novo esperando resposta do usuário */
 let bkPrecisaPermissao=false;
 
+/* ---------- v0.71.6: ESTE ERA O DEFEITO ----------
+   O "arquivo lembrado" usa uma função moderna do navegador, `showSaveFilePicker`,
+   que abre a janela de salvar e devolve um ponteiro para o arquivo escolhido.
+   No computador funciona muito bem.
+
+   Acontece que o navegador embutido do Android também DECLARA essa função — ela
+   existe, responde ao `typeof`, e o app portanto acreditava poder usá-la. Só que
+   dentro do aplicativo ela nunca abre janela nenhuma: fica esperando uma escolha
+   que jamais será feita, e a espera não termina nunca.
+
+   Era exatamente aqui que o backup do Jorge morria, em toda versão, desde o
+   começo: o aplicativo escrevia "montando a lista de vinhos…" e entrava nessa
+   espera. Nunca chegava a falar com o Android — e foi por isso que o diagnóstico
+   mostrava "nenhuma tentativa nesta sessão" mesmo depois de ele apertar o botão,
+   e por isso os meus consertos do lado Java, todos eles, eram irrelevantes.
+
+   A regra agora é: dentro do aplicativo, este caminho não existe. Lá o dono do
+   arquivo é o Android, e é com ele que falamos. */
 function podeLembrarArquivo(){
+  if(dentroDoAplicativo())return false;
   return typeof window!=="undefined" && typeof window.showSaveFilePicker==="function";
 }
 
@@ -3423,16 +3825,42 @@ function carregarDemo(){
    aparelho — nenhuma foto sobe para servidor nenhum. */
 const FOTO_DB="apotheca_fotos", FOTO_LOJA="fotos";
 let _fotoDB=null;
+/* ---------- v0.71.4: nada pode esperar para sempre ----------
+   O armazém de fotos é um banco do próprio navegador. Abrir esse banco devolve
+   uma promessa que, em tese, sempre termina — em sucesso ou em erro. Só que
+   dentro do WebView do Android, com a página vindo de file://, ele pode
+   simplesmente NÃO RESPONDER: nem sucesso, nem erro, nem nada.
+
+   Quando isso acontece, quem estiver esperando fica esperando para sempre. Foi
+   o que aconteceu no aparelho do Jorge: o backup escrevia "Preparando o
+   arquivo…" e morria ali, sem erro, sem janela, sem nada — porque estava parado
+   dentro desta função, aguardando uma resposta que nunca vinha. E como a
+   promessa fica guardada em `_fotoDB`, uma vez travada ela travava a sessão
+   inteira: toda tentativa seguinte morria no mesmo lugar.
+
+   A regra nova é simples e vale para o armazém todo: TUDO tem prazo. Se o banco
+   não responder em quatro segundos, desistimos dele e seguimos sem as fotos —
+   um backup sem fotos é infinitamente melhor do que um backup que nunca
+   acontece e não avisa. */
+function comPrazo(promessa,ms,recado){
+  return Promise.race([
+    promessa,
+    new Promise((_,err)=>setTimeout(()=>err(new Error(recado||"demorou demais")),ms||4000))
+  ]);
+}
 function fotoDB(){
   if(_fotoDB)return _fotoDB;
-  _fotoDB=new Promise((ok,err)=>{
+  _fotoDB=comPrazo(new Promise((ok,err)=>{
     try{
       const req=indexedDB.open(FOTO_DB,1);
       req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains(FOTO_LOJA))d.createObjectStore(FOTO_LOJA)};
       req.onsuccess=()=>ok(req.result);
       req.onerror=()=>err(req.error);
+      req.onblocked=()=>err(new Error("armazém de fotos bloqueado"));
     }catch(e){err(e)}
-  });
+  }),4000,"o armazém de fotos não respondeu");
+  /* Se travou, não guarda o fracasso para sempre: a próxima tentativa recomeça. */
+  _fotoDB.catch(()=>{_fotoDB=null});
   return _fotoDB;
 }
 async function fotoSalvar(id,dataUrl){
@@ -3447,11 +3875,13 @@ async function fotoLer(id){
   if(!id)return null;
   try{
     const d=await fotoDB();
-    return await new Promise((ok,err)=>{
+    /* v0.71.4: a leitura em si também tem prazo — abrir o banco e ler dele são
+       duas esperas distintas, e qualquer uma pode não voltar. */
+    return await comPrazo(new Promise((ok,err)=>{
       const t=d.transaction(FOTO_LOJA,"readonly");
       const r=t.objectStore(FOTO_LOJA).get(id);
       r.onsuccess=()=>ok(r.result||null); r.onerror=()=>err(r.error);
-    });
+    }),4000,"a foto não veio a tempo");
   }catch(e){return null}
 }
 async function fotoApagar(id){
@@ -4884,9 +5314,23 @@ async function confirmarNome(){
   }
   perfil={user:u,cidade,provedor:provPendente||"Google"};
   USUARIOS_APP.push({user:u,nome:u.split(/[._-]/)[0].replace(/^./,c=>c.toUpperCase()),cidade});
-  /* conta nova nasce com a adega ZERADA — a demonstração fica no menu, sob demanda */
-  vinhos=[];historico=[];eventos=[];seguindo=[];adegaDemo=false;
-  ADEGAS=[{id:"casa",nome:"Casa Principal",icone:"🏠"}];
+  /* ---------- v0.71: esta era a linha que apagou a adega de um usuário ----------
+     Estava assim: `vinhos=[];historico=[];...;persist()` — sem olhar se já havia
+     coleção ali dentro. Bastava alguém ser trazido a esta tela por engano (e o
+     `catch` vazio do login fazia isso a cada falha de rede) para que confirmar o
+     próprio nome destruísse tudo, sem pergunta e sem volta.
+
+     Agora só zera o que de fato é descartável: a adega de DEMONSTRAÇÃO, que é
+     vitrine e não pertence a ninguém, ou uma adega que já está vazia. Coleção de
+     verdade nunca é tocada por este caminho — no pior caso a pessoa entra com a
+     própria adega intacta, que é o erro certo a cometer. */
+  if(adegaDemo||!vinhos.length){
+    vinhos=[];historico=[];eventos=[];seguindo=[];
+    ADEGAS=[{id:"casa",nome:"Casa Principal",icone:"🏠"}];
+  }else{
+    socorroGuardar("cadastro de nome com adega cheia");
+  }
+  adegaDemo=false;
   adegaAtiva="todas";
   persist();refreshAdegaSelect();renderAdegaBar();renderColecao();renderHist();
   $("#login-screen").classList.remove("open");
