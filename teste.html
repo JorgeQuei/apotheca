@@ -1,4 +1,3 @@
-<!-- republicação 06/08/2026 21h: a publicação anterior do GitHub Pages falhou por erro interno deles (runner indisponível). Este comentário existe só para disparar uma nova. -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -753,7 +752,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.71.7"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.72"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2391,6 +2390,35 @@ function socorroRestaurar(){
     localStorage.setItem("__apo_t","1");localStorage.removeItem("__apo_t");PERSISTE=true;
   }catch(e){PERSISTE=false}
 })();
+
+/* ---------- v0.72: pedir ao navegador que NÃO descarte a adega ----------
+   O armazenamento de um site é, por padrão, descartável: o navegador pode
+   jogá-lo fora quando o aparelho fica sem espaço, e o Safari do iPhone apaga
+   sozinho o de qualquer site parado há sete dias. Uma adega de 200 rótulos
+   custou horas de digitação e cabe em 100 KB — ser tratada como cache é um
+   erro de categoria.
+
+   `navigator.storage.persist()` existe exatamente para isso: marca o depósito
+   como persistente. O Chrome concede sozinho a quem tem uso recorrente ou
+   instalou o app; o Safari não documenta o que faz. Não há garantia, e por
+   isso isto é UMA camada, não A solução — mas custa uma chamada e, quando é
+   concedida, elimina duas das três formas de a adega sumir sem ninguém mexer.
+
+   Silencioso de propósito: pedir não abre janela nenhuma nos navegadores
+   atuais, e um "não" não é notícia que o usuário possa acionar. Quem precisa
+   agir é o usuário de iPhone, e para ele já existe a faixa de instalar. */
+let ARMAZEM_PERSISTENTE=null;   /* true concedido · false negado · null não respondeu */
+async function garantirArmazemPersistente(){
+  try{
+    if(!navigator.storage||typeof navigator.storage.persist!=="function")return null;
+    if(typeof navigator.storage.persisted==="function"&&await navigator.storage.persisted()){
+      ARMAZEM_PERSISTENTE=true;return true;
+    }
+    ARMAZEM_PERSISTENTE=await navigator.storage.persist();
+    return ARMAZEM_PERSISTENTE;
+  }catch(e){ARMAZEM_PERSISTENTE=null;return null}
+}
+setTimeout(()=>{try{garantirArmazemPersistente()}catch(e){}},1200);
 /* v0.52: quem chega à vitrine (demonstração) pela primeira vez já encontra o
    mapa povoado — as garrafas distribuídas pelas prateleiras, como numa adega
    de verdade. Só roda quando NADA foi posicionado ainda: nunca mexe em mapa
@@ -2605,8 +2633,21 @@ function ehFundador(){
                liberdade de ir embora, que é o que torna seguro entrar. */
 
 const BK_MARCA="apotheca_backup";     /* {ts, garrafas, rotulos} do último backup */
-const BK_DIAS=21;                      /* tempo sem cópia que já incomoda */
-const BK_GARRAFAS=10;                  /* garrafas novas que já valem um aviso */
+/* ---------- v0.72: o alarme ficou mais curto e mais franco ----------
+   Na v0.71 estes números eram 21 dias e 10 garrafas. Estavam calibrados para
+   não incomodar. Em 06/08/2026 um testador perdeu 157 garrafas sem nunca ter
+   feito uma cópia, e no dia seguinte o próprio Jorge perdeu a adega inteira do
+   navegador — só não virou prejuízo porque ele tinha salvo um arquivo na
+   véspera. A diferença entre os dois casos foi o arquivo, e nada mais.
+
+   Educação demais aqui custa a coleção de alguém. Sete dias e cinco garrafas
+   incomodam mais, e é para incomodar mesmo. */
+const BK_DIAS=7;                       /* tempo sem cópia que já incomoda */
+const BK_GARRAFAS=5;                   /* garrafas novas que já valem um aviso */
+const BK_DIAS_GRAVE=21;                /* daqui em diante a faixa não basta: vira janela */
+const BK_NASCIMENTO="apotheca_adega_nasceu";  /* quando esta adega deixou de estar vazia */
+const BK_ALARME_VISTO="apotheca_alarme_visto";
+const BK_ALARME_FOLGA=3*86400000;      /* a janela grave não reaparece antes de 3 dias */
 let bkPend=null;                       /* backup lido, à espera de confirmação */
 
 function bkTotalGarrafas(){return vinhos.reduce((s,v)=>s+(+v.qtd||0),0)}
@@ -2623,15 +2664,78 @@ function bkQuando(){
 
 /* Só avisa quando o aviso muda alguma coisa: adega de verdade, com novidade
    suficiente para doer se sumisse. Demonstração e adega vazia nunca avisam. */
+/* Quando esta adega deixou de estar vazia. Sem isso não há como saber há
+   quanto tempo alguém coleciona SEM nunca ter feito uma cópia — que é
+   justamente o caso mais perigoso, e o único que a marca de backup não
+   enxerga (ela só existe depois do primeiro backup). */
+function bkNascimentoMarcar(){
+  try{
+    if(localStorage.getItem(BK_NASCIMENTO))return;
+    localStorage.setItem(BK_NASCIMENTO,String(Date.now()));
+    /* a adega acabou de deixar de ser hipótese: hora de pedir de novo ao
+       navegador que não a descarte — agora há uso real para justificar */
+    try{garantirArmazemPersistente()}catch(e){}
+  }catch(e){}
+}
+function bkDiasSemNenhumBackup(){
+  try{
+    const t=parseInt(localStorage.getItem(BK_NASCIMENTO)||"0",10);
+    return t?Math.floor((Date.now()-t)/86400000):0;
+  }catch(e){return 0}
+}
+
 function bkPendencia(){
   if(adegaDemo||!vinhos.length)return null;
+  bkNascimentoMarcar();
   const g=bkTotalGarrafas(), m=bkMarcaLer();
-  if(!m)return {primeiro:true,garrafas:g};
+  if(!m){
+    const d=bkDiasSemNenhumBackup();
+    return {primeiro:true,garrafas:g,dias:d,grave:d>=BK_DIAS_GRAVE};
+  }
   const dias=Math.floor((Date.now()-m.ts)/86400000);
   const novas=g-(+m.garrafas||0);
-  if(novas>=BK_GARRAFAS)return {primeiro:false,novas};
-  if(dias>=BK_DIAS)return {primeiro:false,dias};
+  if(dias>=BK_DIAS_GRAVE)return {primeiro:false,dias,grave:true};
+  if(novas>=BK_GARRAFAS)return {primeiro:false,novas,grave:false};
+  if(dias>=BK_DIAS)return {primeiro:false,dias,grave:false};
   return null;
+}
+
+/* ---------- v0.72: quando a faixa já não basta ----------
+   Faixa é fácil de ignorar, e ignorar faixa é o comportamento normal de todo
+   mundo — inclusive meu. Passadas três semanas com uma adega de verdade e
+   nenhuma cópia, o aviso passa a exigir um toque para sair da frente. Não
+   trava o aplicativo, não repete antes de três dias, e nunca aparece para a
+   demonstração nem para adega vazia. */
+function bkAlarmeGraveMostrar(){
+  const p=bkPendencia();
+  if(!p||!p.grave)return false;
+  try{
+    const t=parseInt(localStorage.getItem(BK_ALARME_VISTO)||"0",10);
+    if(t&&(Date.now()-t)<BK_ALARME_FOLGA)return false;
+    localStorage.setItem(BK_ALARME_VISTO,String(Date.now()));
+  }catch(e){}
+  const g=bkTotalGarrafas();
+  const quanto=p.primeiro
+    ? `A sua adega tem <b>${fmt(g)} garrafa${g===1?"":"s"}</b> e <b>nunca</b> foi copiada.`
+    : `Fazem <b>${p.dias} dias</b> desde a sua última cópia, e a adega tem <b>${fmt(g)} garrafa${g===1?"":"s"}</b>.`;
+  $("#modal-consume-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-consume')">✕</button>
+    <h3 class="serif">🛟 Só você tem a sua adega</h3>
+    <div class="sub">Este aviso aparece porque o risco é real, não por formalidade.</div>
+    <div class="explain-box" style="margin:14px 0;border-left-color:var(--warn)">
+      ${quanto}
+      <br><br>Ela mora <b>só neste aparelho</b>. Não está no nosso servidor, não está
+      na sua conta, não está em lugar nenhum além daqui — <b>nem nós temos cópia</b>.
+      Se este aparelho for perdido, trocado, formatado ou limpo, não há de onde voltar.
+      <br><br>Salvar leva menos de um minuto, e a cópia é sua: escolha o Drive, o iCloud,
+      o Dropbox, o OneDrive ou o seu e-mail.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('modal-consume');abrirBackup()">Salvar agora</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-consume')">Depois</button>
+    </div>`;
+  $("#modal-consume").classList.add("open");
+  return true;
 }
 
 /* ============================================================================
@@ -2673,8 +2777,8 @@ function renderFaixaInstalar(){
     el.classList.add("hidden");el.innerHTML="";return;
   }
   el.innerHTML=`<span style="font-size:17px;flex:none">📱</span>
-    <div style="flex:1;min-width:170px"><b>O Apotheca cabe na sua tela de início.</b>
-      Ícone próprio, tela cheia e funcionando sem internet — leva quinze segundos.</div>
+    <div style="flex:1;min-width:170px"><b>No iPhone, o Safari apaga os dados de sites parados há 7 dias.</b>
+      Instalar na tela de início tira o Apotheca dessa regra — leva quinze segundos.</div>
     <button class="btn btn-gold btn-sm" style="flex:none" onclick="abrirInstalarIOS()">Como faço</button>
     <button class="btn btn-ghost btn-sm" style="flex:none" onclick="instDispensar()">agora não</button>`;
   el.classList.remove("hidden");
@@ -2688,28 +2792,59 @@ const ICONE_SHARE=`<svg class="icone-share" width="19" height="19" viewBox="0 0 
 
 function abrirInstalarIOS(){
   const safari=/Safari/.test(navigator.userAgent)&&!/CriOS|FxiOS|EdgiOS|OPiOS/.test(navigator.userAgent);
+  const temAdega=!adegaDemo&&vinhos.length>0;
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
     <h3 class="serif">📱 Apotheca na tela de início</h3>
     <div class="sub">No iPhone e no iPad, o Apotheca se instala pelo próprio Safari — sem loja, sem cadastro, sem ocupar espaço.</div>
     <div class="explain-box" style="margin:14px 0">
-      O que muda depois de instalar: <b>ícone próprio</b> na tela, <b>tela cheia</b> sem as
-      barras do navegador, <b>funciona sem internet</b> e os <b>avisos</b> passam a ser
-      permitidos — a Apple só os libera para apps instalados.
-      <br><br>A sua adega continua a mesma: ela já mora neste aparelho e não se move.
+      <b>No iPhone, instalar não é enfeite — é o que protege a sua adega.</b>
+      O Safari apaga sozinho os dados de qualquer site que passe <b>sete dias sem ser
+      aberto</b>. Instalado na tela de início, o Apotheca deixa de estar sujeito a essa
+      regra. Vêm junto o <b>ícone próprio</b>, a <b>tela cheia</b>, o funcionamento
+      <b>sem internet</b> e os <b>avisos</b>, que a Apple só libera para apps instalados.
     </div>
+    <!-- ================== v0.72: O ALÇAPÃO QUE ESTAVA AQUI ==================
+         Até a v0.71.7 esta tela dizia: "A sua adega continua a mesma: ela já mora
+         neste aparelho e não se move." Era mentira, e da pior espécie — a que
+         tranquiliza antes da queda.
+         No iOS, o app instalado na tela de início tem armazenamento SEPARADO do
+         Safari. É exatamente por isso que ele escapa do apagamento de sete dias:
+         roda em outro processo, com outro depósito. Consequência: quem monta a
+         adega no Safari, lê a nossa frase e instala, abre o ícone novo e encontra
+         a adega VAZIA. Os dados não se perderam — continuam no Safari — mas a
+         pessoa não sabe disso, e foi a nossa frase que a convenceu de que não
+         precisava se preocupar.
+         Agora a tela conta a verdade e entrega o caminho: salve antes, restaure
+         depois. ================================================================= -->
+    <div class="explain-box" style="margin:14px 0;border-left-color:var(--warn)">
+      <b>Atenção antes de instalar:</b> no iPhone, o aplicativo instalado guarda os dados
+      num lugar <b>separado</b> do Safari. A adega que você montou aqui <b>não aparece
+      sozinha</b> lá dentro — ela continua existindo no Safari, mas o ícone novo começa
+      vazio.
+      <br><br>O caminho certo tem duas partes: <b>salve o backup agora</b>, e logo depois
+      de instalar, abra o ícone e use <b>Restaurar de um arquivo</b>.
+    </div>
+    ${temAdega?`<button class="btn btn-gold" style="width:100%;margin-bottom:12px"
+      onclick="abrirBackup()">💾 Salvar o backup antes de instalar</button>
+      <div style="font-size:11.5px;color:var(--ink-3);margin:-6px 0 12px">São ${fmt(bkTotalGarrafas())} garrafas em ${vinhos.length} rótulo${vinhos.length===1?"":"s"}. Guarde o arquivo onde você consiga achar daqui a cinco minutos.</div>`:""}
     ${safari?"":`<div class="explain-box" style="border-left-color:var(--warn)">
       Você parece estar em outro navegador. No iPhone, quem instala na tela de início é o
       <b>Safari</b> — abra <b>apotheca.app.br</b> nele e volte aqui.</div>`}
-    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 10px">TRÊS TOQUES</div>
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 10px">QUATRO PASSOS</div>
     <div class="passo-ios"><div class="n">1</div><div class="t">Toque no botão
       <b>Compartilhar</b> ${ICONE_SHARE} — o quadradinho com a seta para cima, na barra de baixo do Safari.</div></div>
     <div class="passo-ios"><div class="n">2</div><div class="t">Deslize a lista e escolha
       <b>“Adicionar à Tela de Início”</b>.</div></div>
     <div class="passo-ios"><div class="n">3</div><div class="t">Toque em <b>Adicionar</b>, no canto superior direito.
       Pronto: o ícone 🍷 aparece junto dos seus outros aplicativos.</div></div>
+    <div class="passo-ios"><div class="n">4</div><div class="t">Abra o <b>ícone novo</b> e vá em
+      <b>Configurações → 🛟 Backup da adega → 📂 Restaurar de um arquivo</b>. Escolha o arquivo
+      que você acabou de salvar e a adega volta inteira.</div></div>
     <div class="explain-box" style="margin-top:6px">
-      Daí em diante, abra sempre pelo ícone. É o mesmo Apotheca — só que com cara de aplicativo.
+      Daí em diante, abra <b>sempre pelo ícone</b>, e não mais pelo Safari — é lá que a sua
+      adega passa a morar. As duas continuam existindo lado a lado, então cadastrar vinho no
+      Safari depois disso cria uma segunda adega que ninguém vê.
     </div>
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="closeModal('modal-detail')">Entendi</button>
@@ -2745,11 +2880,14 @@ function renderFaixaBackup(){
 
   const p=bkPendencia();
   if(!p){el.classList.add("hidden");el.innerHTML="";return}
+  /* v0.72: o texto passou a dizer o que estava implícito — que ninguém, nem
+     nós, tem uma segunda via da adega desta pessoa. Era informação que só
+     aparecia dentro da tela de backup, onde quem não faz backup não entra. */
   const txt=p.primeiro
-    ? `<b>A sua adega existe só neste aparelho.</b> Guarde uma cópia onde você quiser — leva dez segundos e protege as ${fmt(p.garrafas)} garrafas.`
+    ? `<b>A sua adega existe só neste aparelho — nem nós temos cópia.</b> Guarde uma agora e proteja as ${fmt(p.garrafas)} garrafas.`
     : p.novas
-      ? `<b>${p.novas} garrafa${p.novas===1?"":"s"}</b> desde o seu último backup. Vale atualizar a cópia.`
-      : `O seu último backup foi <b>há ${p.dias} dias</b>. Vale atualizar a cópia.`;
+      ? `<b>${p.novas} garrafa${p.novas===1?"":"s"}</b> desde a sua última cópia. Só você tem a guarda da sua adega.`
+      : `A sua última cópia foi <b>há ${p.dias} dias</b>. Se este aparelho sumir hoje, é por ela que a adega volta.`;
   el.innerHTML=`<span style="font-size:17px;flex:none">🛟</span><div style="flex:1;min-width:160px">${txt}</div>
     <button class="btn btn-gold btn-sm" style="flex:none" onclick="abrirBackup()">Fazer backup</button>`;
   el.classList.remove("hidden");
@@ -3554,8 +3692,8 @@ function abrirConfiguracoes(){
       (n=>n?n+" com mapa":"nenhum ainda")(ADEGAS.filter(a=>a.grade).length),
       "closeModal('modal-detail');abrirMapaEscolha()",
       "Cada garrafa no seu lugar físico — prateleira e casa")}
-    ${podeInstalarNaTela()?linhaConfig("📱","Instalar na tela de início","iPhone e iPad",
-      "abrirInstalarIOS()","Ícone próprio, tela cheia e avisos — em três toques"):""}
+    ${podeInstalarNaTela()?linhaConfig("📱","Instalar na tela de início","recomendado no iPhone",
+      "abrirInstalarIOS()","O Safari apaga dados de sites parados há 7 dias — instalado, não apaga"):""}
     ${linhaConfig("💱","Moeda da adega",simboloMoeda()+" · "+(MOEDAS[MOEDA]||MOEDAS.BRL).nome,
       "abrirMoeda()",
       "Comprou fora? Guarde os preços na moeda em que você pagou")}
@@ -7879,6 +8017,20 @@ function dispensarVersao(){
 
 setTimeout(conferirVersaoNova, 5000);          /* depois que a primeira tela já apareceu */
 setInterval(conferirVersaoNova, 6*60*60*1000); /* e de seis em seis horas, para quem deixa aberto */
+/* ---------- v0.72: o alarme grave, uma vez por sessão ----------
+   Espera a poeira baixar: nove segundos é depois da tela de abertura e depois
+   da tarja de versão nova (cinco). Não fala por cima de nada — se houver
+   qualquer janela aberta, ou se a pessoa ainda estiver na trava ou no login,
+   desiste em silêncio e tenta na próxima abertura. */
+setTimeout(()=>{
+  try{
+    const aberto=id=>{const e=document.getElementById(id);return !!(e&&e.classList.contains("open"))};
+    if(aberto("login-screen")||aberto("trava-screen"))return;
+    if(aberto("modal-detail")||aberto("modal-consume")||aberto("menu-pop"))return;
+    bkAlarmeGraveMostrar();
+  }catch(e){}
+},9000);
+
 (function(){
   const ok=PERSISTE;
   const vb=$("#ver-badge");if(vb)vb.textContent="v"+APP_VERSION;
