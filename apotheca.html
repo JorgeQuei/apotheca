@@ -711,7 +711,7 @@ button.foto-vinho.vazia span{font-size:26px}
     <p style="color:var(--gold-soft);margin-top:-10px">Sua adega, inteligente</p>
     <button class="btn" style="background:#fff;color:#333;min-width:250px;display:flex;align-items:center;justify-content:center;gap:10px" onclick="iniciarLogin('Google')"><b style="color:#4285F4">G</b> Entrar com Google</button>
     <button class="btn" style="background:#000;color:#fff;min-width:250px;display:flex;align-items:center;justify-content:center;gap:10px" onclick="iniciarLogin('Apple')"> Entrar com Apple</button>
-    <p id="login-nota" style="font-size:11.5px;max-width:290px;opacity:.75;line-height:1.5">Login verdadeiro: você autoriza na tela oficial do Google e o app recebe seu e-mail verificado.</p>
+    <p id="login-nota" style="font-size:11.5px;max-width:290px;opacity:.75;line-height:1.5">Login verdadeiro: você autoriza na tela oficial do Google ou da Apple, e o app recebe apenas a sua identificação verificada.</p>
   </div>
   <div id="login-p2" class="hidden" style="background:var(--card);color:var(--ink);border-radius:18px;padding:24px;max-width:340px;width:92%;text-align:left">
     <h3 class="serif" style="font-size:22px;margin-bottom:4px">Escolha seu nome</h3>
@@ -752,7 +752,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.72"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.73"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1107,7 +1107,14 @@ try{sessao=JSON.parse(localStorage.getItem("apotheca_sessao"))||null}catch(e){}
 function ehSite(){return location.protocol==="https:"||location.protocol==="http:"}
 function tokenAtual(){return (sessao&&sessao.access_token)?sessao.access_token:SB_KEY}
 function salvarSessao(){try{sessao?localStorage.setItem("apotheca_sessao",JSON.stringify(sessao)):localStorage.removeItem("apotheca_sessao")}catch(e){}}
-function entrarGoogleReal(){
+/* ---------- v0.73: o mesmo caminho serve para os dois provedores ----------
+   O botão "Entrar com Apple" existia desde a v0.62 e era uma casca: quem
+   tocava recebia "por enquanto, use o Google". O Jorge observou os usuários de
+   iPhone em 07/08/2026 e todos, sem exceção, escolheram a Apple — e batiam
+   nessa porta pintada. A conversão de iPhone não era baixa: era zero, por
+   construção.
+   O fluxo é idêntico ao do Google; só muda o nome do provedor na URL. */
+function entrarComProvedor(prov){
   /* No APK a página mora em file://, onde location.origin vale "null" e o
      Google recusa OAuth dentro de WebView. Por isso o aplicativo abre o
      navegador do celular e volta pelo endereço apotheca://auth.
@@ -1115,17 +1122,60 @@ function entrarGoogleReal(){
      botão de entrar mandava o WebView para um endereço que não existe — e o
      aplicativo ficava preso numa página de erro, sem caminho de volta.
      Agora a escolha do caminho mora aqui dentro, e vale para todos. */
+  const p=(prov==="Apple")?"apple":"google";
+  const marca=(prov==="Apple")?"a Apple":"o Google";
   if(window.Apk&&Apk.abrirNavegador){
-    Apk.abrirNavegador(SB_BASE+"/auth/v1/authorize?provider=google&redirect_to="+encodeURIComponent("apotheca://auth"));
+    Apk.abrirNavegador(SB_BASE+"/auth/v1/authorize?provider="+p+"&redirect_to="+encodeURIComponent("apotheca://auth"));
     toast("🌐 Complete o login no navegador que abriu — eu trago você de volta. 🍷");
     return;
   }
   if(location.protocol!=="https:"&&location.protocol!=="http:"){
-    toast("O login com o Google funciona no aplicativo e no site. 🔑");
+    toast("O login com "+marca+" funciona no aplicativo e no site. 🔑");
     return;
   }
   const volta=location.origin+location.pathname;
-  location.href=SB_BASE+"/auth/v1/authorize?provider=google&redirect_to="+encodeURIComponent(volta);
+  location.href=SB_BASE+"/auth/v1/authorize?provider="+p+"&redirect_to="+encodeURIComponent(volta);
+}
+/* nome antigo mantido: a tela de erro de sincronização ainda chama por ele */
+function entrarGoogleReal(){ return entrarComProvedor("Google") }
+/* ---------- v0.73: a Apple só diz o nome UMA vez ----------
+   O Google devolve nome e foto em toda entrada. A Apple devolve o nome apenas
+   na PRIMEIRÍSSIMA autorização — da segunda em diante manda só o
+   identificador. Quem não guardar naquele instante fica sem o nome para
+   sempre, e a pessoa vira um perfil sem rosto na comunidade. Por isso o nome
+   vindo da Apple é copiado para um canto do aparelho assim que aparece, e
+   relido nas entradas seguintes.
+
+   O outro costume da Apple é o "Ocultar meu e-mail": em vez do endereço real
+   vem um apelido @privaterelay.appleid.com. Serve para entrar, mas não serve
+   para sugerir nome de usuário — propor "k7f2x9b3nm" é pior do que não propor
+   nada. Nesse caso o app se cala e deixa a pessoa escolher. */
+const APPLE_NOME="apotheca_nome_apple";
+const ehRelayApple=e=>/@privaterelay\.appleid\.com$/i.test(e||"");
+function absorverUsuario(u){
+  const meta=u.user_metadata||{};
+  const prov=(u.app_metadata&&(u.app_metadata.provider||(u.app_metadata.providers||[])[0]))||"";
+  sessao.uid=u.id;
+  sessao.email=u.email||"";
+  sessao.provedor=prov==="apple"?"Apple":prov==="google"?"Google":(prov?prov:"Google");
+  sessao.emailOculto=ehRelayApple(sessao.email);
+
+  let nome=meta.full_name||meta.name||"";
+  if(!nome&&Array.isArray(u.identities)){
+    for(const id of u.identities){
+      const d=id&&id.identity_data;
+      if(d&&(d.full_name||d.name)){nome=d.full_name||d.name;break}
+    }
+  }
+  if(sessao.provedor==="Apple"){
+    try{
+      if(nome)localStorage.setItem(APPLE_NOME,nome);
+      else nome=localStorage.getItem(APPLE_NOME)||"";
+    }catch(e){}
+  }
+  if(!nome&&!sessao.emailOculto)nome=(sessao.email||"").split("@")[0];
+  sessao.nome=nome||"";
+  sessao.foto=meta.avatar_url||meta.picture||null;
 }
 async function capturarRetornoOAuth(){
   const h=location.hash||"";
@@ -1139,9 +1189,7 @@ async function capturarRetornoOAuth(){
     const r=await fetch(SB_BASE+"/auth/v1/user",{headers:{apikey:SB_KEY,Authorization:"Bearer "+at}});
     if(!r.ok)throw new Error("auth "+r.status);
     const u=await r.json();
-    sessao.uid=u.id;sessao.email=u.email||"";
-    sessao.nome=(u.user_metadata&&(u.user_metadata.full_name||u.user_metadata.name))||(u.email||"").split("@")[0];
-    sessao.foto=(u.user_metadata&&(u.user_metadata.avatar_url||u.user_metadata.picture))||null;
+    absorverUsuario(u);
     salvarSessao();
     return true;
   }catch(e){sessao=null;salvarSessao();return false}
@@ -1179,9 +1227,7 @@ async function processarTokensExternos(frag){
     const r=await fetch(SB_BASE+"/auth/v1/user",{headers:{apikey:SB_KEY,Authorization:"Bearer "+at}});
     if(!r.ok)throw new Error("auth "+r.status);
     const u=await r.json();
-    sessao.uid=u.id;sessao.email=u.email||"";
-    sessao.nome=(u.user_metadata&&(u.user_metadata.full_name||u.user_metadata.name))||(u.email||"").split("@")[0];
-    sessao.foto=(u.user_metadata&&(u.user_metadata.avatar_url||u.user_metadata.picture))||null;
+    absorverUsuario(u);
     salvarSessao();
     await aposLoginGoogle();
   }catch(e){sessao=null;salvarSessao();toast("Não consegui validar o login — verifique a internet e tente de novo. 📡")}
@@ -1225,7 +1271,7 @@ async function aposLoginGoogle(){
         socorroGuardar("login com adega de outro @usuário");
         setTimeout(()=>toast("Esta adega estava guardada como @"+guardado.dono+". Ela continua aqui — confira antes de mexer. 🛟"),3200);
       }
-      perfil={user:r[0].usuario,cidade:r[0].cidade,provedor:"Google"};
+      perfil={user:r[0].usuario,cidade:r[0].cidade,provedor:(sessao&&sessao.provedor)||"Google"};
       persist();aplicarPerfilUI();
       renderDash();renderColecao();renderHist();refreshAdegaSelect&&refreshAdegaSelect();
       $("#login-screen").classList.remove("open");go("dashboard");
@@ -1268,7 +1314,9 @@ async function aposLoginGoogle(){
   $("#login-screen").classList.add("open");
   $("#login-p1").classList.add("hidden");$("#login-p2").classList.remove("hidden");
   const fb=$("#reg-feedback");
-  if(fb&&sessao&&sessao.email)fb.innerHTML='<span style="color:var(--ok)">✓ Conectado como '+esc(sessao.email)+'</span>';
+  if(fb&&sessao&&sessao.email)fb.innerHTML=sessao.emailOculto
+    ? '<span style="color:var(--ok)">✓ Conectado pela Apple, com o seu e-mail oculto</span>'
+    : '<span style="color:var(--ok)">✓ Conectado como '+esc(sessao.email)+'</span>';
   setTimeout(()=>{
     const i=$("#reg-user");
     if(i){
@@ -5398,18 +5446,20 @@ function sairSessao(){
     try{fetch(SB_BASE+"/auth/v1/logout",{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+sessao.access_token}}).catch(()=>{})}catch(e){}
     sessao=null;salvarSessao();
   }
+  /* v0.73: este texto reescrevia a nota da tela de entrada citando só o
+     Google — desfazendo, em tempo de execução, o que o HTML dizia certo.
+     Quem saísse da conta uma vez via a versão antiga até recarregar a página. */
   const nota=$("#login-nota");
   if(nota)nota.textContent=(ehSite()||window.Apk)
-    ?"Login verdadeiro: você autoriza na tela oficial do Google e o app recebe seu e-mail verificado. Nenhuma senha passa pelo Apotheca."
-    :"Neste visualizador local a entrada é pelo nome de usuário. O login Google real funciona no site e no aplicativo Android.";
+    ?"Login verdadeiro: você autoriza na tela oficial do Google ou da Apple, e o app recebe apenas a sua identificação verificada. Nenhuma senha passa pelo Apotheca."
+    :"Neste visualizador local a entrada é pelo nome de usuário. Os logins Google e Apple funcionam no site e no aplicativo Android.";
   $("#login-p1").classList.remove("hidden");$("#login-p2").classList.add("hidden");
   $("#login-screen").classList.add("open");
 }
 function iniciarLogin(prov){
   provPendente=prov;
-  /* site e APK: entrarGoogleReal() já sabe escolher o caminho de cada um */
-  if(prov==="Google"&&(ehSite()||(window.Apk&&Apk.abrirNavegador))){entrarGoogleReal();return}
-  if(prov==="Apple"){toast("🍎 O login Apple entra na fase de publicação na App Store — por enquanto, use o Google.");return}
+  /* site e APK: entrarComProvedor() já sabe escolher o caminho de cada um */
+  if((prov==="Google"||prov==="Apple")&&(ehSite()||(window.Apk&&Apk.abrirNavegador))){entrarComProvedor(prov);return}
   if(perfil){ /* APK: conta já existe neste aparelho, entra direto */
     $("#login-screen").classList.remove("open");go("dashboard");
     toast(`Bem-vindo de volta, @${perfil.user}! 🍷`);
@@ -5451,7 +5501,7 @@ async function confirmarNome(){
   }catch(e){
     if(String(e.message).includes("409")){$("#reg-feedback").innerHTML='<span style="color:var(--danger)">✗ @'+u+' acabou de ser registrado por outra pessoa — escolha outro.</span>';return}
   }
-  perfil={user:u,cidade,provedor:provPendente||"Google"};
+  perfil={user:u,cidade,provedor:(sessao&&sessao.provedor)||provPendente||"Google"};
   USUARIOS_APP.push({user:u,nome:u.split(/[._-]/)[0].replace(/^./,c=>c.toUpperCase()),cidade});
   /* ---------- v0.71: esta era a linha que apagou a adega de um usuário ----------
      Estava assim: `vinhos=[];historico=[];...;persist()` — sem olhar se já havia
