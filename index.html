@@ -752,7 +752,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.74"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.75"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1277,6 +1277,162 @@ async function processarTokensExternos(frag){
     await aposLoginGoogle();
   }catch(e){sessao=null;salvarSessao();toast("Não consegui validar o login — verifique a internet e tente de novo. 📡")}
 }
+/* ============ v0.75: FORMAS DE ENTRAR ============
+   08/08/2026, pedido do Jorge: "Se algum usuário quiser mudar o acesso para
+   sua conta Apple, terá que primeiro pedir para cancelar sua conta, não é
+   isso?" Era isso mesmo — e a resposta certa não é cancelar conta nenhuma.
+
+   O problema nasceu de um acidente de história: o botão "Entrar com Apple"
+   existia desde a v0.62 e era uma casca, então TODO usuário de iPhone criou
+   conta pelo Google. Agora que a porta da Apple abre, eles querem trocar — e a
+   função `vincular_perfil` do banco recusa mover um perfil que já tem dono
+   (e faz bem: é o que impede alguém de sequestrar a conta alheia).
+
+   A saída é uma conta com DUAS chaves. O Supabase chama isso de vínculo de
+   identidades: o mesmo usuário passa a ter Google e Apple apontando para ele,
+   entra por qualquer um dos dois, e continua sendo o mesmo @nome com a mesma
+   adega.
+
+   REGRA INEGOCIÁVEL DESTE MÓDULO: nada aqui toca em `vinhos`. Vincular é
+   operação de identidade, não de coleção. Ainda assim guardo uma cópia de
+   socorro antes de sair da página — depois da semana que tivemos, cinto e
+   suspensório. */
+const NOMES_PROV={google:"Google",apple:"Apple"};
+const VINCULO_VOLTA="vinculo";
+
+async function identidadesDaSessao(){
+  if(!sessao||!sessao.access_token)return null;
+  try{
+    const r=await fetch(SB_BASE+"/auth/v1/user",
+      {headers:{apikey:SB_KEY,Authorization:"Bearer "+sessao.access_token}});
+    if(!r.ok)throw new Error("user "+r.status);
+    const u=await r.json();
+    return (Array.isArray(u.identities)?u.identities:[]).map(i=>({
+      id:i.identity_id,
+      prov:String(i.provider||"").toLowerCase(),
+      email:(i.identity_data&&i.identity_data.email)||""
+    }));
+  }catch(e){return null}
+}
+
+async function abrirFormasDeEntrar(){
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🔑 Formas de entrar</h3>
+    <div class="sub">Conferindo com o servidor…</div>`;
+  $("#modal-detail").classList.add("open");
+  const ids=await identidadesDaSessao();
+  if(!ids){
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="closeModal('modal-detail')">✕</button>
+      <h3 class="serif">🔑 Formas de entrar</h3>
+      <div class="explain-box" style="margin-top:12px">
+        Não consegui falar com o servidor agora — <b>a sua adega está intacta</b>.
+        Confira a internet e tente de novo. 📡
+      </div>`;
+    return;
+  }
+  const tem=p=>ids.some(i=>i.prov===p);
+  const linha=i=>`
+    <div class="pessoa" style="cursor:default">
+      <span style="font-size:19px;flex:none">${i.prov==="apple"?"":"🇬"}</span>
+      <div class="inf"><b>${esc(NOMES_PROV[i.prov]||i.prov)}</b>
+      <small>${i.email?esc(i.email):"identidade verificada"}</small></div>
+      ${ids.length>1?`<button class="btn btn-ghost btn-sm" style="flex:none"
+        onclick="confirmarDesvincular('${esc(i.id)}','${esc(i.prov)}')">remover</button>`:""}
+    </div>`;
+  const faltando=["google","apple"].filter(p=>!tem(p));
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🔑 Formas de entrar</h3>
+    <div class="sub">A sua conta é <b>@${esc(perfil?perfil.user:"")}</b>. Estas são as portas que abrem nela.</div>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">EM USO</div>
+    ${ids.map(linha).join("")}
+
+    ${faltando.length?`
+    <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">ADICIONAR</div>
+    ${faltando.map(p=>`
+      <button class="btn ${p==="apple"?"btn-primary":"btn-ghost"}" style="width:100%;margin-bottom:8px"
+        onclick="vincularIdentidade('${p}')">${p==="apple"?"":"🇬"} Adicionar entrada pela ${NOMES_PROV[p]}</button>`).join("")}
+    <div class="explain-box" style="margin-top:6px">
+      <b>A sua adega não muda.</b> Você continua sendo <b>@${esc(perfil?perfil.user:"")}</b>, com as
+      mesmas garrafas, o mesmo histórico e os mesmos seguidores — só ganha mais um jeito de entrar.
+      Depois disso, tanto faz por qual porta você chega.
+    </div>`:`
+    <div class="explain-box" style="margin-top:12px">
+      Você já pode entrar pelas duas. Se um dia trocar de celular, qualquer uma delas
+      devolve a mesma conta.
+    </div>`}`;
+}
+
+async function vincularIdentidade(prov){
+  if(!sessao||!sessao.access_token){toast("Entre na sua conta antes de adicionar outra porta. 🔑");return}
+  /* cinto e suspensório: a operação não mexe na adega, mas vamos sair da
+     página e eu não quero descobrir surpresa na volta */
+  try{socorroGuardar("antes de vincular outra forma de entrar")}catch(e){}
+  toast("Preparando… ⏳");
+  const volta=location.origin+location.pathname+"?"+VINCULO_VOLTA+"="+prov;
+  const alvo=SB_BASE+"/auth/v1/user/identities/authorize?provider="+encodeURIComponent(prov)
+    +"&redirect_to="+encodeURIComponent(dentroDoAplicativo()?"apotheca://auth":volta)
+    +"&skip_http_redirect=true";
+  try{
+    const r=await fetch(alvo,{headers:{apikey:SB_KEY,Authorization:"Bearer "+sessao.access_token}});
+    const d=await r.json().catch(()=>null);
+    if(!r.ok||!d||!d.url){
+      const m=(d&&(d.msg||d.message||d.error_description))||("erro "+r.status);
+      if(/manual linking|not enabled|disabled/i.test(m))
+        toast("O vínculo de contas ainda não está ligado no servidor. Avise o Jorge. 🔧");
+      else toast("Não consegui iniciar o vínculo: "+m+" 📡");
+      return;
+    }
+    if(window.Apk&&Apk.abrirNavegador){
+      Apk.abrirNavegador(d.url);
+      toast("🌐 Conclua no navegador que abriu — eu trago você de volta.");
+      return;
+    }
+    location.href=d.url;
+  }catch(e){ toast("Não consegui falar com o servidor. A sua adega está intacta. 📡") }
+}
+
+function confirmarDesvincular(id,prov){
+  $("#modal-consume-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-consume')">✕</button>
+    <h3 class="serif">Remover a entrada pela ${esc(NOMES_PROV[prov]||prov)}?</h3>
+    <div class="explain-box" style="margin:14px 0;border-left-color:var(--warn)">
+      A sua adega e o seu @${esc(perfil?perfil.user:"")} <b>não mudam</b>. O que muda é que você
+      deixa de conseguir entrar por essa porta — vai precisar usar a outra.
+      <br><br>Só faça isso se tiver certeza de que ainda consegue entrar pela outra.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="desvincularIdentidade('${esc(id)}','${esc(prov)}')">Remover</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-consume')">Cancelar</button>
+    </div>`;
+  $("#modal-consume").classList.add("open");
+}
+
+async function desvincularIdentidade(id,prov){
+  closeModal("modal-consume");
+  try{
+    const r=await fetch(SB_BASE+"/auth/v1/user/identities/"+encodeURIComponent(id),
+      {method:"DELETE",headers:{apikey:SB_KEY,Authorization:"Bearer "+sessao.access_token}});
+    if(!r.ok)throw new Error("erro "+r.status);
+    toast("Entrada pela "+(NOMES_PROV[prov]||prov)+" removida. 🔑");
+    await abrirFormasDeEntrar();
+  }catch(e){ toast("Não consegui remover agora. Tente de novo. 📡") }
+}
+
+/* Chamada na volta do provedor: distingue "acabei de vincular" de "acabei de
+   entrar", para o app não dar as boas-vindas como se fosse um login novo. */
+function vinculoNaVolta(){
+  try{
+    const p=new URLSearchParams(location.search||"").get(VINCULO_VOLTA);
+    if(!p)return null;
+    try{history.replaceState(null,"",location.pathname+"#dashboard")}catch(e){}
+    return p;
+  }catch(e){return null}
+}
+
 async function aposLoginGoogle(){
   /* ---------- v0.71: por que esta função foi reescrita ----------
      Ela terminava num `catch(e){}` vazio que engolia QUALQUER erro — internet
@@ -3801,6 +3957,9 @@ function abrirConfiguracoes(){
       "closeModal('modal-detail');abrirZerarAdega()",
       adegaDemo?"Sair da demonstração e começar a sua adega de verdade"
                :"Apagar as garrafas deste aparelho e recomeçar do zero")}
+    ${(sessao&&perfil)?linhaConfig("🔑","Formas de entrar","Google e Apple",
+      "abrirFormasDeEntrar()",
+      "Use a mesma conta entrando pelo Google ou pela Apple — a adega é a mesma"):""}
     ${linhaConfig("🔒","Quem vê minha adega",
       privacidadeAdega==="publica"?"todos":privacidadeAdega==="privada"?"ninguém":"amigos",
       "closeModal('modal-detail');abrirPrivacidadeAdega()",
@@ -7979,7 +8138,17 @@ initSelects();renderAdegaBar();renderDishes();renderDash();renderColecao();rende
   try{veioDoGoogle=await capturarRetornoOAuth()}catch(e){}
   /* 2) sessão salva de visitas anteriores: renova se estiver vencida */
   if(!veioDoGoogle){try{await garantirSessaoValida()}catch(e){}}
-  if(veioDoGoogle){await aposLoginGoogle()}
+  const provVinculado=vinculoNaVolta();
+  if(veioDoGoogle&&provVinculado){
+    /* voltou de um VÍNCULO, não de um login: a conta é a mesma, a adega é a
+       mesma, e dar "bem-vindo de volta" aqui seria confuso. */
+    try{await garantirVinculo()}catch(e){}
+    aplicarPerfilUI();
+    setTimeout(()=>toast("Pronto — agora você também entra pela "+
+      (NOMES_PROV[provVinculado]||provVinculado)+". A sua adega continua a mesma. 🔑"),900);
+    setTimeout(()=>{try{abrirFormasDeEntrar()}catch(e){}},2600);
+  }
+  else if(veioDoGoogle){await aposLoginGoogle()}
   else if(!perfil){sairSessao()}
   else{aplicarPerfilUI()}
   /* convite de confraria chegando pela URL (?convite=APO-XXXXXX) ou guardado de antes do login */
