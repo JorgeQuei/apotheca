@@ -491,6 +491,7 @@ button.foto-vinho.vazia span{font-size:26px}
           <option value="safra">Ordenar: Safra</option>
           <option value="preco">Ordenar: Preço ↓</option>
           <option value="qtd">Ordenar: Quantidade ↓</option>
+          <option value="nota">Ordenar: Nota ↓</option>
         </select>
       </div>
       <div class="count-note" id="colecao-count"></div>
@@ -731,6 +732,8 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <!-- v0.76: aviso da porta errada — fica acima da tela de entrada -->
 <div class="avp" id="avp"><div class="avp-caixa" id="avp-corpo"></div></div>
+<!-- v0.78: a pergunta da volta — precisa aparecer por cima da ficha do vinho -->
+<div class="avp" id="nota-pop"><div class="avp-caixa" id="nota-pop-corpo" style="max-width:360px;text-align:center"></div></div>
 
 <!-- Scanner overlay -->
 <div class="scan-overlay" id="scanner">
@@ -761,7 +764,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.76"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.80"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2697,8 +2700,271 @@ const $=s=>document.querySelector(s);
 const fmt=n=>n.toLocaleString("pt-BR");
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2800)}
 function safraTxt(v){return v.safra?esc(v.safra):"NV"}
-/* Nota da comunidade Apotheca (simulada de forma estável por rótulo no protótipo) */
-function comunidade(v){const nota=(3.4+((v.id*37)%16)/10).toFixed(1);const n=(180+(v.id*577)%4200);return {nota,n}}
+/* ============ v0.77: A NOTA QUE O APLICATIVO INVENTAVA ============
+   Aqui morava isto:
+
+     function comunidade(v){ const nota=(3.4+((v.id*37)%16)/10).toFixed(1);
+                             const n=(180+(v.id*577)%4200); return {nota,n} }
+
+   `v.id` é um contador que começa em 100 e sobe de um em um a cada vinho
+   cadastrado NAQUELE aparelho. Ou seja: a "nota" era a posição do vinho na
+   adega, disfarçada de opinião. O ciclo se repetia a cada 16 rótulos —
+   3,8 · 4,3 · 4,8 · 3,7 · 4,2 · 4,7 · 3,6 … — e o mesmo vinho recebia notas
+   diferentes em adegas diferentes. Trocar uma garrafa de adega gerava id novo
+   e, com ele, uma nota nova para a mesma garrafa.
+
+   E o rótulo ao lado dizia "Nota média da comunidade Apotheca" e
+   "N avaliações de usuários". Não havia tabela de avaliações. Não havia
+   usuário nenhum por trás daquele número.
+
+   Relato do Jorge, 08/08/2026: um usuário cadastrou um Sassicaia de quase
+   R$ 4.000, nota 4,8 no Vivino, e o Apotheca cravou 3,7. Ele riu e perguntou
+   "de onde ele tirou essa conclusão?". Tirou da 4ª posição da adega dele.
+
+   Não dá para consertar a fórmula: enquanto não existir avaliação de verdade,
+   não existe versão honesta desse número. Então ele sai — e no lugar fica a
+   nota que a pessoa mesma deu, que é real e vem do histórico. Espaço vazio é
+   melhor que espaço mentindo. */
+/* A única nota verdadeira que o Apotheca tem sobre um vinho é a que a própria
+   pessoa deu ao abrir uma garrafa — ela mora no histórico. */
+function minhaNota(v){
+  /* v0.78: a nota passou a morar no próprio vinho — assim vale também para
+     quem ainda não abriu garrafa nenhuma. O histórico continua sendo a
+     memória da ocasião, e serve de reserva para as adegas antigas. */
+  const n=Math.max(0,Math.min(5,+v.nota||0));
+  if(n)return n;
+  const h=historico.find(x=>String(x.nome||"").startsWith(v.nome));
+  if(!h)return null;
+  const e=Math.max(0,Math.min(5,h.estrelas|0));
+  return e||null;
+}
+function estrelasTxt(e){return "★".repeat(Math.floor(e))+"☆".repeat(5-Math.floor(e))}
+
+/* ===== v0.79: O NÚMERO É O QUE O OLHO LÊ =====
+   Jorge: "o usuário do Vivino, tiro por mim, nem observa a quantidade de
+   estrelas e sim a nota grande que aparece para ele em cada vinho."
+
+   Ele tem razão, e junto veio uma correção que simplifica: **no Vivino ninguém
+   dá 4,6**. A pessoa toca em estrelas, de meia em meia; o 4,6 é a MÉDIA de
+   milhares. Entrada grosseira e rápida, saída com decimal. Pedir "digite 4,6"
+   no celular traria teclado no meio do caminho e precisão falsa — ninguém
+   distingue o próprio 4,6 do próprio 4,7.
+
+   Hoje a média só pode ser a nota da própria pessoa, porque as notas ainda não
+   saem do aparelho. `notaExibida()` já devolve a origem e a contagem para que,
+   quando existir a tabela de avaliações e o LWIN, "4,5 · sua nota" vire
+   "4,6 · 23 avaliações no Apotheca" sem mexer em tela nenhuma. */
+function notaTxt(n){return (Math.round(n*10)/10).toFixed(1).replace(".",",")}
+function estrelasHTML(n){
+  const v=Math.max(0,Math.min(5,+n||0));
+  let s="";
+  for(let e=1;e<=5;e++){
+    if(v>=e) s+='<span style="color:var(--gold)">★</span>';
+    else if(v>=e-0.5) s+='<span style="background:linear-gradient(90deg,var(--gold) 50%,var(--line) 50%);-webkit-background-clip:text;background-clip:text;color:transparent">★</span>';
+    else s+='<span style="color:var(--line)">★</span>';
+  }
+  return s;
+}
+/* devolve {valor, n, origem} — hoje sempre a nota de quem está usando o app */
+function notaExibida(v){
+  const n=minhaNota(v);
+  return n?{valor:n,n:1,origem:"sua"}:null;
+}
+
+/* ============ v0.78: OS OMBROS DOS GIGANTES ============
+   Ideia do Jorge: em vez de copiar a nota de fora — o que exigiria raspar
+   sites que proíbem isso por escrito —, o Apotheca LEVA a pessoa até lá e,
+   quando ela volta, pergunta o que ELA achou. A consulta deixa de ser porta
+   de saída e vira máquina de gerar nota nossa.
+
+   Escolha dos destinos, medida no navegador em 08/08/2026:
+   · Wine-Searcher — `/find/<nome>/<safra>` cai DIRETO na ficha do vinho e da
+     safra certa, com nota da comunidade, nota dos críticos e preço médio. Ele
+     ainda normaliza sozinho um nome vago. É o mais rápido: um toque, sem
+     tela intermediária. Por isso é o principal.
+   · Vivino — desvia para uma página de exploração com filtros e devolve uma
+     LISTA, não o vinho (na prova, trouxe a safra 2019 para uma busca de 2018).
+     Funciona e tem a cobertura popular que o Wine-Searcher não tem, mas é mais
+     lento. Por isso é o segundo.
+   · CellarTracker — descartado: não tem endereço de busca público estável
+     (a tentativa devolveu página em branco) e as notas da comunidade dele já
+     aparecem dentro do Wine-Searcher. Terceira opção que repete a primeira é
+     só mais uma decisão para o usuário tomar. */
+const REF_PENDENTE="apotheca_ref_pendente";
+const REF_PRAZO=45*60000;      /* consulta esquecida depois de 45 min */
+
+function refTermo(v){
+  return [v.nome,(v.vinicola&&v.vinicola!=="—")?v.vinicola:""].join(" ")
+    .replace(/\s+/g," ").trim();
+}
+function refURL(onde,v){
+  const t=refTermo(v);
+  if(onde==="ws"){
+    const slug=t.toLowerCase().replace(/[^a-z0-9]+/g,"+").replace(/^\++|\++$/g,"");
+    return "https://www.wine-searcher.com/find/"+slug+(v.safra?"/"+v.safra:"");
+  }
+  return "https://www.vivino.com/search/wines?q="+encodeURIComponent(t+(v.safra?" "+v.safra:""));
+}
+function consultarFora(onde,id){
+  const v=vinhos.find(x=>x.id===id);if(!v)return;
+  /* fica guardado no aparelho, e não só na memória: no iPhone o app pode ser
+     recarregado do zero quando a pessoa volta do Safari */
+  try{localStorage.setItem(REF_PENDENTE,JSON.stringify({id,ts:Date.now(),onde}))}catch(e){}
+  const w=window.open(refURL(onde,v),"_blank","noopener");
+  if(!w)location.href=refURL(onde,v);   /* bloqueou a aba: vai na mesma janela */
+}
+
+/* ---- a volta: "e você, qual a sua nota?" ---- */
+function refPendenteLer(){
+  try{
+    const p=JSON.parse(localStorage.getItem(REF_PENDENTE)||"null");
+    if(!p||!p.id)return null;
+    if(Date.now()-(p.ts||0)>REF_PRAZO){refPendenteLimpar();return null}
+    return p;
+  }catch(e){return null}
+}
+function refPendenteLimpar(){try{localStorage.removeItem(REF_PENDENTE)}catch(e){}}
+
+let notaPopId=null, notaPopVal=0;
+function perguntarMinhaNota(id){
+  const v=vinhos.find(x=>x.id===id);if(!v)return false;
+  notaPopId=id; notaPopVal=minhaNota(v)||0;
+  $("#nota-pop-corpo").innerHTML=`
+    <h3 class="serif" style="font-size:20px;margin-bottom:4px">E você, qual a sua nota?</h3>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:4px">
+      <b>${esc(v.nome)}</b> ${safraTxt(v)} · ${esc(v.vinicola)}</p>
+    <p style="font-size:12px;color:var(--ink-3);margin-bottom:14px">
+      Vale a <b>sua</b> experiência, não a nota que você acabou de ler.</p>
+    <div id="nota-pop-valor" style="font-size:44px;font-weight:700;line-height:1;color:var(--wine);margin-bottom:2px"></div>
+    <div id="nota-pop-estrelas" style="display:flex;gap:4px;justify-content:center;margin:10px 0 4px"></div>
+    <div style="font-size:11px;color:var(--ink-3);margin-bottom:16px">Toque de novo na mesma
+      estrela para <b>meia estrela</b> — é assim que se chega ao 4,5.</div>
+    <button id="nota-pop-ok" class="btn btn-primary" style="width:100%;margin-bottom:8px"
+      onclick="gravarMinhaNota()" disabled>Guardar a minha nota</button>
+    <button class="btn btn-ghost" style="width:100%" onclick="pedirReferencia()">Ainda não provei este vinho</button>`;
+  notaPopPintar();
+  $("#nota-pop").classList.add("open");
+  return true;
+}
+function notaPopPintar(){
+  const v=notaPopVal;
+  $("#nota-pop-valor").innerHTML=v?notaTxt(v):'<span style="color:var(--ink-3);font-size:24px;font-weight:400">—</span>';
+  $("#nota-pop-estrelas").innerHTML=[1,2,3,4,5].map(e=>{
+    const cheia=v>=e, meia=(!cheia&&v>=e-0.5);
+    const desenho=cheia?'<span style="color:var(--gold)">★</span>'
+      :meia?'<span style="background:linear-gradient(90deg,var(--gold) 50%,var(--line) 50%);-webkit-background-clip:text;background-clip:text;color:transparent">★</span>'
+      :'<span style="color:var(--line)">★</span>';
+    return `<button class="btn btn-ghost" style="font-size:28px;line-height:1;padding:6px 8px;border-color:transparent;min-width:44px"
+      onclick="notaPopToque(${e})" aria-label="${e} estrela${e>1?"s":""}">${desenho}</button>`;
+  }).join("");
+  const ok=$("#nota-pop-ok"); if(ok){ok.disabled=!v;ok.style.opacity=v?"1":".45"}
+}
+/* um toque põe a estrela cheia; o segundo toque na MESMA estrela tira meia.
+   É melhor no celular do que dividir cada estrela em duas metades de 25px —
+   aqui todo alvo tem os 44px que o dedo precisa. */
+function notaPopToque(e){
+  notaPopVal=(notaPopVal===e)?e-0.5:e;
+  if(notaPopVal<0.5)notaPopVal=0.5;
+  notaPopPintar();
+}
+function fecharNotaPop(){refPendenteLimpar();$("#nota-pop").classList.remove("open")}
+
+/* ===== v0.80: A REFERÊNCIA — o número que a pessoa VIU =====
+   Jorge: "o usuário observando o 96/100 poderia sim emitir uma classificação
+   em números para que a sua ficha não fique sem uma pontuação, mesmo que não
+   seja a sua."
+
+   Certo: uma adega de 35 rótulos em que 30 nunca foram abertos ficaria muda
+   justamente onde a informação ajudaria a decidir o que abrir hoje.
+
+   Duas regras que fazem isso não virar o §53 outra vez:
+   1. quem converte é a PESSOA, não o aplicativo. A régua de 100 pontos não
+      começa no zero (a do Parker começa em 50; abaixo de 80 quase não se
+      publica), então uma conta linear mentiria nas pontas — 85/100, que é um
+      vinho correto e sem graça, viraria 4,25, que no Vivino é um vinhaço;
+   2. a referência NUNCA entra em média. No dia em que as notas subirem para o
+      Supabase, sobe só o que a pessoa provou. Média feita de eco do
+      Wine-Searcher seria a nossa versão pior do número deles. */
+let refPopVal=0;
+function pedirReferencia(){
+  const v=vinhos.find(x=>x.id===notaPopId);if(!v){fecharNotaPop();return}
+  const p=refPendenteLer();
+  const fonte=p&&p.onde==="vivino"?"Vivino":(p&&p.onde==="ws"?"Wine-Searcher":"");
+  refPopVal=(v.ref&&+v.ref.n)||0;
+  $("#nota-pop-corpo").innerHTML=`
+    <h3 class="serif" style="font-size:19px;margin-bottom:4px">Que nota você daria pelo que viu?</h3>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:4px">
+      <b>${esc(v.nome)}</b> ${safraTxt(v)}</p>
+    <p style="font-size:12px;color:var(--ink-3);margin-bottom:12px">
+      Isto fica guardado como <b>referência</b> — não é a sua nota, e não conta como
+      avaliação sua. Serve para a ficha não ficar muda enquanto a garrafa não é aberta.</p>
+    <div id="nota-pop-valor" style="font-size:40px;font-weight:700;line-height:1;color:var(--ink-2)"></div>
+    <div id="nota-pop-estrelas" style="display:flex;gap:4px;justify-content:center;margin:8px 0 10px"></div>
+    <div class="field" style="text-align:left;margin-bottom:14px">
+      <label style="font-size:11.5px">Onde você viu (opcional)</label>
+      <input id="ref-txt" placeholder="ex.: 96/100 no Wine-Searcher"
+        value="${esc(v.ref&&v.ref.txt?v.ref.txt:(fonte?"no "+fonte:""))}">
+    </div>
+    <button id="nota-pop-ok" class="btn btn-primary" style="width:100%;margin-bottom:8px"
+      onclick="gravarReferencia()" disabled>Guardar a referência</button>
+    <button class="btn btn-ghost" style="width:100%" onclick="fecharNotaPop()">Não quero anotar</button>`;
+  refPopPintar();
+}
+function refPopPintar(){
+  const v=refPopVal;
+  $("#nota-pop-valor").innerHTML=v?notaTxt(v):'<span style="color:var(--ink-3);font-size:22px;font-weight:400">—</span>';
+  $("#nota-pop-estrelas").innerHTML=[1,2,3,4,5].map(e=>{
+    const cheia=v>=e, meia=(!cheia&&v>=e-0.5);
+    const cor=cheia?"var(--ink-3)":"var(--line)";
+    const desenho=meia
+      ?'<span style="background:linear-gradient(90deg,var(--ink-3) 50%,var(--line) 50%);-webkit-background-clip:text;background-clip:text;color:transparent">★</span>'
+      :`<span style="color:${cor}">★</span>`;
+    return `<button class="btn btn-ghost" style="font-size:26px;line-height:1;padding:6px 8px;border-color:transparent;min-width:44px"
+      onclick="refPopToque(${e})" aria-label="${e} estrela${e>1?"s":""}">${desenho}</button>`;
+  }).join("");
+  const ok=$("#nota-pop-ok"); if(ok){ok.disabled=!v;ok.style.opacity=v?"1":".45"}
+}
+function refPopToque(e){
+  refPopVal=(refPopVal===e)?e-0.5:e;
+  if(refPopVal<0.5)refPopVal=0.5;
+  refPopPintar();
+}
+function gravarReferencia(){
+  const v=vinhos.find(x=>x.id===notaPopId);
+  if(!v||!refPopVal)return;
+  v.ref={n:Math.round(refPopVal*2)/2, txt:(($("#ref-txt")||{}).value||"").trim().slice(0,60)};
+  persist(); refPendenteLimpar();
+  $("#nota-pop").classList.remove("open");
+  try{renderColecao()}catch(e){}
+  if($("#modal-detail").classList.contains("open")){try{openDetail(v.id)}catch(e){}}
+  toast("Referência anotada. A sua nota continua esperando a garrafa. 📝");
+}
+function refDoVinho(v){
+  const n=v&&v.ref?Math.max(0,Math.min(5,+v.ref.n||0)):0;
+  return n?{n,txt:(v.ref.txt||"")}:null;
+}
+function gravarMinhaNota(id,valor){
+  const alvo=(id===undefined)?notaPopId:id;
+  const nota=(valor===undefined)?notaPopVal:valor;
+  const v=vinhos.find(x=>x.id===alvo);
+  if(!nota)return;
+  if(v){v.nota=Math.max(0.5,Math.min(5,Math.round(nota*2)/2));persist();}
+  refPendenteLimpar();
+  $("#nota-pop").classList.remove("open");
+  try{renderColecao()}catch(err){}
+  if($("#modal-detail").classList.contains("open")){try{openDetail(alvo)}catch(err){}}
+  toast("Sua nota "+notaTxt(v?v.nota:nota)+" ficou guardada. É dela que a comunidade Apotheca vai nascer. ★");
+}
+/* pergunta só quando o app volta a ficar na frente, e nunca por cima de outra
+   janela que já esteja pedindo alguma coisa */
+function refConferirVolta(){
+  const p=refPendenteLer();if(!p)return;
+  if($("#nota-pop").classList.contains("open"))return;
+  if($("#login-screen").classList.contains("open")||$("#avp").classList.contains("open"))return;
+  setTimeout(()=>{ if(refPendenteLer())perguntarMinhaNota(p.id) },700);
+}
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden)refConferirVolta() });
+window.addEventListener("focus",refConferirVolta);
 function status(v){
   if(!v.jan) return {k:"auge",txt:"No auge"};
   if(ANO<v.jan[0]) return {k:"guardar",txt:"Guardar"};
@@ -3182,7 +3448,7 @@ let bkFotosPuladas=0;
    o nosso importador reconhece, então o CSV do backup volta para dentro do
    Apotheca pelo mesmo caminho de uma planilha do CellarTracker. */
 const BK_CSV=["Nome","Vinicola","Safra","Tipo","Uvas","Pais","Regiao","Quantidade","Preco",
-              "Adega","Posicao","JanelaInicio","JanelaFim","Corpo","Acidez","Taninos","Docura","Notas"];
+              "Adega","Posicao","JanelaInicio","JanelaFim","Corpo","Acidez","Taninos","Docura","Notas","MinhaNota","Referencia","OndeVi"];
 function bkCampo(x){const t=String(x==null?"":x);return /[",;\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t}
 function bkCSVTexto(){
   const l=[BK_CSV.join(",")];
@@ -3190,7 +3456,7 @@ function bkCSVTexto(){
     const a=adegaDe(v.adega);
     l.push([v.nome,v.vinicola,v.safra||"",v.tipo,(v.uvas||[]).join(" / "),v.pais,v.regiao,v.qtd,v.preco,
       a?a.nome:"",(Array.isArray(v.pos)?v.pos:[]).map(x=>posNome(a,x)).join(" / "),
-      (v.jan||[])[0]||"",(v.jan||[])[1]||"",v.corpo,v.acidez,v.tanino,v.doc,v.notas||""
+      (v.jan||[])[0]||"",(v.jan||[])[1]||"",v.corpo,v.acidez,v.tanino,v.doc,v.notas||"",v.nota||"",(v.ref&&v.ref.n)||"",(v.ref&&v.ref.txt)||""
     ].map(bkCampo).join(","));
   });
   /* o BOM faz o Excel abrir com os acentos certos, em vez de "Fran├ºa" */
@@ -6110,7 +6376,10 @@ function renderColecao(){
     const alvo=(v.nome+" "+v.vinicola+" "+v.regiao+" "+v.uvas.join(" ")).toLowerCase();
     return (!q||alvo.includes(q))&&(!ft||v.tipo===ft)&&(!fp||v.pais===fp);
   });
-  const sorters={nome:(a,b)=>a.nome.localeCompare(b.nome),safra:(a,b)=>(a.safra||9999)-(b.safra||9999),preco:(a,b)=>b.preco-a.preco,qtd:(a,b)=>b.qtd-a.qtd};
+  const sorters={nome:(a,b)=>a.nome.localeCompare(b.nome),safra:(a,b)=>(a.safra||9999)-(b.safra||9999),preco:(a,b)=>b.preco-a.preco,qtd:(a,b)=>b.qtd-a.qtd,
+    /* v0.80: só agora existe nota para ordenar. Vinho sem nota vai para o fim —
+       nunca para o começo como se fosse zero. */
+    nota:(a,b)=>((minhaNota(b)||refDoVinho(b)&&refDoVinho(b).n||-1)-(minhaNota(a)||refDoVinho(a)&&refDoVinho(a).n||-1))};
   lista.sort(sorters[ord]);
   const tot=lista.reduce((s,v)=>s+v.qtd,0);
   const escopoAdega=adegaAtiva==="todas"?"":" em "+adegaDe(adegaAtiva).icone+" "+adegaDe(adegaAtiva).nome;
@@ -6122,7 +6391,10 @@ function renderColecao(){
       <div style="flex:1;min-width:0"><h4>${esc(v.nome)} <span style="color:var(--ink-3);font-weight:400">${safraTxt(v)}</span></h4><div class="vin">${esc(v.vinicola)} · ${esc(v.regiao)}</div></div>
       <span class="badge" style="background:${CORES[v.tipo]||"#666"}">${esc(v.tipo)}</span></div>
       <div class="meta"><span>${esc(v.pais)}</span><span>${esc((v.uvas||[]).join(", "))}</span><span class="tag ${s.k}" style="padding:3px 8px">${s.txt}</span>${adegaAtiva==="todas"?`<span class="adega-loc">${esc(adegaDe(v.adega).icone)} ${esc(adegaDe(v.adega).nome)}</span>`:""}</div>
-      <div class="bottom"><span class="qty">${v.qtd} <small>garrafa${v.qtd>1?"s":""}</small></span><span style="font-size:12.5px;color:var(--ink-2)" title="Nota média da comunidade Apotheca"><span class="stars" style="font-size:13px">★</span> <b>${comunidade(v).nota}</b> · ${fmt(comunidade(v).n)} aval.</span></div>
+      <div class="bottom"><span class="qty">${v.qtd} <small>garrafa${v.qtd>1?"s":""}</small></span>${(r=>r
+        ?`<span title="${r.origem==="sua"?"A sua nota para este vinho":"Média no Apotheca"}"><b style="font-size:17px;color:var(--wine)">${notaTxt(r.valor)}</b> <span style="font-size:12px">${estrelasHTML(r.valor)}</span></span>`
+        :(x=>x?`<span title="Referência que você anotou — não é a sua nota" style="color:var(--ink-3)"><span style="font-size:9.5px;letter-spacing:.6px;border:1px solid var(--line);border-radius:4px;padding:1px 4px;vertical-align:2px">REF</span> <b style="font-size:15px;font-weight:600">${notaTxt(x.n)}</b></span>`:"")(refDoVinho(v))
+        )(notaExibida(v))}</div>
     </div>`;
   }).join("")||`<div class="empty" style="grid-column:1/-1"><div class="big">🔍</div>Nenhum vinho encontrado com esses filtros.</div>`;
   pintarFotos($("#wine-grid"));
@@ -6153,10 +6425,30 @@ function openDetail(id){
       <div><b>Doçura</b>${meter(v.doc)}</div>
       <div><b>Localização</b>${esc(adegaDe(v.adega).icone)} ${esc(adegaDe(v.adega).nome)} · ${v.qtd} garrafa${v.qtd>1?"s":""}${posTexto(v,6)}</div>
       <div><b>Preço de aquisição</b>${brl(v.preco)} / garrafa</div>
-      <div><b>Comunidade Apotheca</b><span class="stars">★</span> ${comunidade(v).nota} / 5,0 <span style="color:var(--ink-3)">(${fmt(comunidade(v).n)} avaliações de usuários)</span></div>
-      <div><b>Sua última nota</b>${(h=>h?`<span class="stars">${"★".repeat(Math.max(0,Math.min(5,h.estrelas|0)))}${"☆".repeat(5-Math.max(0,Math.min(5,h.estrelas|0)))}</span>`:"você ainda não avaliou")(historico.find(x=>String(x.nome||"").startsWith(v.nome)))}</div>
+      <div><b>${(r=>r&&r.origem!=="sua"?"Nota no Apotheca":"Sua nota")(notaExibida(v))}</b>${(r=>r
+        ?`<span style="font-size:26px;font-weight:700;color:var(--wine);vertical-align:-2px">${notaTxt(r.valor)}</span>
+           <span style="font-size:15px;margin-left:6px">${estrelasHTML(r.valor)}</span>
+           <span style="color:var(--ink-3);font-size:11.5px;margin-left:6px">${r.origem==="sua"?"":fmt(r.n)+" avaliações"}</span>
+           <button class="btn btn-ghost btn-sm" style="margin-left:8px;padding:2px 8px" onclick="perguntarMinhaNota(${v.id})">mudar</button>`
+        :`<button class="btn btn-ghost btn-sm" style="padding:2px 10px" onclick="perguntarMinhaNota(${v.id})">dar a minha nota</button>`)(notaExibida(v))}</div>
+      ${(x=>x?`<div><b>Referência</b><span style="font-size:9.5px;letter-spacing:.6px;border:1px solid var(--line);border-radius:4px;padding:1px 4px;color:var(--ink-3)">REF</span>
+        <b style="font-size:17px;color:var(--ink-2);margin-left:4px">${notaTxt(x.n)}</b>
+        <span style="color:var(--ink-3);font-size:11.5px;margin-left:6px">${x.txt?esc(x.txt)+" · ":""}anotado por você</span></div>`:"")(refDoVinho(v))}
     </div>
     <div class="notes">“${esc(v.notas)}”</div>
+    <div class="explain-box" style="margin-top:14px">
+      <b>Ver a nota lá fora</b><br>
+      <span style="font-size:12.5px">O Apotheca não copia nota de ninguém — ele te leva até a fonte,
+      e quando você voltar pergunta o que <b>você</b> achou.</span>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-gold btn-sm" style="flex:1;min-width:150px"
+          onclick="consultarFora('ws',${v.id})">🔎 Wine-Searcher</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1;min-width:120px"
+          onclick="consultarFora('vivino',${v.id})">Vivino</button>
+      </div>
+      <div style="font-size:11px;color:var(--ink-3);margin-top:8px">O Wine-Searcher costuma cair
+      direto na safra certa e mostra também a nota dos críticos. O Vivino tem mais vinho do dia a dia.</div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="openConsume(${v.id})">🍷 Abrir uma garrafa</button>
       <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Fechar</button>
@@ -6244,6 +6536,10 @@ function confirmConsume(id){
   let casaLivre=null;
   if(Array.isArray(v.pos)&&v.pos.length>v.qtd)casaLivre=v.pos.pop();
   historico.unshift({nome:`${v.nome} ${safraTxt(v)} · ${v.vinicola}`,prato:$("#c-prato").value||"—",data:new Intl.DateTimeFormat("pt-BR").format(new Date()),estrelas:rateSel||0});
+  /* v0.78: quem avalia ao abrir a garrafa também está dando a sua nota ao
+     rótulo — é a mesma opinião, e é a mais confiável de todas, porque veio
+     depois de beber. O histórico continua guardando a ocasião. */
+  if(rateSel)v.nota=Math.max(1,Math.min(5,rateSel|0));
   addAtividade(`abriu um <b>${v.nome} ${safraTxt(v)}</b>${$("#c-prato").value?" com "+$("#c-prato").value:""}`,rateSel||0);
   if(v.qtd<=0){vinhos=vinhos.filter(x=>x.id!==id);toast(`Última garrafa de ${v.nome} consumida — rótulo movido ao histórico. 🍷`)}
   else toast(`Saúde! Restam ${v.qtd} garrafa${v.qtd>1?"s":""} de ${v.nome}.${casaLivre?` Casa ${posNome(adegaDe(v.adega),casaLivre)} liberada no mapa.`:""} 🥂`);
