@@ -733,7 +733,7 @@ button.foto-vinho.vazia span{font-size:26px}
 <!-- v0.76: aviso da porta errada — fica acima da tela de entrada -->
 <div class="avp" id="avp"><div class="avp-caixa" id="avp-corpo"></div></div>
 <!-- v0.78: a pergunta da volta — precisa aparecer por cima da ficha do vinho -->
-<div class="avp" id="nota-pop"><div class="avp-caixa" id="nota-pop-corpo" style="max-width:360px;text-align:center"></div></div>
+<div class="avp" id="nota-pop" onclick="if(event.target===this)fecharNotaPop()"><div class="avp-caixa" id="nota-pop-corpo" style="max-width:360px;text-align:center;position:relative"></div></div>
 
 <!-- Scanner overlay -->
 <div class="scan-overlay" id="scanner">
@@ -764,7 +764,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.80"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.81"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2805,13 +2805,40 @@ function refURL(onde,v){
   }
   return "https://www.vivino.com/search/wines?q="+encodeURIComponent(t+(v.safra?" "+v.safra:""));
 }
+/* v0.81: DENTRO DO APLICATIVO ANDROID, O BOTÃO NÃO ABRIA NADA.
+   Relato do Jorge, no aparelho dele: "não abre nada do Vivino nem Wine-Searcher,
+   o link não funciona". A causa eram dois silêncios em fila:
+     · `window.open` é engolido pelo WebView, que não abre janelas novas;
+     · o `location.href` de reserva caía no shouldOverrideUrlLoading, que
+       devolve "já tratei" para todo endereço de fora e não faz nada.
+   O aplicativo recusava duas vezes e não contava nenhuma. E, pior, a consulta
+   já ficava marcada como pendente — então a pergunta "qual a sua nota?"
+   aparecia por causa de uma viagem que nunca aconteceu.
+   Agora: no Android o JS chama Apk.abrirFora(), que RESPONDE se conseguiu. Se
+   o aplicativo for antigo e nem tiver esse método, o app diz isso em vez de
+   fingir. E a consulta só é marcada quando alguma porta abriu de verdade. */
 function consultarFora(onde,id){
   const v=vinhos.find(x=>x.id===id);if(!v)return;
-  /* fica guardado no aparelho, e não só na memória: no iPhone o app pode ser
-     recarregado do zero quando a pessoa volta do Safari */
-  try{localStorage.setItem(REF_PENDENTE,JSON.stringify({id,ts:Date.now(),onde}))}catch(e){}
-  const w=window.open(refURL(onde,v),"_blank","noopener");
-  if(!w)location.href=refURL(onde,v);   /* bloqueou a aba: vai na mesma janela */
+  const url=refURL(onde,v);
+  const marcar=()=>{try{localStorage.setItem(REF_PENDENTE,JSON.stringify({id,ts:Date.now(),onde}))}catch(e){}};
+
+  if(window.Apk){
+    if(typeof Apk.abrirFora!=="function"){
+      toast("Esta versão do aplicativo ainda não abre sites de fora. Atualize o Apotheca — no site já funciona. 🔄");
+      return;
+    }
+    let ok=false;
+    try{ok=Apk.abrirFora(url)}catch(e){ok=false}
+    if(!ok){toast("Não consegui abrir o navegador deste aparelho. 📡");return}
+    marcar();return;
+  }
+
+  const w=window.open(url,"_blank","noopener");
+  if(w){marcar();return}
+  /* navegador bloqueou a aba nova: vai na mesma janela, e a marca fica para
+     quando a pessoa voltar */
+  marcar();
+  location.href=url;
 }
 
 /* ---- a volta: "e você, qual a sua nota?" ---- */
@@ -2830,6 +2857,8 @@ function perguntarMinhaNota(id){
   const v=vinhos.find(x=>x.id===id);if(!v)return false;
   notaPopId=id; notaPopVal=minhaNota(v)||0;
   $("#nota-pop-corpo").innerHTML=`
+    <button class="close" style="position:absolute;top:10px;right:12px" onclick="fecharNotaPop()"
+      aria-label="Fechar">✕</button>
     <h3 class="serif" style="font-size:20px;margin-bottom:4px">E você, qual a sua nota?</h3>
     <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:4px">
       <b>${esc(v.nome)}</b> ${safraTxt(v)} · ${esc(v.vinicola)}</p>
@@ -2892,6 +2921,8 @@ function pedirReferencia(){
   const fonte=p&&p.onde==="vivino"?"Vivino":(p&&p.onde==="ws"?"Wine-Searcher":"");
   refPopVal=(v.ref&&+v.ref.n)||0;
   $("#nota-pop-corpo").innerHTML=`
+    <button class="close" style="position:absolute;top:10px;right:12px" onclick="fecharNotaPop()"
+      aria-label="Fechar">✕</button>
     <h3 class="serif" style="font-size:19px;margin-bottom:4px">Que nota você daria pelo que viu?</h3>
     <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:4px">
       <b>${esc(v.nome)}</b> ${safraTxt(v)}</p>
@@ -2957,11 +2988,24 @@ function gravarMinhaNota(id,valor){
 }
 /* pergunta só quando o app volta a ficar na frente, e nunca por cima de outra
    janela que já esteja pedindo alguma coisa */
+/* v0.81: as guardas estavam ANTES do setTimeout, e não dentro dele. No WebView
+   os eventos de foco chegam em rajada; cada um agendava uma chamada, e as
+   chamadas seguintes redesenhavam a janela por cima da que já estava aberta —
+   zerando as estrelas que o Jorge acabara de tocar e trazendo de volta o passo
+   1 mesmo depois de ele apertar "ainda não provei". Era isso que prendia o
+   aplicativo naquela tela. Agora existe um único agendamento por vez, e quem
+   decide é o estado no momento de abrir, não o de 700ms antes. */
+let refTimer=null;
 function refConferirVolta(){
-  const p=refPendenteLer();if(!p)return;
-  if($("#nota-pop").classList.contains("open"))return;
-  if($("#login-screen").classList.contains("open")||$("#avp").classList.contains("open"))return;
-  setTimeout(()=>{ if(refPendenteLer())perguntarMinhaNota(p.id) },700);
+  if(refTimer)return;
+  if(!refPendenteLer())return;
+  refTimer=setTimeout(()=>{
+    refTimer=null;
+    const p=refPendenteLer();if(!p)return;
+    if($("#nota-pop").classList.contains("open"))return;
+    if($("#login-screen").classList.contains("open")||$("#avp").classList.contains("open"))return;
+    perguntarMinhaNota(p.id);
+  },700);
 }
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden)refConferirVolta() });
 window.addEventListener("focus",refConferirVolta);
