@@ -752,7 +752,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.73"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.74"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1177,7 +1177,48 @@ function absorverUsuario(u){
   sessao.nome=nome||"";
   sessao.foto=meta.avatar_url||meta.picture||null;
 }
+/* ---------- v0.74: o erro que voltava calado ----------
+   08/08/2026. O Jorge testou o login pela Apple e voltou para a tela dos
+   botões, sem explicação nenhuma. Ele me perguntou "isso é normal?" — e a
+   resposta estava escrita no próprio endereço do navegador:
+
+       ?error=invalid_request&error_code=bad_oauth_state
+       &error_description=OAuth+state+has+expired
+
+   O login tinha demorado demais (autenticação de dois fatores, mais a nossa
+   conversa no meio) e o bilhete de segurança do Supabase venceu. O aplicativo
+   SABIA disso e não contou: procurava tokens só depois do "#", enquanto o erro
+   vinha antes, no "?", e era descartado em silêncio.
+
+   É o mesmo defeito de fundo do backup que anunciava sucesso sem salvar (§44)
+   e da tela que prometia que a adega "não se move" (§46): o programa conhecia
+   a verdade e escolheu calar. Aqui ele passa a falar. */
+function recadoDeErroOAuth(cod,err,desc){
+  const tudo=(cod||"")+" "+(err||"")+" "+(desc||"");
+  if(/bad_oauth_state|expired/i.test(tudo))
+    return "O login demorou demais e expirou por segurança. Toque em entrar e conclua sem parar no meio. ⏱️";
+  if(/access_denied|cancel/i.test(tudo))
+    return "Login cancelado — nada mudou na sua adega. 🍷";
+  if(/invalid_client|unauthorized_client/i.test(tudo))
+    return "O provedor recusou este aplicativo. Avise o Jorge — é configuração, não é você. 🔧";
+  return "Não consegui concluir o login"+(cod?" ("+cod+")":"")+". Tente de novo. 📡";
+}
+function erroDeRetornoOAuth(){
+  try{
+    const q=new URLSearchParams((location.search||"").replace(/^\?/,""));
+    const h=new URLSearchParams((location.hash||"").replace(/^#/,""));
+    const cod=q.get("error_code")||h.get("error_code")||"";
+    const err=q.get("error")||h.get("error")||"";
+    if(!cod&&!err)return false;
+    const desc=q.get("error_description")||h.get("error_description")||"";
+    /* limpa o endereço para o aviso não ressurgir a cada recarga */
+    try{history.replaceState(null,"",location.pathname+"#dashboard")}catch(e){}
+    setTimeout(()=>{try{toast(recadoDeErroOAuth(cod,err,desc))}catch(e){}},700);
+    return true;
+  }catch(e){return false}
+}
 async function capturarRetornoOAuth(){
+  if(erroDeRetornoOAuth())return false;
   const h=location.hash||"";
   if(h.indexOf("access_token=")<0)return false;
   const p=new URLSearchParams(h.replace(/^#/,""));
@@ -1221,7 +1262,11 @@ async function garantirSessaoValida(){
 async function processarTokensExternos(frag){
   const p=new URLSearchParams((frag||"").replace(/^#/,""));
   const at=p.get("access_token"),rt=p.get("refresh_token"),ei=parseInt(p.get("expires_in")||"3600",10);
-  if(!at){toast("Login não concluído — tente de novo. 🔁");return}
+  if(!at){
+    /* v0.74: o WebView recebia o mesmo silêncio. Agora diz o porquê. */
+    toast(recadoDeErroOAuth(p.get("error_code"),p.get("error"),p.get("error_description")));
+    return;
+  }
   sessao={access_token:at,refresh_token:rt,expira:Date.now()+(ei-120)*1000};
   try{
     const r=await fetch(SB_BASE+"/auth/v1/user",{headers:{apikey:SB_KEY,Authorization:"Bearer "+at}});
