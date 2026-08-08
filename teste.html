@@ -91,6 +91,12 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .menu-pop .mi .cont{margin-left:auto;font-size:11px;background:var(--cream);padding:2px 8px;border-radius:99px;color:var(--ink-2)}
 .menu-pop .mtit{padding:10px 17px 5px;font-size:10.5px;font-weight:700;letter-spacing:1.2px;color:var(--ink-3)}
 .login-screen{position:fixed;inset:0;background:linear-gradient(170deg,var(--wine),#471323);z-index:200;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:#f4e8da;text-align:center;padding:24px}
+/* v0.76: o aviso da porta errada precisa aparecer POR CIMA da tela de entrada
+   (z-index 200) — por isso não usa o sistema de modais, que vive no 80 e ficaria
+   escondido atrás dela. */
+.avp{position:fixed;inset:0;background:rgba(20,8,14,.94);z-index:210;display:none;align-items:center;justify-content:center;padding:18px}
+.avp.open{display:flex}
+.avp-caixa{background:var(--card);color:var(--ink);border-radius:18px;max-width:430px;width:100%;padding:24px;text-align:left;max-height:88vh;overflow:auto;box-shadow:0 18px 60px rgba(0,0,0,.45)}
 .login-screen.open{display:flex}
 
 /* ===== Seletor de adegas ===== */
@@ -723,6 +729,9 @@ button.foto-vinho.vazia span{font-size:26px}
   </div>
 </div>
 
+<!-- v0.76: aviso da porta errada — fica acima da tela de entrada -->
+<div class="avp" id="avp"><div class="avp-caixa" id="avp-corpo"></div></div>
+
 <!-- Scanner overlay -->
 <div class="scan-overlay" id="scanner">
   <div class="scan-frame">
@@ -752,7 +761,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.75"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.76"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1399,7 +1408,7 @@ function confirmarDesvincular(id,prov){
   $("#modal-consume-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-consume')">✕</button>
     <h3 class="serif">Remover a entrada pela ${esc(NOMES_PROV[prov]||prov)}?</h3>
-    <div class="explain-box" style="margin:14px 0;border-left-color:var(--warn)">
+    <div class="explain-box" style="margin:14px 0;border-left:4px solid var(--warn)">
       A sua adega e o seu @${esc(perfil?perfil.user:"")} <b>não mudam</b>. O que muda é que você
       deixa de conseguir entrar por essa porta — vai precisar usar a outra.
       <br><br>Só faça isso se tiver certeza de que ainda consegue entrar pela outra.
@@ -2971,7 +2980,7 @@ function bkAlarmeGraveMostrar(){
     <button class="close" onclick="closeModal('modal-consume')">✕</button>
     <h3 class="serif">🛟 Só você tem a sua adega</h3>
     <div class="sub">Este aviso aparece porque o risco é real, não por formalidade.</div>
-    <div class="explain-box" style="margin:14px 0;border-left-color:var(--warn)">
+    <div class="explain-box" style="margin:14px 0;border-left:4px solid var(--warn)">
       ${quanto}
       <br><br>Ela mora <b>só neste aparelho</b>. Não está no nosso servidor, não está
       na sua conta, não está em lugar nenhum além daqui — <b>nem nós temos cópia</b>.
@@ -3066,7 +3075,7 @@ function abrirInstalarIOS(){
          precisava se preocupar.
          Agora a tela conta a verdade e entrega o caminho: salve antes, restaure
          depois. ================================================================= -->
-    <div class="explain-box" style="margin:14px 0;border-left-color:var(--warn)">
+    <div class="explain-box" style="margin:14px 0;border-left:4px solid var(--warn)">
       <b>Atenção antes de instalar:</b> no iPhone, o aplicativo instalado guarda os dados
       num lugar <b>separado</b> do Safari. A adega que você montou aqui <b>não aparece
       sozinha</b> lá dentro — ela continua existindo no Safari, mas o ícone novo começa
@@ -3077,7 +3086,7 @@ function abrirInstalarIOS(){
     ${temAdega?`<button class="btn btn-gold" style="width:100%;margin-bottom:12px"
       onclick="abrirBackup()">💾 Salvar o backup antes de instalar</button>
       <div style="font-size:11.5px;color:var(--ink-3);margin:-6px 0 12px">São ${fmt(bkTotalGarrafas())} garrafas em ${vinhos.length} rótulo${vinhos.length===1?"":"s"}. Guarde o arquivo onde você consiga achar daqui a cinco minutos.</div>`:""}
-    ${safari?"":`<div class="explain-box" style="border-left-color:var(--warn)">
+    ${safari?"":`<div class="explain-box" style="border-left:4px solid var(--warn)">
       Você parece estar em outro navegador. No iPhone, quem instala na tela de início é o
       <b>Safari</b> — abra <b>apotheca.app.br</b> nele e volte aqui.</div>`}
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 10px">QUATRO PASSOS</div>
@@ -5660,7 +5669,103 @@ function sairSessao(){
   $("#login-p1").classList.remove("hidden");$("#login-p2").classList.add("hidden");
   $("#login-screen").classList.add("open");
 }
+/* ==================== v0.76: A PORTA ERRADA ====================
+   Medição de 08/08: 36 dos 49 usuários do Apotheca estão no iPhone. Desde a
+   v0.73 o botão da Apple funciona de verdade — e é justamente aí que mora a
+   armadilha: quem já tem adega criada pela conta Google e aperta a Apple na
+   tela de entrada NÃO volta para casa. Abre uma conta nova, com outro nome de
+   usuário e a prateleira vazia (o mesmo estrago do §43).
+
+   Até aqui o aplicativo sabia disso — ele guarda `perfil.provedor` — e mandava
+   a pessoa embora calado. É o defeito de sempre: o programa conhece a verdade
+   e não conta. Esta tela conta antes, e ainda entrega a saída boa (entrar pela
+   porta certa e acrescentar a outra em Ajustes → Formas de entrar).
+
+   Fica FORA do sistema de modais de propósito: aqueles vivem no z-index 80 e
+   a tela de entrada está no 200 — apareceriam atrás dela, invisíveis. */
+let avpProv=null;
+
+function donoDaAdegaLocal(){
+  if(!perfil)return null;
+  /* Antes da v0.73 só existia uma porta. Perfil sem provedor anotado é, por
+     construção, conta do Google — isso não é chute, é a história do app. */
+  return perfil.provedor||"Google";
+}
+function precisaAvisarPorta(prov){
+  if(prov!=="Google"&&prov!=="Apple")return null;
+  const dono=donoDaAdegaLocal();
+  if(!dono||dono===prov)return null;
+  return dono;
+}
+function avpAbrir(prov){
+  const dono=precisaAvisarPorta(prov);
+  if(!dono)return false;
+  avpProv=prov;
+  const rot=(!adegaDemo&&vinhos.length)?vinhos.length:0;
+  const g=rot?bkTotalGarrafas():0;
+  const quando=bkQuando();
+  $("#login-screen").classList.remove("open");   /* o aviso precisa falar sozinho */
+  $("#avp-corpo").innerHTML=`
+    <h3 class="serif" style="font-size:21px;margin-bottom:6px">⚠️ Esta adega é da sua conta ${dono}</h3>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:14px">
+      Você pediu para entrar pela <b>${prov}</b>, mas a adega guardada neste aparelho
+      pertence à sua conta <b>${dono}</b>.</p>
+    <div class="explain-box" style="border-left:4px solid var(--warn);margin-bottom:14px">
+      Entrar pela ${prov} <b>não traz a sua adega junto</b>: abre uma conta nova, com
+      outro nome de usuário e <b>a prateleira vazia</b>. A sua adega não se perde — ela
+      continua existindo, ligada à conta ${dono}.
+    </div>
+    ${rot?`<div class="explain-box" style="border-left:4px solid var(--danger);margin-bottom:12px">
+      <b>Faça agora o backup da sua adega.</b> São ${fmt(g)} garrafas em ${rot}
+      rótulo${rot===1?"":"s"}${quando?` — a sua última cópia é de <b>${quando}</b>`:`, e <b>você ainda não tem nenhuma cópia</b>`}.
+      Um arquivo salvo agora devolve tudo, aconteça o que acontecer.
+    </div>
+    <button class="btn btn-gold" style="width:100%;margin-bottom:16px"
+      onclick="avpBackup()">💾 Salvar o backup da adega agora</button>`:""}
+    <button class="btn btn-primary" style="width:100%;margin-bottom:6px"
+      onclick="avpPortaCerta()">Entrar pela ${dono} — é a minha adega</button>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:0 0 16px">É por aqui que você
+      volta para casa. Depois, em <b>Ajustes → 🔑 Formas de entrar</b>, dá para acrescentar
+      a ${prov} à <b>mesma</b> conta — sem perder nada.</div>
+    <button class="btn btn-ghost" style="width:100%"
+      onclick="avpSeguirAssim()">Quero mesmo uma conta nova pela ${prov}</button>
+    <div style="font-size:11.5px;color:var(--ink-3);margin-top:6px">Escolha isto só se a
+      intenção for começar do zero, do lado da sua adega atual.</div>`;
+  $("#avp").classList.add("open");
+  return true;
+}
+function avpFechar(){$("#avp").classList.remove("open")}
+function avpPortaCerta(){
+  const dono=donoDaAdegaLocal();
+  avpFechar();$("#login-screen").classList.add("open");
+  iniciarLoginDireto(dono);
+}
+function avpSeguirAssim(){
+  const p=avpProv;
+  avpFechar();$("#login-screen").classList.add("open");
+  iniciarLoginDireto(p);
+}
+async function avpBackup(){
+  const p=avpProv;
+  const antes=(bkMarcaLer()||{}).ts||0;
+  /* fecha o aviso e mantém a tela de entrada escondida: o andamento do backup
+     (z-index 130) e os avisos (120) ficariam atrás dela se ela voltasse agora */
+  avpFechar();
+  try{await bkSalvar("json",true)}catch(e){}
+  const depois=(bkMarcaLer()||{}).ts||0;
+  /* §44: só anuncia sucesso se a marca mudou de verdade. Salvar que falhou e
+     diz que deu certo é pior do que não ter botão nenhum. */
+  if(depois>antes)setTimeout(()=>toast("Backup salvo. Agora escolha por onde entrar. 🛟"),400);
+  if(!avpAbrir(p))$("#login-screen").classList.add("open");
+}
+
 function iniciarLogin(prov){
+  /* v0.76: antes de mandar a pessoa para fora do app, conferir se esta é mesmo
+     a porta desta adega */
+  if(avpAbrir(prov))return;
+  iniciarLoginDireto(prov);
+}
+function iniciarLoginDireto(prov){
   provPendente=prov;
   /* site e APK: entrarComProvedor() já sabe escolher o caminho de cada um */
   if((prov==="Google"||prov==="Apple")&&(ehSite()||(window.Apk&&Apk.abrirNavegador))){entrarComProvedor(prov);return}
