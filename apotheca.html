@@ -764,7 +764,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.85"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.86"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -877,10 +877,27 @@ function expandirBase(j){
   }
   return out;
 }
-/* A base vem em pedaços — 3,8 MB cada. Dois motivos: o envio ao repositório
-   aceita 10 MB por arquivo, e o primeiro pedaço já deixa o aplicativo
-   utilizável enquanto os outros ainda estão chegando. Se um pedaço falhar,
-   o usuário fica com os que chegaram; nada quebra. */
+/* ====== v0.86: NUNCA MUDE O CONTEÚDO DE UM NOME DE ARQUIVO JÁ PUBLICADO ======
+   Na v0.85 eu troquei o FORMATO de `vinhos-db.json` — de vetor puro para
+   dicionário — mantendo o nome. O aplicativo novo lia os dois formatos, e eu
+   achei que isso bastava. Não bastava: quem importa não é o aplicativo novo,
+   é o que está no navegador das pessoas. A v0.83 em cache faz
+
+       if(Array.isArray(j) && j.length){ ... }
+
+   e o arquivo novo é objeto, não vetor. Resultado: rejeitava a base inteira e
+   caía na amostra embutida. O Jorge abriu o Sobre e viu "100 vinhos".
+   Compatibilidade para trás eu tinha feito; para FRENTE, que era a que
+   contava, não — o código antigo já estava distribuído e não podia mudar.
+
+   Conserto: `vinhos-db.json` volta a ser byte a byte o arquivo antigo, e a
+   base nova mora em nomes novos — base-1.json, base-2.json, base-3.json.
+   Quem tem versão velha em cache continua com os 100.646 de sempre; quem tem
+   a v0.86 pede os arquivos novos e recebe os 206.776. Ninguém fica com 100.
+
+   Os pedaços de 3,8 MB seguem por dois motivos: o envio ao repositório aceita
+   10 MB por arquivo, e o primeiro já deixa o aplicativo utilizável enquanto os
+   outros chegam em paralelo. Se um falhar, fica-se com os que chegaram. */
 function baixarJSON(u){
   return new Promise(res=>{
     try{
@@ -893,7 +910,7 @@ function baixarJSON(u){
   });
 }
 (function carregarBaseExterna(){
-  baixarJSON("vinhos-db.json").then(function(j){
+  baixarJSON("base-1.json").then(function(j){
     const b=expandirBase(j);
     if(!b)return;
     baseMundialPronta=b; baseIdx=null;
