@@ -773,7 +773,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.89"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.90"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -3788,8 +3788,26 @@ function bkDiasSemNenhumBackup(){
   }catch(e){return 0}
 }
 
+/* ====== v0.90: O BACKUP MUDOU DE PAPEL ======
+   Observação do Jorge: com a adega na nuvem, "a função backup ficou um pouco
+   obsoleta; o usuário só usa se realmente quiser guardar uma cópia consigo".
+
+   Ele está certo na metade que importa. O backup deixou de ser SEGURO e virou
+   SAÍDA — e a saída não pode morrer, por duas razões:
+
+   · é o que impede a pessoa de se sentir refém. No dia em que ela quiser
+     deixar o Apotheca, tem que poder levar a adega embora. A nossa própria
+     política promete isso (portabilidade, LGPD art. 18);
+   · a sincronia protege contra PERDER o aparelho, não contra APAGAR sem
+     querer. Se alguém excluir trinta rótulos por engano, a sincronia apaga
+     obedientemente nos três aparelhos. Arquivo guardado tem data e não obedece.
+
+   O que muda, então, é o TOM: com a sincronia ligada, o alarme se cala e a
+   tela deixa de falar em risco para falar em posse. */
 function bkPendencia(){
   if(adegaDemo||!vinhos.length)return null;
+  /* com a adega guardada na conta, o alarme perde a razão de existir */
+  if(typeof sincLigada==="function"&&sincLigada()&&sinc.versao>0)return null;
   bkNascimentoMarcar();
   const g=bkTotalGarrafas(), m=bkMarcaLer();
   if(!m){
@@ -4493,14 +4511,26 @@ function abrirBackup(){
   const comFotos=vinhos.filter(v=>v.fotoId).length;
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
-    <h3 class="serif">🛟 Backup da adega</h3>
-    <div class="sub">O Apotheca prepara o arquivo. Onde guardar é você quem decide.</div>
+    <h3 class="serif">${sincLigada()&&sinc.versao>0?"📤 Levar a minha adega":"🛟 Backup da adega"}</h3>
+    <div class="sub">${sincLigada()&&sinc.versao>0
+      ?"Uma cópia sua, para guardar onde você quiser."
+      :"O Apotheca prepara o arquivo. Onde guardar é você quem decide."}</div>
 
     <div class="explain-box" style="margin-top:12px">
-      A sua adega mora <b>neste aparelho</b> e nunca foi enviada a servidor nenhum —
-      nem ao nosso. Por isso ela também não volta sozinha se você trocar de celular.
-      Salve o arquivo no <b>Drive, iCloud, Dropbox, OneDrive</b>, no e-mail, onde preferir:
-      nós não escolhemos por você e não ficamos com cópia.
+      ${sincLigada()&&sinc.versao>0?`
+        A sua adega já está guardada na sua conta e volta sozinha em qualquer aparelho —
+        você <b>não precisa</b> deste arquivo para não perdê-la.
+        <br><br>Ele serve para outra coisa: <b>ter a sua adega com você</b>, fora daqui.
+        Para levar embora no dia em que quiser, para abrir numa planilha, ou para ter uma
+        foto de hoje — porque a sincronia protege contra perder o aparelho, mas não contra
+        apagar por engano: se um rótulo for excluído, ele some nos três aparelhos.
+        Um arquivo salvo tem data e não obedece.
+      `:`
+        A sua adega mora <b>neste aparelho</b> e nunca foi enviada a servidor nenhum —
+        nem ao nosso. Por isso ela também não volta sozinha se você trocar de celular.
+        Salve o arquivo no <b>Drive, iCloud, Dropbox, OneDrive</b>, no e-mail, onde preferir:
+        nós não escolhemos por você e não ficamos com cópia.
+      `}
     </div>
 
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:16px 0 6px">SITUAÇÃO</div>
@@ -4801,9 +4831,13 @@ function abrirConfiguracoes(){
     ${linhaConfig("💱","Moeda da adega",simboloMoeda()+" · "+(MOEDAS[MOEDA]||MOEDAS.BRL).nome,
       "abrirMoeda()",
       "Comprou fora? Guarde os preços na moeda em que você pagou")}
-    ${linhaConfig("🛟","Backup da adega",(q=>q?q:"nunca")(bkQuando()),
-      "abrirBackup()",
-      "Salve uma cópia onde você quiser — Drive, iCloud, Dropbox, e-mail")}
+    ${sincLigada()&&sinc.versao>0
+      ?linhaConfig("📤","Levar a minha adega",(q=>q?q:"exportar")(bkQuando()),
+        "abrirBackup()",
+        "Uma cópia sua, para guardar fora do aplicativo ou abrir numa planilha")
+      :linhaConfig("🛟","Backup da adega",(q=>q?q:"nunca")(bkQuando()),
+        "abrirBackup()",
+        "Salve uma cópia onde você quiser — Drive, iCloud, Dropbox, e-mail")}
     ${linhaConfig("☁️","Minha adega em todos os aparelhos",
       sincLigada()?"ligada ✓":"desligada",
       "abrirSincronia()",
