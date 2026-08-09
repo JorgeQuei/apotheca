@@ -764,7 +764,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.82"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.83"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2820,25 +2820,49 @@ function refURL(onde,v){
 function consultarFora(onde,id){
   const v=vinhos.find(x=>x.id===id);if(!v)return;
   const url=refURL(onde,v);
-  const marcar=()=>{try{localStorage.setItem(REF_PENDENTE,JSON.stringify({id,ts:Date.now(),onde}))}catch(e){}};
+  /* v0.83: a marca acumula os destinos já consultados nesta rodada, para a
+     janela da volta saber o que ainda falta oferecer. */
+  const ant=refPendenteLer();
+  const vistos=(ant&&ant.id===id&&Array.isArray(ant.vistos))?ant.vistos.slice():[];
+  if(vistos.indexOf(onde)<0)vistos.push(onde);
+  const marcar=()=>{try{localStorage.setItem(REF_PENDENTE,JSON.stringify({id,ts:Date.now(),onde,vistos}))}catch(e){}};
 
   if(window.Apk){
     if(typeof Apk.abrirFora!=="function"){
       toast("Esta versão do aplicativo ainda não abre sites de fora. Atualize o Apotheca — no site já funciona. 🔄");
-      return;
+      return false;
     }
     let ok=false;
     try{ok=Apk.abrirFora(url)}catch(e){ok=false}
-    if(!ok){toast("Não consegui abrir o navegador deste aparelho. 📡");return}
-    marcar();return;
+    if(!ok){toast("Não consegui abrir o navegador deste aparelho. 📡");return false}
+    marcar();return true;
   }
 
   const w=window.open(url,"_blank","noopener");
-  if(w){marcar();return}
+  if(w){marcar();return true}
   /* navegador bloqueou a aba nova: vai na mesma janela, e a marca fica para
      quando a pessoa voltar */
   marcar();
   location.href=url;
+  return true;
+}
+
+/* v0.83, pedido do Jorge: "se quando procurar no Wine, ver a classificação e
+   ter uma opção como 'Quer ver no Vivino também?' seria uma maravilha, pois
+   numa mesma pesquisa veria as minhas duas opções."
+   A janela da volta passa a oferecer o destino que faltou. Quem aceita sai,
+   olha, volta — e a pergunta reaparece, agora sem oferecer nada, porque os
+   dois já foram vistos. */
+const NOMES_FORA={ws:"Wine-Searcher",vivino:"Vivino"};
+function foraQueFalta(id){
+  const p=refPendenteLer();
+  if(!p||p.id!==id||!Array.isArray(p.vistos)||!p.vistos.length)return null;
+  const falta=["ws","vivino"].filter(x=>p.vistos.indexOf(x)<0);
+  return falta.length?falta[0]:null;
+}
+function verTambem(onde,id){
+  $("#nota-pop").classList.remove("open");
+  if(!consultarFora(onde,id))perguntarMinhaNota(id);   /* não abriu: devolve a janela */
 }
 
 /* ---- a volta: "e você, qual a sua nota?" ---- */
@@ -2872,6 +2896,10 @@ function perguntarMinhaNota(id){
     <div id="nota-pop-estrelas" style="display:flex;gap:4px;justify-content:center;margin:10px 0 4px"></div>
     <div style="font-size:11px;color:var(--ink-3);margin-bottom:16px">Toque nas estrelas — de novo
       na mesma para <b>meia</b> — ou <b>digite</b> a nota acima, com decimal: 4,7 vale.</div>
+    ${(f=>f?`<button class="btn btn-gold" style="width:100%;margin-bottom:10px"
+      onclick="verTambem('${f}',${id})">🔎 Ver também no ${NOMES_FORA[f]}</button>
+      <div style="font-size:11px;color:var(--ink-3);margin:-6px 0 12px">Você volta para cá
+      quando terminar — a sua nota continua esperando.</div>`:"")(foraQueFalta(id))}
     <button id="nota-pop-ok" class="btn btn-primary" style="width:100%;margin-bottom:8px"
       onclick="gravarMinhaNota()" disabled>Guardar a minha nota</button>
     <button class="btn btn-ghost" style="width:100%" onclick="pedirReferencia()">Ainda não provei este vinho</button>`;
@@ -2942,7 +2970,8 @@ let refPopVal=0;
 function pedirReferencia(){
   const v=vinhos.find(x=>x.id===notaPopId);if(!v){fecharNotaPop();return}
   const p=refPendenteLer();
-  const fonte=p&&p.onde==="vivino"?"Vivino":(p&&p.onde==="ws"?"Wine-Searcher":"");
+  const vistos=(p&&Array.isArray(p.vistos)&&p.vistos.length)?p.vistos:(p&&p.onde?[p.onde]:[]);
+  const fonte=vistos.map(x=>NOMES_FORA[x]||x).join(" e no ");
   refPopVal=(v.ref&&+v.ref.n)||0;
   $("#nota-pop-corpo").innerHTML=`
     <button class="close" style="position:absolute;top:10px;right:12px" onclick="fecharNotaPop()"
