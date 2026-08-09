@@ -773,7 +773,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.88"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.89"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2709,6 +2709,9 @@ function persist(){
     if(!vinhos.length)socorroGuardar("gravação com a adega vazia");
     localStorage.setItem(STORE_KEY,JSON.stringify({dono:perfil?perfil.user:null,adegaDemo,MOEDA,vinhos,ADEGAS,historico,eventos,seguindo,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,MURAL,meusBrindes,NEXT_ID,NEXT_EV,MSGS,BLOQUEADOS}));
     PERSISTE=true;
+    /* v0.89: qualquer alteração da adega — não só as que a fila registra —
+       agenda a subida. Sem isso, uma edição de preço ficava só aqui. */
+    if(typeof sincAgendar==="function")sincAgendar();
   }catch(e){PERSISTE=false}
 }
 
@@ -2941,11 +2944,97 @@ async function sincTrazer(){
     return r;
   }catch(e){ return {estado:"offline"} }
 }
-let sincTimerGrav=null;
+let sincTimerGrav=null,aplicandoDaNuvem=false;
 function sincAgendar(){          /* respiro: não grava a cada tecla */
-  if(!sincLigada())return;
+  if(!sincLigada()||aplicandoDaNuvem)return;
   clearTimeout(sincTimerGrav);
   sincTimerGrav=setTimeout(()=>sincronizar(),4000);
+}
+function sincRedesenhar(){
+  try{renderAdegaBar&&renderAdegaBar();renderColecao&&renderColecao();
+      renderDash&&renderDash();}catch(e){}
+}
+
+/* ====== v0.89: O APLICATIVO BUSCA SOZINHO ======
+   Relato do Jorge, minutos depois de a v0.88 subir: sincronizou no celular e
+   "no navegador do meu Mac não atualizou ainda". Ele achou que a falha era
+   dele, por não ter ligado a sincronia no navegador também. Não era.
+
+   Duas coisas faltavam, e as duas são minhas:
+
+   1. Mesmo com a sincronia LIGADA nos dois lados, eu só tinha escrito a
+      SUBIDA. Descer dependia de a pessoa apertar "Trazer a adega guardada".
+      Ou seja, o milagre que ele descreveu — "chego em casa, abro o navegador
+      e a adega está atualizada" — não acontecia sozinho. Agora acontece: ao
+      abrir, e toda vez que o aplicativo volta para a frente, ele pergunta ao
+      servidor se há versão mais nova e a traz.
+
+   2. Num aparelho onde a sincronia ainda está desligada, ninguém avisava que
+      existia uma adega guardada esperando. A pessoa tinha que saber procurar.
+      Agora, se você entrou na sua conta e há adega no servidor, o aplicativo
+      oferece uma vez — e continua sendo você quem decide. */
+async function sincAoAbrir(){
+  if(!sessao||!sessao.uid)return;
+  if(!sinc.on)return await sincOferecer();
+  try{
+    const r=await rpc("ler_adega",{});
+    if(!r||r.estado!=="ok")return;
+    if(r.versao>(sinc.versao|0)){
+      /* o servidor está à frente. Se este aparelho tem intenções guardadas,
+         elas são repetidas por cima do que veio — nunca descartadas. */
+      const juntada=fila.length?filaAplicar(r.dados,fila):r.dados;
+      aplicandoDaNuvem=true;
+      adegaDaNuvem(juntada);
+      sinc.versao=r.versao; sincGravar(); persist();
+      aplicandoDaNuvem=false;
+      sincRedesenhar();
+      if(fila.length){ await sincronizar(true) } else { filaLimpar() }
+      toast("Adega atualizada pelos seus outros aparelhos ☁️");
+    }else if(fila.length){
+      await sincronizar();
+    }
+  }catch(e){}
+}
+async function sincOferecer(){
+  if(localStorage.getItem("apotheca_sinc_convite")==="1")return;
+  try{
+    const r=await rpc("ler_adega",{});
+    if(!r||r.estado!=="ok"||!r.dados)return;
+    const n=(r.dados.vinhos||[]).length; if(!n)return;
+    localStorage.setItem("apotheca_sinc_convite","1");   /* convida uma vez só */
+    window.__sincConvite=r;
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="closeModal('modal-detail')">✕</button>
+      <h3 class="serif">☁️ Encontrei a sua adega</h3>
+      <div class="sub">Ela está guardada na sua conta, vinda de outro aparelho.</div>
+      <div class="explain-box" style="margin-top:14px">
+        <b>${n} rótulo${n===1?"":"s"} · ${r.garrafas} garrafa${r.garrafas===1?"":"s"}</b><br>
+        ${r.aparelho?"Gravada por: "+esc(r.aparelho)+"<br>":""}
+        ${r.atualizado?"Atualizada em "+esc(new Date(r.atualizado).toLocaleString("pt-BR")):""}
+      </div>
+      <p style="font-size:13.5px;line-height:1.6;margin-top:12px">
+        Quer usá-la também neste aparelho? A partir daí os dois ficam sempre
+        iguais, e você pode desligar quando quiser.</p>
+      <button class="btn btn-primary" style="width:100%;margin-top:10px"
+        onclick="sincAceitarConvite()">Sim, trazer para este aparelho</button>
+      <button class="btn btn-ghost" style="width:100%;margin-top:8px"
+        onclick="closeModal('modal-detail')">Agora não</button>`;
+    $("#modal-detail").classList.add("open");
+  }catch(e){}
+}
+async function sincAceitarConvite(){
+  const r=window.__sincConvite; if(!r)return;
+  if(vinhos.length)socorroGuardar("convite da sincronia");
+  sinc.on=true;
+  aplicandoDaNuvem=true;
+  adegaDaNuvem(r.dados);
+  sinc.versao=r.versao; sinc.quando=new Date().toISOString(); sincGravar();
+  filaLimpar(); persist();
+  aplicandoDaNuvem=false;
+  sincRedesenhar();
+  window.__sincConvite=null;
+  closeModal("modal-detail");
+  toast("Pronto! Sua adega está neste aparelho também ☁️✓");
 }
 
 /* Devolve a adega guardada pela cópia de socorro. Só o usuário manda nisso. */
@@ -3452,9 +3541,10 @@ window.addEventListener("focus",refConferirVolta);
 /* v0.88: ao voltar para o aplicativo, tenta sincronizar. É aqui que a fila
    guardada no modo avião finalmente viaja — "assim que você abrir com sinal". */
 document.addEventListener("visibilitychange",()=>{
-  if(!document.hidden&&typeof sincLigada==="function"&&sincLigada())sincAgendar();
+  if(!document.hidden&&typeof sincAoAbrir==="function")sincAoAbrir();
 });
-window.addEventListener("online",()=>{ if(typeof sincLigada==="function"&&sincLigada())sincAgendar() });
+window.addEventListener("online",()=>{ if(typeof sincAoAbrir==="function")sincAoAbrir() });
+setTimeout(()=>{ try{sincAoAbrir()}catch(e){} },2500);   /* na abertura */
 function status(v){
   if(!v.jan) return {k:"auge",txt:"No auge"};
   if(ANO<v.jan[0]) return {k:"guardar",txt:"Guardar"};
