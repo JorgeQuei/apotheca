@@ -773,7 +773,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.90"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.91"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2882,6 +2882,33 @@ function adegaDaNuvem(d){
 }
 function garrafasTotais(){return vinhos.reduce((s,v)=>s+(v.qtd||0),0)}
 
+/* ====== v0.91: O AVISO QUE NÃO PARAVA ======
+   Relato do Jorge, minutos depois da v0.90: "fica a todo instante aparecendo
+   'Adega atualizada por todos os aparelhos'".
+
+   O aviso estava certo; o motivo não. Na v0.89 eu fiz `persist()` agendar a
+   subida — para que uma edição de preço também viajasse. Só que `persist()` é
+   chamado por muita coisa que NÃO mexe na adega: a sincronia da comunidade, o
+   carregamento de encontros, o refresco do perfil. Cada uma dessas chamadas
+   gravava a adega no servidor de novo e **subia a versão sem nada ter mudado**.
+
+   Com dois aparelhos ligados, isso vira um pingue-pongue: o celular sobe uma
+   versão vazia de novidade, o Mac vê "versão mais nova" e avisa; o Mac sobe,
+   o celular vê "versão mais nova" e avisa. Para sempre, sem um único vinho
+   ter mudado de lugar.
+
+   O conserto não é calar o aviso — é parar de gravar à toa. Antes de falar
+   com o servidor, o aplicativo compara uma assinatura do conteúdo com a da
+   última gravação. Igual, não manda nada. */
+function sincAssinatura(){
+  try{
+    const t=JSON.stringify(adegaParaNuvem());
+    let h=5381;
+    for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;
+    return t.length+":"+(h>>>0).toString(36);
+  }catch(e){return ""}
+}
+
 let sincBusy=false,sincPendente=null;
 /* Uma volta só de conversa com o servidor. `forcar` manda gravar por cima. */
 async function sincGravarAgora(forcar){
@@ -2898,6 +2925,11 @@ async function sincGravarAgora(forcar){
 async function sincronizar(forcar){
   if(sincBusy)return {estado:"ocupado"};
   if(!sincLigada())return {estado:"desligada"};
+  const assin=sincAssinatura();
+  /* nada mudou desde a última gravação e não há fila: não há o que dizer.
+     Esta linha é o que impede a versão de subir à toa e o outro aparelho de
+     ser avisado de uma novidade que não existe. */
+  if(!forcar&&!fila.length&&assin&&assin===sinc.assin)return {estado:"igual"};
   sincBusy=true;
   try{
     let r=await sincGravarAgora(forcar);
@@ -2905,14 +2937,20 @@ async function sincronizar(forcar){
       /* outro aparelho gravou enquanto este esteve fora. Mandar o bloco
          apagaria aquele trabalho. Então a adega do servidor vira a base e as
          intenções desta fila são repetidas por cima dela. */
-      const juntada=filaAplicar(r.servidor,fila);
+      const tinhaFila=fila.length>0;
+      const juntada=tinhaFila?filaAplicar(r.servidor,fila):r.servidor;
+      aplicandoDaNuvem=true;
       adegaDaNuvem(juntada);
-      sinc.versao=r.versao; sincGravar(); persist();
-      r=await sincGravarAgora(true);
-      if(r&&(r.estado==="ok"||r.estado==="criada")){
-        renderAdegaBar&&renderAdegaBar(); renderColecao&&renderColecao(); renderDash&&renderDash();
-        toast("Adega juntada com a dos seus outros aparelhos ✓");
+      sinc.versao=r.versao; sinc.assin=sincAssinatura(); sincGravar(); persist();
+      aplicandoDaNuvem=false;
+      sincRedesenhar();
+      if(!tinhaFila){
+        /* só vim buscar. Não devolvo nada, senão subo a versão sem motivo e
+           deixo o outro aparelho "atrasado" por nada. */
+        filaLimpar();
+        return {estado:"ok",versao:r.versao,trazido:true};
       }
+      r=await sincGravarAgora(true);
     }
     if(r&&r.estado==="menor"){
       /* a adega deste aparelho é menor que a guardada. Não se substitui o
@@ -2923,6 +2961,7 @@ async function sincronizar(forcar){
     }
     if(r&&(r.estado==="ok"||r.estado==="criada")){
       sinc.versao=r.versao; sinc.quando=new Date().toISOString();
+      sinc.assin=sincAssinatura();
       sincGravar(); filaLimpar();
       fotosSubirPendentes();            /* em segundo plano, sem travar nada */
     }
@@ -2937,9 +2976,12 @@ async function sincTrazer(){
   try{
     const r=await rpc("ler_adega",{});
     if(!r||r.estado!=="ok")return r||{estado:"erro"};
+    aplicandoDaNuvem=true;
     adegaDaNuvem(r.dados);
-    sinc.versao=r.versao; sinc.quando=new Date().toISOString(); sincGravar();
+    sinc.versao=r.versao; sinc.quando=new Date().toISOString();
+    sinc.assin=sincAssinatura(); sincGravar();
     filaLimpar(); persist();
+    aplicandoDaNuvem=false;
     renderAdegaBar&&renderAdegaBar(); renderColecao&&renderColecao(); renderDash&&renderDash();
     return r;
   }catch(e){ return {estado:"offline"} }
@@ -2982,14 +3024,25 @@ async function sincAoAbrir(){
     if(r.versao>(sinc.versao|0)){
       /* o servidor está à frente. Se este aparelho tem intenções guardadas,
          elas são repetidas por cima do que veio — nunca descartadas. */
+      const antes=sincAssinatura();
+      const rotAntes=vinhos.length, gfAntes=garrafasTotais();
       const juntada=fila.length?filaAplicar(r.dados,fila):r.dados;
       aplicandoDaNuvem=true;
       adegaDaNuvem(juntada);
-      sinc.versao=r.versao; sincGravar(); persist();
+      sinc.versao=r.versao; sinc.assin=sincAssinatura(); sincGravar(); persist();
       aplicandoDaNuvem=false;
       sincRedesenhar();
       if(fila.length){ await sincronizar(true) } else { filaLimpar() }
-      toast("Adega atualizada pelos seus outros aparelhos ☁️");
+      /* v0.91: versão nova não é novidade. Só avisa se a adega REALMENTE
+         mudou de conteúdo — e só chama a atenção se mudou o que se vê. */
+      if(sinc.assin!==antes){
+        const dr=vinhos.length-rotAntes, dg=garrafasTotais()-gfAntes;
+        if(dr||dg){
+          const p1=dr?`${dr>0?"+":"−"}${Math.abs(dr)} rótulo${Math.abs(dr)===1?"":"s"}`:"";
+          const p2=dg?`${dg>0?"+":"−"}${Math.abs(dg)} garrafa${Math.abs(dg)===1?"":"s"}`:"";
+          toast("Adega atualizada ☁️ "+[p1,p2].filter(Boolean).join(" · "));
+        }
+      }
     }else if(fila.length){
       await sincronizar();
     }
@@ -3028,7 +3081,8 @@ async function sincAceitarConvite(){
   sinc.on=true;
   aplicandoDaNuvem=true;
   adegaDaNuvem(r.dados);
-  sinc.versao=r.versao; sinc.quando=new Date().toISOString(); sincGravar();
+  sinc.versao=r.versao; sinc.quando=new Date().toISOString();
+  sinc.assin=sincAssinatura(); sincGravar();
   filaLimpar(); persist();
   aplicandoDaNuvem=false;
   sincRedesenhar();
@@ -5051,7 +5105,7 @@ async function sincEscolher(qual){
   socorroGuardar("escolha na sincronia");
   if(qual==="nuvem"){
     adegaDaNuvem(r.servidor);
-    sinc.versao=r.versao; sincGravar(); filaLimpar(); persist();
+    sinc.versao=r.versao; sinc.assin=sincAssinatura(); sincGravar(); filaLimpar(); persist();
     renderAdegaBar&&renderAdegaBar(); renderColecao&&renderColecao(); renderDash&&renderDash();
     toast("Adega da nuvem trazida ✓");
   }else{
