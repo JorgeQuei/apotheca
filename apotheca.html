@@ -764,7 +764,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.81"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.82"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2864,10 +2864,14 @@ function perguntarMinhaNota(id){
       <b>${esc(v.nome)}</b> ${safraTxt(v)} · ${esc(v.vinicola)}</p>
     <p style="font-size:12px;color:var(--ink-3);margin-bottom:14px">
       Vale a <b>sua</b> experiência, não a nota que você acabou de ler.</p>
-    <div id="nota-pop-valor" style="font-size:44px;font-weight:700;line-height:1;color:var(--wine);margin-bottom:2px"></div>
+    <input id="nota-pop-valor" inputmode="decimal" autocomplete="off" placeholder="—"
+      oninput="notaPopDigitou(this.value)" onfocus="this.select()"
+      style="font-size:44px;font-weight:700;line-height:1.1;color:var(--wine);margin-bottom:2px;
+             width:150px;text-align:center;border:none;border-bottom:2px dashed var(--line);
+             background:transparent;padding:0 0 2px;font-family:inherit">
     <div id="nota-pop-estrelas" style="display:flex;gap:4px;justify-content:center;margin:10px 0 4px"></div>
-    <div style="font-size:11px;color:var(--ink-3);margin-bottom:16px">Toque de novo na mesma
-      estrela para <b>meia estrela</b> — é assim que se chega ao 4,5.</div>
+    <div style="font-size:11px;color:var(--ink-3);margin-bottom:16px">Toque nas estrelas — de novo
+      na mesma para <b>meia</b> — ou <b>digite</b> a nota acima, com decimal: 4,7 vale.</div>
     <button id="nota-pop-ok" class="btn btn-primary" style="width:100%;margin-bottom:8px"
       onclick="gravarMinhaNota()" disabled>Guardar a minha nota</button>
     <button class="btn btn-ghost" style="width:100%" onclick="pedirReferencia()">Ainda não provei este vinho</button>`;
@@ -2875,9 +2879,11 @@ function perguntarMinhaNota(id){
   $("#nota-pop").classList.add("open");
   return true;
 }
-function notaPopPintar(){
+function notaPopPintar(digitando){
   const v=notaPopVal;
-  $("#nota-pop-valor").innerHTML=v?notaTxt(v):'<span style="color:var(--ink-3);font-size:24px;font-weight:400">—</span>';
+  /* v0.82: enquanto o dedo está no teclado, o campo não pode ser reescrito por
+     baixo — senão "4," vira "4,0" no meio da digitação e o decimal nunca sai. */
+  if(!digitando){const c=$("#nota-pop-valor"); if(c)c.value=v?notaTxt(v):""}
   $("#nota-pop-estrelas").innerHTML=[1,2,3,4,5].map(e=>{
     const cheia=v>=e, meia=(!cheia&&v>=e-0.5);
     const desenho=cheia?'<span style="color:var(--gold)">★</span>'
@@ -2895,6 +2901,24 @@ function notaPopToque(e){
   notaPopVal=(notaPopVal===e)?e-0.5:e;
   if(notaPopVal<0.5)notaPopVal=0.5;
   notaPopPintar();
+}
+/* v0.82, pedido do Jorge depois de testar em três vinhos: "queria que o usuário
+   tivesse a opção de digitar a sua nota, ao invés de ficar clicando uma ou duas
+   vezes nas estrelas. Seria mais fidedigno."
+
+   Ele está certo, e eu estava aplicando a um caderno particular uma regra que
+   só valia para número afirmado em público. As estrelas continuam, porque
+   teclado no meio do fluxo é lento para quem só quer registrar depressa — os
+   dois caminhos vivem juntos, sem modo: tocou, o número muda; digitou, as
+   estrelas acompanham. */
+function notaPopDigitou(txt){
+  notaPopVal=notaDoTexto(txt);
+  notaPopPintar(true);
+}
+function notaDoTexto(txt){
+  const n=parseFloat(String(txt||"").replace(",","."));
+  if(!isFinite(n)||n<=0)return 0;
+  return Math.round(Math.min(5,n)*10)/10;   /* um decimal, teto em 5,0 */
 }
 function fecharNotaPop(){refPendenteLimpar();$("#nota-pop").classList.remove("open")}
 
@@ -2929,8 +2953,14 @@ function pedirReferencia(){
     <p style="font-size:12px;color:var(--ink-3);margin-bottom:12px">
       Isto fica guardado como <b>referência</b> — não é a sua nota, e não conta como
       avaliação sua. Serve para a ficha não ficar muda enquanto a garrafa não é aberta.</p>
-    <div id="nota-pop-valor" style="font-size:40px;font-weight:700;line-height:1;color:var(--ink-2)"></div>
+    <input id="nota-pop-valor" inputmode="decimal" autocomplete="off" placeholder="—"
+      oninput="refPopDigitou(this.value)" onfocus="this.select()"
+      style="font-size:40px;font-weight:700;line-height:1.1;color:var(--ink-2);width:140px;
+             text-align:center;border:none;border-bottom:2px dashed var(--line);
+             background:transparent;padding:0 0 2px;font-family:inherit">
     <div id="nota-pop-estrelas" style="display:flex;gap:4px;justify-content:center;margin:8px 0 10px"></div>
+    <div style="font-size:11px;color:var(--ink-3);margin-bottom:10px">Toque nas estrelas ou
+      <b>digite</b> — 96/100 vira 4,8 se for assim que você lê.</div>
     <div class="field" style="text-align:left;margin-bottom:14px">
       <label style="font-size:11.5px">Onde você viu (opcional)</label>
       <input id="ref-txt" placeholder="ex.: 96/100 no Wine-Searcher"
@@ -2941,9 +2971,9 @@ function pedirReferencia(){
     <button class="btn btn-ghost" style="width:100%" onclick="fecharNotaPop()">Não quero anotar</button>`;
   refPopPintar();
 }
-function refPopPintar(){
+function refPopPintar(digitando){
   const v=refPopVal;
-  $("#nota-pop-valor").innerHTML=v?notaTxt(v):'<span style="color:var(--ink-3);font-size:22px;font-weight:400">—</span>';
+  if(!digitando){const c=$("#nota-pop-valor"); if(c)c.value=v?notaTxt(v):""}
   $("#nota-pop-estrelas").innerHTML=[1,2,3,4,5].map(e=>{
     const cheia=v>=e, meia=(!cheia&&v>=e-0.5);
     const cor=cheia?"var(--ink-3)":"var(--line)";
@@ -2960,10 +2990,11 @@ function refPopToque(e){
   if(refPopVal<0.5)refPopVal=0.5;
   refPopPintar();
 }
+function refPopDigitou(txt){ refPopVal=notaDoTexto(txt); refPopPintar(true); }
 function gravarReferencia(){
   const v=vinhos.find(x=>x.id===notaPopId);
   if(!v||!refPopVal)return;
-  v.ref={n:Math.round(refPopVal*2)/2, txt:(($("#ref-txt")||{}).value||"").trim().slice(0,60)};
+  v.ref={n:Math.round(refPopVal*10)/10, txt:(($("#ref-txt")||{}).value||"").trim().slice(0,60)};
   persist(); refPendenteLimpar();
   $("#nota-pop").classList.remove("open");
   try{renderColecao()}catch(e){}
@@ -2979,7 +3010,7 @@ function gravarMinhaNota(id,valor){
   const nota=(valor===undefined)?notaPopVal:valor;
   const v=vinhos.find(x=>x.id===alvo);
   if(!nota)return;
-  if(v){v.nota=Math.max(0.5,Math.min(5,Math.round(nota*2)/2));persist();}
+  if(v){v.nota=Math.max(0.1,Math.min(5,Math.round(nota*10)/10));persist();}
   refPendenteLimpar();
   $("#nota-pop").classList.remove("open");
   try{renderColecao()}catch(err){}
