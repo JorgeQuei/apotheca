@@ -773,7 +773,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.87"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.88"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2759,6 +2759,7 @@ function filaAnotar(op){
   if(!op||!op.op)return;
   op.t=Date.now();
   fila.push(op); filaGravar(); pintarNuvem();
+  if(typeof sincAgendar==="function")sincAgendar();
 }
 function filaLimpar(){ fila=[]; filaGravar(); pintarNuvem(); }
 
@@ -2801,9 +2802,150 @@ function pintarNuvem(){
   if(!el)return;
   const n=fila.length;
   if(!n){el.classList.remove("show");return}
+  if(typeof sincLigada==="function"&&!sincLigada()){
+    /* sincronia desligada: a fila existe, mas não há para onde ir. Não
+       prometemos viagem nenhuma — seria mentir de um jeito novo. */
+    el.classList.remove("show");return;
+  }
   el.innerHTML="☁️ "+n+" alteraç"+(n===1?"ão":"ões")+" a caminho";
   el.title="Salvo neste aparelho. Chega aos seus outros aparelhos quando houver sinal.";
   el.classList.add("show");
+}
+
+/* ============ v0.88: A ADEGA EM TODOS OS APARELHOS ============
+   Desligado de fábrica. A política de privacidade promete que a adega não sai
+   do aparelho, e essa promessa continua verdadeira para quem não ligar nada.
+   Quem ligar sabe exatamente o que muda, porque leu antes de tocar no botão.
+
+   O que sobe: vinhos, adegas, histórico, eventos, moeda e os contadores.
+   O que NÃO sobe: perfil, confrarias, mural, mensagens, quem você segue.
+   Perfil carrega @usuário e cidade — subir junto anularia o sentido de a
+   tabela não ter dono. O resto é vida social, que já tem tratamento próprio.  */
+const SINC_KEY="apotheca_sinc_v1";
+let sinc={on:false,versao:0,quando:null};
+try{Object.assign(sinc,JSON.parse(localStorage.getItem(SINC_KEY))||{})}catch(e){}
+function sincGravar(){try{localStorage.setItem(SINC_KEY,JSON.stringify(sinc))}catch(e){}}
+function sincLigada(){return !!(sinc.on&&sessao&&sessao.uid)}
+
+function nomeAparelho(){
+  const u=navigator.userAgent||"";
+  if(window.Apk)return "Apotheca no Android";
+  if(/iPhone/.test(u))return "iPhone";
+  if(/iPad/.test(u))return "iPad";
+  if(/Android/.test(u))return "Android";
+  if(/Macintosh/.test(u))return "Mac";
+  if(/Windows/.test(u))return "Windows";
+  return "outro aparelho";
+}
+function adegaParaNuvem(){
+  return {vinhos,ADEGAS,historico,eventos,MOEDA,NEXT_ID,NEXT_EV};
+}
+/* Tudo o que chega da rede é dado de fora, e dado de fora entra pela portaria.
+   Um vinho sem `uvas` derrubava a tela inteira da Coleção — descoberto pelo
+   t088, com o servidor simulado devolvendo fichas incompletas. Não se conserta
+   isso na tela: conserta-se aqui, onde o dado entra. */
+function limparVinhoDeFora(v){
+  if(!v||typeof v!=="object")return null;
+  const n={...v};
+  n.id=+n.id||0; if(!n.id)return null;
+  n.nome=String(n.nome==null?"":n.nome)||"Sem nome";
+  n.qtd=Math.max(0,Math.min(9999,+n.qtd||0));
+  n.vinicola=String(n.vinicola==null?"—":n.vinicola);
+  n.regiao=String(n.regiao==null?"—":n.regiao);
+  n.pais=String(n.pais==null?"—":n.pais);
+  n.tipo=TIPOS.indexOf(n.tipo)>=0?n.tipo:"Tinto";
+  n.uvas=Array.isArray(n.uvas)?n.uvas.map(x=>String(x)):(n.uvas?[String(n.uvas)]:[]);
+  n.adega=String(n.adega==null?"":n.adega)||(ADEGAS[0]&&ADEGAS[0].id)||"casa";
+  n.safra=+n.safra||0;
+  n.preco=+n.preco||0;
+  for(const c of ["corpo","acidez","tanino","doc"])n[c]=Math.max(1,Math.min(5,+n[c]||3));
+  if(!Array.isArray(n.jan)||n.jan.length!==2)n.jan=[ANO,ANO+5];
+  if(!Array.isArray(n.pos))delete n.pos;
+  n.notas=String(n.notas==null?"":n.notas).slice(0,4000);
+  if(n.nota!=null)n.nota=Math.max(0,Math.min(5,+n.nota||0));
+  return n;
+}
+function adegaDaNuvem(d){
+  if(!d||!Array.isArray(d.vinhos))return false;
+  vinhos=d.vinhos.map(limparVinhoDeFora).filter(Boolean);
+  if(Array.isArray(d.ADEGAS)&&d.ADEGAS.length)ADEGAS=d.ADEGAS;
+  historico=Array.isArray(d.historico)?d.historico:[];
+  eventos=Array.isArray(d.eventos)?d.eventos:eventos;
+  if(d.MOEDA&&MOEDAS[d.MOEDA])MOEDA=d.MOEDA;
+  NEXT_ID=Math.max(NEXT_ID||0,d.NEXT_ID||0);
+  NEXT_EV=Math.max(NEXT_EV||0,d.NEXT_EV||0);
+  adegaDemo=false;
+  return true;
+}
+function garrafasTotais(){return vinhos.reduce((s,v)=>s+(v.qtd||0),0)}
+
+let sincBusy=false,sincPendente=null;
+/* Uma volta só de conversa com o servidor. `forcar` manda gravar por cima. */
+async function sincGravarAgora(forcar){
+  return await rpc("gravar_adega",{
+    p_versao:sinc.versao|0,
+    p_dados:adegaParaNuvem(),
+    p_rotulos:vinhos.length,
+    p_garrafas:garrafasTotais(),
+    p_aparelho:nomeAparelho(),
+    p_forcar:!!forcar
+  });
+}
+/* O coração. Três desfechos, e o do meio é a razão de a fila existir. */
+async function sincronizar(forcar){
+  if(sincBusy)return {estado:"ocupado"};
+  if(!sincLigada())return {estado:"desligada"};
+  sincBusy=true;
+  try{
+    let r=await sincGravarAgora(forcar);
+    if(r&&r.estado==="atrasado"){
+      /* outro aparelho gravou enquanto este esteve fora. Mandar o bloco
+         apagaria aquele trabalho. Então a adega do servidor vira a base e as
+         intenções desta fila são repetidas por cima dela. */
+      const juntada=filaAplicar(r.servidor,fila);
+      adegaDaNuvem(juntada);
+      sinc.versao=r.versao; sincGravar(); persist();
+      r=await sincGravarAgora(true);
+      if(r&&(r.estado==="ok"||r.estado==="criada")){
+        renderAdegaBar&&renderAdegaBar(); renderColecao&&renderColecao(); renderDash&&renderDash();
+        toast("Adega juntada com a dos seus outros aparelhos ✓");
+      }
+    }
+    if(r&&r.estado==="menor"){
+      /* a adega deste aparelho é menor que a guardada. Não se substitui o
+         cheio pelo vazio sem alguém mandar. É o socorroGuardar virado regra. */
+      sincPendente=r;
+      sincPerguntarMenor(r);
+      return r;
+    }
+    if(r&&(r.estado==="ok"||r.estado==="criada")){
+      sinc.versao=r.versao; sinc.quando=new Date().toISOString();
+      sincGravar(); filaLimpar();
+      fotosSubirPendentes();            /* em segundo plano, sem travar nada */
+    }
+    return r||{estado:"erro"};
+  }catch(e){
+    return {estado:"offline"};      /* sem sinal: a fila espera, nada se perde */
+  }finally{ sincBusy=false; pintarNuvem(); }
+}
+/* Traz a adega do servidor para um aparelho que ainda não a tem. */
+async function sincTrazer(){
+  if(!sincLigada())return {estado:"desligada"};
+  try{
+    const r=await rpc("ler_adega",{});
+    if(!r||r.estado!=="ok")return r||{estado:"erro"};
+    adegaDaNuvem(r.dados);
+    sinc.versao=r.versao; sinc.quando=new Date().toISOString(); sincGravar();
+    filaLimpar(); persist();
+    renderAdegaBar&&renderAdegaBar(); renderColecao&&renderColecao(); renderDash&&renderDash();
+    return r;
+  }catch(e){ return {estado:"offline"} }
+}
+let sincTimerGrav=null;
+function sincAgendar(){          /* respiro: não grava a cada tecla */
+  if(!sincLigada())return;
+  clearTimeout(sincTimerGrav);
+  sincTimerGrav=setTimeout(()=>sincronizar(),4000);
 }
 
 /* Devolve a adega guardada pela cópia de socorro. Só o usuário manda nisso. */
@@ -3307,6 +3449,12 @@ function refConferirVolta(){
 }
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden)refConferirVolta() });
 window.addEventListener("focus",refConferirVolta);
+/* v0.88: ao voltar para o aplicativo, tenta sincronizar. É aqui que a fila
+   guardada no modo avião finalmente viaja — "assim que você abrir com sinal". */
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden&&typeof sincLigada==="function"&&sincLigada())sincAgendar();
+});
+window.addEventListener("online",()=>{ if(typeof sincLigada==="function"&&sincLigada())sincAgendar() });
 function status(v){
   if(!v.jan) return {k:"auge",txt:"No auge"};
   if(ANO<v.jan[0]) return {k:"guardar",txt:"Guardar"};
@@ -4566,6 +4714,11 @@ function abrirConfiguracoes(){
     ${linhaConfig("🛟","Backup da adega",(q=>q?q:"nunca")(bkQuando()),
       "abrirBackup()",
       "Salve uma cópia onde você quiser — Drive, iCloud, Dropbox, e-mail")}
+    ${linhaConfig("☁️","Minha adega em todos os aparelhos",
+      sincLigada()?"ligada ✓":"desligada",
+      "abrirSincronia()",
+      sincLigada()?"A mesma adega no celular, no tablet e no computador"
+                  :"Hoje ela vive só neste aparelho — você decide se isso muda")}
     ${linhaConfig("📥","Importar de outro aplicativo","CSV",
       "abrirImportador()",
       "Traga a sua adega do CellarTracker, Vivino, VinoCell ou de planilha")}
@@ -4653,6 +4806,139 @@ function abrirAjuda(){
 }
 /* v0.52: a política de privacidade a um toque, dentro do app.
    No APK, window.open não abre o navegador — usa a ponte Apk.abrirNavegador */
+/* ============ v0.88: A TELA DA ESCOLHA ============
+   Ninguém liga isto por acidente. A tela diz o que sobe, o que não sobe, que
+   vai sem nome e que desligar apaga do servidor — antes do botão, não depois. */
+function abrirSincronia(){
+  const ligada=sincLigada();
+  const quando=sinc.quando?new Date(sinc.quando).toLocaleString("pt-BR"):null;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">☁️ Minha adega em todos os aparelhos</h3>
+    <div class="sub">Hoje a sua adega vive só neste aparelho. Você decide se isso muda.</div>
+
+    ${!sessao||!sessao.uid?`
+      <div class="explain-box" style="margin-top:14px">
+        <b>Para usar isto é preciso estar conectado.</b><br>
+        A sua adega é ligada à sua conta — sem conta, não há onde guardá-la nem
+        como devolvê-la a você no outro aparelho.
+      </div>`:`
+      <div class="explain-box" style="margin-top:14px">
+        <b>O que muda se você ligar</b><br>
+        A sua coleção passa a ser guardada também no nosso servidor, para
+        aparecer igual no celular, no tablet e no computador — sem backup manual.
+      </div>
+
+      <div style="font-size:13.5px;line-height:1.7;margin-top:14px">
+        <p style="margin-bottom:9px">🔒 <b>Vai sem o seu nome.</b> A adega fica ligada a um código que não
+        diz quem você é. Não guardamos nome, e-mail nem cidade junto dela.</p>
+        <p style="margin-bottom:9px">🗺️ <b>Vai a adega inteira, inclusive o mapa.</b> Para a coleção
+        aparecer completa no outro aparelho, a posição das garrafas sobe junto.
+        Preferimos dizer isso do que esconder num detalhe.</p>
+        <p style="margin-bottom:9px">🙅 <b>Não sobe</b> o seu perfil, as confrarias, o mural nem as
+        conversas. Só o acervo.</p>
+        <p style="margin-bottom:9px">↩️ <b>Você continua mandando.</b> Desligar apaga a sua adega do
+        servidor na mesma hora, e ela volta a viver só no aparelho.</p>
+      </div>
+
+      ${ligada?`
+        <div class="explain-box" style="margin-top:14px;background:#eef6ee">
+          <b>Ligada ✓</b><br>
+          ${quando?"Última sincronia: "+esc(quando)+".":"Ainda não sincronizou."}
+          ${fila.length?"<br>"+fila.length+" alteraç"+(fila.length===1?"ão":"ões")+" a caminho.":""}
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:12px"
+          onclick="sincAgora()">☁️ Sincronizar agora</button>
+        <button class="btn btn-ghost" style="width:100%;margin-top:8px"
+          onclick="sincBaixarDaNuvem()">📥 Trazer a adega guardada para este aparelho</button>
+        <button class="btn btn-ghost" style="width:100%;margin-top:8px;color:var(--danger);border-color:var(--danger)"
+          onclick="sincDesligar(this)">Desligar e apagar do servidor</button>
+      `:`
+        <button class="btn btn-primary" style="width:100%;margin-top:14px"
+          onclick="sincLigar()">Ligar a sincronização</button>
+        <div style="font-size:12px;color:var(--ink-3);text-align:center;margin-top:8px">
+          Desligado de fábrica. Nada sobe enquanto você não tocar aqui.</div>
+      `}
+    `}`;
+  $("#modal-detail").classList.add("open");
+}
+async function sincLigar(){
+  if(!sessao||!sessao.uid){toast("Entre na sua conta primeiro. 🔑");return}
+  sinc.on=true; sinc.versao=0; sincGravar();
+  toast("Ligando… ☁️");
+  const r=await sincronizar();
+  if(r.estado==="offline"){toast("Sem sinal agora — sobe assim que houver. 📡")}
+  else if(r.estado==="menor"){/* a tela do conflito já apareceu */}
+  else if(r.estado==="criada"||r.estado==="ok")toast("Pronto! Sua adega está nos seus aparelhos ☁️✓");
+  abrirSincronia();
+}
+async function sincAgora(){
+  toast("Sincronizando… ☁️");
+  const r=await sincronizar();
+  if(r.estado==="offline")toast("Sem sinal — a fila espera. 📡");
+  else if(r.estado==="ok"||r.estado==="criada")toast("Adega sincronizada ✓");
+  abrirSincronia();
+}
+async function sincBaixarDaNuvem(){
+  const r=await sincTrazer();
+  if(r.estado==="vazia")toast("Não há adega guardada ainda.");
+  else if(r.estado==="offline")toast("Sem sinal agora. 📡");
+  else if(r.estado==="ok")toast("Adega trazida para este aparelho ✓");
+  abrirSincronia();
+}
+async function sincDesligar(btn){
+  if(btn&&!btn.dataset.armado){
+    btn.dataset.armado="1";
+    btn.textContent="⚠️ Isto apaga a adega do servidor. Toque para confirmar";
+    setTimeout(()=>{if(btn.isConnected){btn.dataset.armado="";btn.textContent="Desligar e apagar do servidor"}},4000);
+    return;
+  }
+  try{
+    await fetch(SB_URL+"/adegas?dono=eq."+encodeURIComponent(sessao.uid),
+      {method:"DELETE",headers:{apikey:SB_KEY,Authorization:"Bearer "+tokenAtual()}});
+  }catch(e){}
+  await fotosApagarDaNuvem();      /* foto é parte da adega: sai junto */
+  sinc.on=false; sinc.versao=0; sinc.quando=null; sincGravar();
+  toast("Desligado. Sua adega voltou a viver só neste aparelho.");
+  abrirSincronia();
+}
+/* A pergunta do "menor": nunca substituir o cheio pelo vazio calado. */
+function sincPerguntarMenor(r){
+  const daqui=vinhos.length, gDaqui=garrafasTotais();
+  window.__sincConf=r;
+  $("#modal-detail-body").innerHTML=`
+    <h3 class="serif">⚠️ As duas adegas estão diferentes</h3>
+    <div class="sub">Não vou substituir uma pela outra sem você mandar.</div>
+    <div class="explain-box" style="margin-top:14px">
+      <b>Neste aparelho:</b> ${daqui} rótulo${daqui===1?"":"s"} · ${gDaqui} garrafa${gDaqui===1?"":"s"}<br>
+      <b>Guardada na nuvem:</b> ${r.rotulos} rótulo${r.rotulos===1?"":"s"} · ${r.garrafas} garrafa${r.garrafas===1?"":"s"}
+      ${r.aparelho?"<br><small>gravada por: "+esc(r.aparelho)+"</small>":""}
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:12px"
+      onclick="sincEscolher('nuvem')">📥 Ficar com a da nuvem (a maior)</button>
+    <button class="btn btn-ghost" style="width:100%;margin-top:8px"
+      onclick="sincEscolher('aqui')">📤 Ficar com a deste aparelho</button>
+    <div style="font-size:12px;color:var(--ink-3);margin-top:10px">
+      Antes de trocar, o aplicativo guarda uma cópia de socorro do que está aqui.</div>`;
+  $("#modal-detail").classList.add("open");
+}
+async function sincEscolher(qual){
+  const r=window.__sincConf; if(!r)return;
+  socorroGuardar("escolha na sincronia");
+  if(qual==="nuvem"){
+    adegaDaNuvem(r.servidor);
+    sinc.versao=r.versao; sincGravar(); filaLimpar(); persist();
+    renderAdegaBar&&renderAdegaBar(); renderColecao&&renderColecao(); renderDash&&renderDash();
+    toast("Adega da nuvem trazida ✓");
+  }else{
+    sinc.versao=r.versao; sincGravar();
+    const g=await sincronizar(true);
+    toast(g&&g.estado==="ok"?"A adega deste aparelho virou a oficial ✓":"Não consegui gravar agora. 📡");
+  }
+  window.__sincConf=null;
+  closeModal("modal-detail");
+}
+
 function abrirPolitica(){
   const u=SITE_URL+"politica-privacidade.html";
   if(window.Apk&&Apk.abrirNavegador)Apk.abrirNavegador(u);
@@ -4880,7 +5166,109 @@ async function fotoSalvar(id,dataUrl){
     t.oncomplete=()=>ok(id); t.onerror=()=>err(t.error);
   });
 }
+/* ====== v0.88: A FOTO QUE VIAJA COM O DONO ======
+   Decisão do Jorge, 09/08/2026: foto compartilhada entre usuários, não —
+   biblioteca comum é publicação, e publicação exige moderação sem fim. Foto
+   do próprio dono viajando com ele, sim: é o que faz a adega aparecer
+   completa no tablet em vez de com cartões cegos.
+
+   O barato disto é que ele já tinha construído a peça difícil sem saber. O
+   cartão e a ficha nunca leem a foto direto — penduram <img data-foto="id">
+   e o `pintarFotos` resolve depois. Então a nuvem coube DENTRO do fotoLer:
+
+       procura no aparelho  ->  achou? devolve
+                            ->  não achou, e a sincronia está ligada?
+                               baixa, guarda no aparelho, devolve
+
+   Uma função. O cartão não muda, a ficha não muda, o mapa não muda. E o
+   comportamento sob demanda sai de graça: as fotos chegam conforme os cartões
+   aparecem na tela, como em qualquer galeria — nada de baixar 50 MB na
+   abertura.
+
+   Para a nuvem vai uma versão menor (600 px) que a do aparelho (900 px):
+   basta para um cartão de celular e dobra quantas fotos cabem no plano
+   gratuito. O original em alta continua com quem fotografou. */
+const FOTO_BALDE="fotos";
+function fotoCaminho(id){
+  return (sessao&&sessao.uid?sessao.uid:"sem")+"/"+String(id).replace(/[^A-Za-z0-9_.-]/g,"_")+".jpg";
+}
+async function fotoSubir(id,dataUrl){
+  if(!sincLigada()||!id||!dataUrl)return false;
+  try{
+    const menor=await fotoComprimir(dataUrl,600,90000);
+    const bin=await (await fetch(menor)).blob();
+    const r=await fetch(SB_BASE+"/storage/v1/object/"+FOTO_BALDE+"/"+fotoCaminho(id)+"?upsert=true",
+      {method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+tokenAtual(),
+                              "Content-Type":"image/jpeg","x-upsert":"true"},body:bin});
+    return r.ok;
+  }catch(e){return false}
+}
+async function fotoBaixar(id){
+  if(!sincLigada()||!id)return null;
+  try{
+    const r=await fetch(SB_BASE+"/storage/v1/object/"+FOTO_BALDE+"/"+fotoCaminho(id),
+      {headers:{apikey:SB_KEY,Authorization:"Bearer "+tokenAtual()}});
+    if(!r.ok)return null;
+    const b=await r.blob();
+    if(!b||!b.size||b.size>3000000)return null;         /* portaria: nada absurdo entra */
+    if(b.type&&b.type.indexOf("image/")!==0)return null; /* e só imagem */
+    return await new Promise((ok,err)=>{
+      const f=new FileReader(); f.onload=()=>ok(f.result); f.onerror=()=>err(f.error);
+      f.readAsDataURL(b);
+    });
+  }catch(e){return null}
+}
+/* Ao ligar a sincronia, as fotos que já existiam aqui precisam subir também —
+   senão o outro aparelho recebe a adega e cartões cegos. Vai devagar, uma a
+   uma, para não estrangular a rede do usuário. */
+let fotosSubindo=false;
+async function fotosSubirPendentes(){
+  if(fotosSubindo||!sincLigada())return 0;
+  fotosSubindo=true; let n=0;
+  try{
+    const marca=JSON.parse(localStorage.getItem("apotheca_fotos_na_nuvem")||"{}");
+    for(const v of vinhos){
+      if(!v.fotoId||marca[v.fotoId])continue;
+      const url=await fotoLerLocal(v.fotoId);
+      if(!url)continue;
+      if(await fotoSubir(v.fotoId,url)){ marca[v.fotoId]=1; n++;
+        try{localStorage.setItem("apotheca_fotos_na_nuvem",JSON.stringify(marca))}catch(e){} }
+    }
+  }catch(e){}
+  finally{ fotosSubindo=false }
+  return n;
+}
+/* Desligar apaga a adega do servidor — e a política vai dizer isso. Foto é
+   parte da adega; deixá-la para trás seria cumprir a promessa pela metade. */
+async function fotosApagarDaNuvem(){
+  if(!sessao||!sessao.uid)return 0;
+  try{
+    const l=await fetch(SB_BASE+"/storage/v1/object/list/"+FOTO_BALDE,
+      {method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+tokenAtual(),
+                              "Content-Type":"application/json"},
+       body:JSON.stringify({prefix:sessao.uid,limit:1000})});
+    if(!l.ok)return 0;
+    const lista=await l.json();
+    if(!Array.isArray(lista)||!lista.length)return 0;
+    const alvos=lista.map(o=>sessao.uid+"/"+o.name);
+    const d=await fetch(SB_BASE+"/storage/v1/object/"+FOTO_BALDE,
+      {method:"DELETE",headers:{apikey:SB_KEY,Authorization:"Bearer "+tokenAtual(),
+                                "Content-Type":"application/json"},
+       body:JSON.stringify({prefixes:alvos})});
+    if(d.ok){try{localStorage.removeItem("apotheca_fotos_na_nuvem")}catch(e){}}
+    return d.ok?alvos.length:0;
+  }catch(e){return 0}
+}
 async function fotoLer(id){
+  if(!id)return null;
+  const local=await fotoLerLocal(id);
+  if(local)return local;
+  /* não está aqui: pode ser um vinho que chegou pela nuvem, de outro aparelho */
+  const daNuvem=await fotoBaixar(id);
+  if(daNuvem){ try{await fotoSalvar(id,daNuvem)}catch(e){} }
+  return daNuvem;
+}
+async function fotoLerLocal(id){
   if(!id)return null;
   try{
     const d=await fotoDB();
@@ -4901,19 +5289,20 @@ async function fotoApagar(id){
   }catch(e){}
 }
 /* comprime no aparelho: 900px no lado maior, retrato de garrafa, ~60 KB */
-function fotoComprimir(arquivoOuDataUrl){
+function fotoComprimir(arquivoOuDataUrl,lado,teto){
   return new Promise((ok,err)=>{
     const img=new Image();
     img.onload=()=>{
       try{
         if(img._url)URL.revokeObjectURL(img._url);
-        const fator=Math.min(1,900/Math.max(img.width,img.height));
+        const fator=Math.min(1,(lado||900)/Math.max(img.width,img.height));
         const cv=document.createElement("canvas");
         cv.width=Math.max(1,Math.round(img.width*fator));
         cv.height=Math.max(1,Math.round(img.height*fator));
         cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
         let q=0.72,url=cv.toDataURL("image/jpeg",q);
-        while(url.length>260000&&q>0.4){q-=0.1;url=cv.toDataURL("image/jpeg",q)}
+        const lim=teto||260000;
+        while(url.length>lim&&q>0.4){q-=0.1;url=cv.toDataURL("image/jpeg",q)}
         ok(url);
       }catch(e){err(e)}
     };
@@ -4929,6 +5318,8 @@ async function definirFotoVinho(v,arquivoOuDataUrl){
   await fotoSalvar(id,url);
   v.fotoId=id; delete v.foto;      /* some com a cópia antiga, pesada */
   persist();
+  fotoSubir(id,url);               /* em segundo plano: se falhar, tenta na próxima */
+  sincAgendar&&sincAgendar();
   return id;
 }
 /* preenche <img data-foto="id"> assim que a foto for lida do armazém */
@@ -6716,7 +7107,7 @@ function renderColecao(){
   const q=($("#f-busca").value||"").toLowerCase();
   const ft=$("#f-tipo").value, fp=$("#f-pais").value, ord=$("#f-ordem").value;
   let lista=vinhosAtivos().filter(v=>{
-    const alvo=(v.nome+" "+v.vinicola+" "+v.regiao+" "+v.uvas.join(" ")).toLowerCase();
+    const alvo=(v.nome+" "+v.vinicola+" "+v.regiao+" "+(Array.isArray(v.uvas)?v.uvas.join(" "):(v.uvas||""))).toLowerCase();
     return (!q||alvo.includes(q))&&(!ft||v.tipo===ft)&&(!fp||v.pais===fp);
   });
   const sorters={nome:(a,b)=>a.nome.localeCompare(b.nome),safra:(a,b)=>(a.safra||9999)-(b.safra||9999),preco:(a,b)=>b.preco-a.preco,qtd:(a,b)=>b.qtd-a.qtd,

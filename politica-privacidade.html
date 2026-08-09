@@ -59,13 +59,36 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
   </div>
 
   <div class="card">
-    <h2>O princípio que organiza tudo: sua adega não sai do seu aparelho</h2>
+    <h2>O princípio que organiza tudo: a adega é sua, e por padrão não sai do seu aparelho</h2>
     <p>
       O Apotheca foi desenhado com uma separação rígida entre o que é <b>seu acervo</b> e o que é
       <b>vida social</b>. A sua coleção — cada rótulo, quantidade, preço de aquisição, notas,
-      histórico de consumo e o mapa físico da adega — fica guardada <b>somente no seu
-      celular ou navegador</b>. Nada disso é enviado aos nossos servidores, nunca, em nenhuma
-      hipótese. Nós não temos como ver a sua adega nem o quanto ela vale.
+      histórico de consumo, fotos e o mapa físico da adega — fica guardada <b>somente no seu
+      celular ou navegador</b>. <b>Por padrão, nada disso é enviado aos nossos servidores.</b>
+      Você não precisa fazer nada para que seja assim: é como o aplicativo vem, e é como ele
+      fica se você nunca mexer em nada.
+    </p>
+    <p>
+      <b>Se você quiser a mesma adega em mais de um aparelho</b>, existe uma opção em
+      <b>Configurações → Minha adega em todos os aparelhos</b>. Ao ligá-la — e só então — a sua
+      coleção passa a ser guardada também no nosso servidor, para que você a encontre igual no
+      celular, no tablet e no computador, sem depender de backup manual. A partir daí valem
+      três compromissos:
+    </p>
+    <ul>
+      <li><b>Vai sem o seu nome.</b> A adega é guardada ligada a um código que não diz quem você
+      é. Não guardamos nome, e-mail nem cidade junto dela.</li>
+      <li><b>Vai a adega inteira, inclusive o mapa e as fotos.</b> Para a coleção aparecer
+      completa no outro aparelho, a posição das garrafas e as fotos dos rótulos sobem junto.
+      Preferimos dizer isso com todas as letras a esconder num detalhe.</li>
+      <li><b>Você continua mandando.</b> Desligar a opção <b>apaga a sua adega e as fotos do
+      nosso servidor na mesma hora</b> — não fica cópia guardada — e ela volta a viver só no
+      aparelho. Apagar a conta apaga tudo junto.</li>
+    </ul>
+    <p>
+      O que <b>nunca</b> sobe, com a sincronização ligada ou desligada: o seu perfil, as
+      confrarias, o mural e as conversas reservadas seguem tendo o tratamento próprio descrito
+      na tabela abaixo — a sincronização é do acervo, não da vida social.
     </p>
     <div class="destaque">
       Para a comunidade vão, no máximo, <b>totais</b> (quantas garrafas, quantos rótulos, quantos
@@ -82,6 +105,7 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
       <tr><td>Histórico de consumo e avaliações pessoais</td><td>Só no seu aparelho</td><td>Sua memória de degustação</td></tr>
       <tr><td>Mapa da adega (estrutura e posição das garrafas)</td><td>Só no seu aparelho</td><td>Achar a garrafa sem revirar a adega</td></tr>
       <tr><td>Fotos dos vinhos que você cadastra</td><td>Só no seu aparelho</td><td>Ver a garrafa na ficha</td></tr>
+      <tr><td><b>Adega sincronizada</b> — coleção, histórico, mapa e fotos <i>(só se você ligar)</i></td><td>Servidor, <b>sem o seu nome</b></td><td>Ter a mesma adega no celular, no tablet e no computador</td></tr>
       <tr><td>Foto do rótulo no momento do escaneamento</td><td>Passa pelo servidor e é <b>descartada em seguida</b></td><td>Identificar o vinho</td></tr>
       <tr><td>Contagem de leituras do scanner (quantas, em qual mês)</td><td>Servidor</td><td>Garantir as leituras gratuitas de cada pessoa</td></tr>
       <tr><td>Perfil público (@usuário, nome de exibição, cidade)</td><td>Servidor</td><td>Ser encontrado pelos amigos</td></tr>
@@ -124,7 +148,7 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
     <p>Tratamos cada dado com uma finalidade específica e uma base legal da LGPD:</p>
     <ul>
       <li><b>Execução do serviço</b> (art. 7º, V): login, perfil, rede, mensagens, encontros — sem isso o aplicativo não funciona;</li>
-      <li><b>Consentimento</b> (art. 7º, I): os totais da sua adega na comunidade — desligável a qualquer momento, no mesmo lugar onde se liga;</li>
+      <li><b>Consentimento</b> (art. 7º, I): os totais da sua adega na comunidade e a sincronização da adega entre os seus aparelhos — ambos desligáveis a qualquer momento, no mesmo lugar onde se ligam;</li>
       <li><b>Legítimo interesse</b> (art. 7º, IX): segurança, prevenção de abuso e moderação (denúncias, bloqueios).</li>
     </ul>
     <p>
@@ -137,7 +161,7 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
   <div class="card">
     <h2>Com quem os dados passam (operadores)</h2>
     <ul>
-      <li><b>Supabase</b> — hospeda o banco de dados do servidor (perfil, rede, mensagens, encontros). Os dados podem ser armazenados em servidores fora do Brasil, com salvaguardas contratuais do provedor;</li>
+      <li><b>Supabase</b> — hospeda o banco de dados do servidor (perfil, rede, mensagens, encontros) e, para quem ligar a sincronização, a adega e as fotos, guardadas sem identificação. Os dados podem ser armazenados em servidores fora do Brasil, com salvaguardas contratuais do provedor;</li>
       <li><b>GitHub Pages</b> — serve o site. Não recebe dados de conta;</li>
       <li><b>Google</b> — o login "Entrar com Google" segue as regras do Google; recebemos apenas seu e-mail verificado e nome. As fotos de rótulo que você escaneia são enviadas ao Google (Gemini) para leitura, com a chave do Apotheca (ou com a sua, se você a configurar no modo avançado), sob os termos do Google, e não são guardadas por nós.</li>
       <li><b>Apple</b> — o login "Entrar com a Apple" segue as regras da Apple; recebemos apenas o seu e-mail verificado e, se você permitir, o seu nome. Se você escolher <b>"Ocultar meu e-mail"</b>, a Apple nos entrega um endereço de encaminhamento (algo como <code>a1b2c3@privaterelay.appleid.com</code>) e nós nunca vemos o seu e-mail verdadeiro — quem faz a ponte é a Apple. A Apple não recebe a sua adega, nem o que você bebe, nem com quem você se relaciona no aplicativo: ela participa apenas do momento de entrar.</li>
@@ -146,6 +170,10 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
 
   <div class="card">
     <h2>Retenção e exclusão</h2>
+    <p>
+      Se você tiver ligado a sincronização, <b>desligá-la apaga a sua adega e as suas fotos do
+      servidor na mesma hora</b>, e a coleção volta a viver apenas no aparelho.
+    </p>
     <p>
       Os dados do servidor existem enquanto a sua conta existir. Você pode <b>apagar a conta pelo
       próprio aplicativo</b>, em menos de um minuto (☰ → Configurações → Minha conta e meus dados →
