@@ -247,6 +247,14 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 .toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--wine);color:#fdf3e7;padding:13px 22px;border-radius:12px;font-size:14px;z-index:120;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .3s,transform .3s,visibility .3s;box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:90vw;text-align:center}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible}
+/* v0.87: o selo discreto da fila. Fica no alto, não cobre botão nenhum e não
+   pede nada — é informação, não interrupção. */
+#nuvem-pill{position:fixed;top:10px;right:12px;z-index:119;
+  background:rgba(110,26,50,.92);color:#f6dfae;padding:6px 11px;border-radius:999px;
+  font-size:11.5px;letter-spacing:.2px;box-shadow:0 4px 14px rgba(0,0,0,.25);
+  opacity:0;visibility:hidden;transform:translateY(-10px);pointer-events:none;
+  transition:opacity .3s,transform .3s,visibility .3s;max-width:70vw}
+#nuvem-pill.show{opacity:1;visibility:visible;transform:translateY(0)}
 /* Tarja de versão nova (v0.47). Fica acima da barra de baixo no celular e
    solta no canto do computador; nunca cobre um botão de ação. */
 .tarja-versao{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:118;
@@ -760,11 +768,12 @@ button.foto-vinho.vazia span{font-size:26px}
 <div class="modal-bg" id="modal-consume"><div class="modal" id="modal-consume-body"></div></div>
 
 <div class="toast" id="toast"></div>
+<div id="nuvem-pill"></div>
 <div class="tarja-versao hidden" id="tarja-versao"></div>
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.86"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.87"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2701,6 +2710,100 @@ function persist(){
     localStorage.setItem(STORE_KEY,JSON.stringify({dono:perfil?perfil.user:null,adegaDemo,MOEDA,vinhos,ADEGAS,historico,eventos,seguindo,perfil,USUARIOS_APP,feed,NEXT_FEED,minhasConfrarias,CONFRARIAS,MURAL,meusBrindes,NEXT_ID,NEXT_EV,MSGS,BLOQUEADOS}));
     PERSISTE=true;
   }catch(e){PERSISTE=false}
+}
+
+/* ============ v0.87: A FILA DE INTENÇÕES ============
+   Ideia do Jorge, 09/08/2026: "não tinha como travar a movimentação da adega
+   quando ela estiver offline? O usuário poderia fazer isso e o aplicativo
+   avisar que a mudança ocorrerá quando a internet voltar."
+
+   A trava eu não fiz — registrar a garrafa na mesa do restaurante, com o vinho
+   na taça, é o melhor momento que o Apotheca tem, e é justamente onde o sinal
+   falta. Mas a segunda metade da ideia dele é a engenharia certa, e é esta:
+   o aparelho não guarda só o RESULTADO, guarda a INTENÇÃO.
+
+       sexta 19h32   novo    Château Margaux 2015
+       sábado 21h05  qtd     Barolo  −1
+       sábado 21h07  campo   Barolo  nota 4,7
+
+   Por que isso importa. Quando a internet volta, existem dois caminhos:
+
+   · o comum (99%) — ninguém mexeu na adega em outro lugar desde a última
+     sincronia. Sobe o bloco inteiro e pronto. A fila nem é usada.
+   · o raro — o aparelho ficou dias offline e outro aparelho gravou nesse
+     meio-tempo. Aqui, mandar o bloco APAGARIA o que o outro fez. Então o
+     aplicativo pega a adega do servidor como base e REPETE as intenções por
+     cima dela. "−1 Barolo" aplicado sobre o estado novo dá a conta certa.
+     Comparar dois blocos e adivinhar a intenção não daria: ver 5 de um lado
+     e 4 do outro não diz se alguém bebeu uma ou comprou quatro.
+
+   É por isso que a fila existe. Não para o dia normal — para o dia esquisito,
+   e para que o dia esquisito não precise perguntar nada ao usuário.
+
+   Limite honesto: nem toda alteração da adega passa por aqui ainda. As que não
+   passam continuam viajando dentro do bloco, e portanto só se comportam bem no
+   caminho comum. As três que mais somam — garrafa aberta, rótulo cadastrado e
+   rótulo excluído — estão cobertas. */
+const FILA_KEY="apotheca_fila_v1";
+let fila=[];
+try{fila=JSON.parse(localStorage.getItem(FILA_KEY))||[]}catch(e){fila=[]}
+if(!Array.isArray(fila))fila=[];
+
+function filaGravar(){
+  try{
+    if(fila.length>800)fila=fila.slice(-800);   /* teto: fila não é histórico */
+    localStorage.setItem(FILA_KEY,JSON.stringify(fila));
+  }catch(e){}
+}
+function filaAnotar(op){
+  if(!op||!op.op)return;
+  op.t=Date.now();
+  fila.push(op); filaGravar(); pintarNuvem();
+}
+function filaLimpar(){ fila=[]; filaGravar(); pintarNuvem(); }
+
+/* Repete as intenções sobre uma adega-base e devolve a adega resultante.
+   Puro: não toca em nada de fora, o que o torna testável sozinho. */
+function filaAplicar(base,ops){
+  const b={vinhos:[],historico:[],ADEGAS:[],eventos:[]};
+  try{Object.assign(b,JSON.parse(JSON.stringify(base||{})))}catch(e){}
+  if(!Array.isArray(b.vinhos))b.vinhos=[];
+  if(!Array.isArray(b.historico))b.historico=[];
+  for(const o of (ops||[])){
+    const acha=()=>b.vinhos.find(x=>x.id===o.id);
+    if(o.op==="novo"){
+      if(o.v&&!acha())b.vinhos.push(JSON.parse(JSON.stringify(o.v)));
+    }else if(o.op==="qtd"){
+      const v=acha(); if(!v)continue;
+      v.qtd=Math.max(0,(v.qtd||0)+(o.d||0));
+      if(Array.isArray(v.pos)&&v.pos.length>v.qtd)v.pos=v.pos.slice(0,v.qtd);
+      if(v.qtd<=0)b.vinhos=b.vinhos.filter(x=>x.id!==o.id);
+    }else if(o.op==="campo"){
+      const v=acha(); if(v&&o.c)Object.assign(v,o.c);
+    }else if(o.op==="apagar"){
+      b.vinhos=b.vinhos.filter(x=>x.id!==o.id);
+    }else if(o.op==="hist"){
+      if(o.h&&!b.historico.some(h=>h.nome===o.h.nome&&h.data===o.h.data&&h.prato===o.h.prato))
+        b.historico.unshift(o.h);
+    }
+  }
+  if(typeof base==="object"&&base&&base.NEXT_ID)
+    b.NEXT_ID=Math.max(base.NEXT_ID||0, (typeof NEXT_ID==="number"?NEXT_ID:0));
+  return b;
+}
+
+/* O aviso. A frase importa: a alteração NÃO está pendente — ela já está
+   gravada aqui e a tela já mostra o número certo. O que está a caminho é a
+   viagem dela até os outros aparelhos. Dizer "será aplicada quando a internet
+   voltar" faria a pessoa desconfiar do número que está vendo. */
+function pintarNuvem(){
+  const el=document.getElementById("nuvem-pill");
+  if(!el)return;
+  const n=fila.length;
+  if(!n){el.classList.remove("show");return}
+  el.innerHTML="☁️ "+n+" alteraç"+(n===1?"ão":"ões")+" a caminho";
+  el.title="Salvo neste aparelho. Chega aos seus outros aparelhos quando houver sinal.";
+  el.classList.add("show");
 }
 
 /* Devolve a adega guardada pela cópia de socorro. Só o usuário manda nisso. */
@@ -6770,6 +6873,7 @@ function openConsume(id,prato){
 function confirmConsume(id){
   const v=vinhos.find(x=>x.id===id);if(!v)return;
   v.qtd--;
+  filaAnotar({op:"qtd",id:v.id,d:-1});
   /* v0.50: o mapa se mantém sozinho — abriu uma garrafa, uma casa é liberada.
      Sai a última posição da lista (ordenada, então a "mais funda"); se a pessoa
      pegou outra fisicamente, o ajuste fino fica a um toque em Guardar no mapa. */
@@ -6779,7 +6883,8 @@ function confirmConsume(id){
   /* v0.78: quem avalia ao abrir a garrafa também está dando a sua nota ao
      rótulo — é a mesma opinião, e é a mais confiável de todas, porque veio
      depois de beber. O histórico continua guardando a ocasião. */
-  if(rateSel)v.nota=Math.max(1,Math.min(5,rateSel|0));
+  if(rateSel){v.nota=Math.max(1,Math.min(5,rateSel|0));filaAnotar({op:"campo",id:v.id,c:{nota:v.nota}})}
+  filaAnotar({op:"hist",h:historico[0]});
   addAtividade(`abriu um <b>${v.nome} ${safraTxt(v)}</b>${$("#c-prato").value?" com "+$("#c-prato").value:""}`,rateSel||0);
   if(v.qtd<=0){vinhos=vinhos.filter(x=>x.id!==id);toast(`Última garrafa de ${v.nome} consumida — rótulo movido ao histórico. 🍷`)}
   else toast(`Saúde! Restam ${v.qtd} garrafa${v.qtd>1?"s":""} de ${v.nome}.${casaLivre?` Casa ${posNome(adegaDe(v.adega),casaLivre)} liberada no mapa.`:""} 🥂`);
@@ -6910,6 +7015,7 @@ function excluirVinho(id,btn){
   }
   const v=vinhos.find(x=>x.id===id);if(!v)return;
   vinhos=vinhos.filter(x=>x.id!==id);
+  filaAnotar({op:"apagar",id:id});
   eventos.forEach(ev=>{ev.minhas=(ev.minhas||[]).filter(x=>x!==id)});
   persist();closeModal("modal-detail");
   refreshAdegaSelect();renderAdegaBar();renderDash();renderColecao();
@@ -7137,6 +7243,7 @@ function saveWine(){
     corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,doc:1,
     qtd:Math.max(1,+$("#a-qtd").value||1),preco:+$("#a-preco").value||0,
     jan:[+$("#a-jan1").value||ANO,+$("#a-jan2").value||ANO+5],notas:$("#a-notas").value||"Sem notas registradas."});
+  filaAnotar({op:"novo",id:_novoId,v:vinhos[vinhos.length-1]});
   addAtividade(`adicionou <b>${nome}</b> à adega`);
   toast(`${nome} adicionado em ${adegaDe(adegaSel).icone} ${adegaDe(adegaSel).nome}! 🍾`);
   clearForm();persist();renderAdegaBar();

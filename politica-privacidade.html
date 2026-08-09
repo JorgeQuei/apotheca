@@ -85,7 +85,7 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
       <tr><td>Foto do rótulo no momento do escaneamento</td><td>Passa pelo servidor e é <b>descartada em seguida</b></td><td>Identificar o vinho</td></tr>
       <tr><td>Contagem de leituras do scanner (quantas, em qual mês)</td><td>Servidor</td><td>Garantir as leituras gratuitas de cada pessoa</td></tr>
       <tr><td>Perfil público (@usuário, nome de exibição, cidade)</td><td>Servidor</td><td>Ser encontrado pelos amigos</td></tr>
-      <tr><td>E-mail da conta Google (login)</td><td>Servidor</td><td>Entrar sem senha e recuperar a conta</td></tr>
+      <tr><td>E-mail da conta de login (Google ou Apple)</td><td>Servidor</td><td>Entrar sem senha e recuperar a conta</td></tr>
       <tr><td>Quem você segue e quem segue você</td><td>Servidor</td><td>A rede social funcionar</td></tr>
       <tr><td>Conversas reservadas (mensagens diretas)</td><td>Servidor</td><td>Entregar a mensagem ao destinatário</td></tr>
       <tr><td>Atividades públicas (ex.: "abriu um Barolo")</td><td>Servidor</td><td>O mural da comunidade</td></tr>
@@ -140,6 +140,7 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
       <li><b>Supabase</b> — hospeda o banco de dados do servidor (perfil, rede, mensagens, encontros). Os dados podem ser armazenados em servidores fora do Brasil, com salvaguardas contratuais do provedor;</li>
       <li><b>GitHub Pages</b> — serve o site. Não recebe dados de conta;</li>
       <li><b>Google</b> — o login "Entrar com Google" segue as regras do Google; recebemos apenas seu e-mail verificado e nome. As fotos de rótulo que você escaneia são enviadas ao Google (Gemini) para leitura, com a chave do Apotheca (ou com a sua, se você a configurar no modo avançado), sob os termos do Google, e não são guardadas por nós.</li>
+      <li><b>Apple</b> — o login "Entrar com a Apple" segue as regras da Apple; recebemos apenas o seu e-mail verificado e, se você permitir, o seu nome. Se você escolher <b>"Ocultar meu e-mail"</b>, a Apple nos entrega um endereço de encaminhamento (algo como <code>a1b2c3@privaterelay.appleid.com</code>) e nós nunca vemos o seu e-mail verdadeiro — quem faz a ponte é a Apple. A Apple não recebe a sua adega, nem o que você bebe, nem com quem você se relaciona no aplicativo: ela participa apenas do momento de entrar.</li>
     </ul>
   </div>
 
@@ -209,7 +210,7 @@ footer{color:var(--ink-3);font-size:13px;text-align:center;padding:22px 20px 40p
 <footer class="wrap">
   Apotheca · <a href="https://apotheca.app.br/">apotheca.app.br</a> ·
   <a href="https://apotheca.app.br/excluir-conta.html">excluir minha conta</a><br>
-  Política vigente desde 3 de agosto de 2026 · Controlador: Jorge Queiroz (pessoa física) · privacidade@apotheca.app.br
+  Política vigente desde 9 de agosto de 2026 · Controlador: Jorge Queiroz (pessoa física) · privacidade@apotheca.app.br
 </footer>
 </body>
 </html>
