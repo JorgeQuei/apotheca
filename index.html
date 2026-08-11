@@ -779,7 +779,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.93"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.95"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2905,6 +2905,8 @@ function limparVinhoDeFora(v){
   if(!Array.isArray(n.pos))delete n.pos;
   n.notas=String(n.notas==null?"":n.notas).slice(0,4000);
   if(n.nota!=null)n.nota=Math.max(0,Math.min(5,+n.nota||0));
+  /* v0.95: o formato é texto curto de rótulo ("1,5 L"). Vem da rede: apara. */
+  if(n.tam!=null){ n.tam=String(n.tam).trim().slice(0,12); if(!n.tam)delete n.tam; }
   return n;
 }
 function adegaDaNuvem(d){
@@ -3594,7 +3596,11 @@ function gravarReferencia(){
 }
 function refDoVinho(v){
   const n=v&&v.ref?Math.max(0,Math.min(5,+v.ref.n||0)):0;
-  return n?{n,txt:(v.ref.txt||"")}:null;
+  /* v0.95: "de" diz quem pôs a referência ali. Sem isso, a nota que veio numa
+     importação aparecia com a legenda "anotado por você" — e não foi ele quem
+     anotou. Referência é dado de fora; mentir sobre a procedência dela é
+     exatamente o defeito que o campo veio corrigir. */
+  return n?{n,txt:(v.ref.txt||""),de:(v.ref.de==="imp"?"imp":"sua")}:null;
 }
 function gravarMinhaNota(id,valor){
   const alvo=(id===undefined)?notaPopId:id;
@@ -4138,14 +4144,17 @@ let bkFotosPuladas=0;
 /* Cabeçalhos em português e sem acento de propósito: são os mesmos nomes que
    o nosso importador reconhece, então o CSV do backup volta para dentro do
    Apotheca pelo mesmo caminho de uma planilha do CellarTracker. */
-const BK_CSV=["Nome","Vinicola","Safra","Tipo","Uvas","Pais","Regiao","Quantidade","Preco",
+/* v0.95: "Tamanho" entra na lista. O formato da garrafa passou a ser um dado
+   nosso nesta versão; se ficasse de fora daqui, o magnum voltaria do backup
+   como garrafa comum — e o CSV do backup é justamente o caminho de volta. */
+const BK_CSV=["Nome","Vinicola","Safra","Tipo","Uvas","Pais","Regiao","Quantidade","Tamanho","Preco",
               "Adega","Posicao","JanelaInicio","JanelaFim","Corpo","Acidez","Taninos","Docura","Notas","MinhaNota","Referencia","OndeVi"];
 function bkCampo(x){const t=String(x==null?"":x);return /[",;\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t}
 function bkCSVTexto(){
   const l=[BK_CSV.join(",")];
   vinhos.forEach(v=>{
     const a=adegaDe(v.adega);
-    l.push([v.nome,v.vinicola,v.safra||"",v.tipo,(v.uvas||[]).join(" / "),v.pais,v.regiao,v.qtd,v.preco,
+    l.push([v.nome,v.vinicola,v.safra||"",v.tipo,(v.uvas||[]).join(" / "),v.pais,v.regiao,v.qtd,v.tam||"",v.preco,
       a?a.nome:"",(Array.isArray(v.pos)?v.pos:[]).map(x=>posNome(a,x)).join(" / "),
       (v.jan||[])[0]||"",(v.jan||[])[1]||"",v.corpo,v.acidez,v.tanino,v.doc,v.notas||"",v.nota||"",(v.ref&&v.ref.n)||"",(v.ref&&v.ref.txt)||""
     ].map(bkCampo).join(","));
@@ -5651,8 +5660,87 @@ const IMP_CANDIDATOS={
   janIni:["beginconsume","apogee debut","a boire de","drink from","janela inicio","janelainicio"],
   janFim:["endconsume","apogee fin","a boire jusqu","drink to","drink until","janela fim","janelafim"],
   notas:["mynotes","your review","private note","tasting note","notes","notas","observacoes","commentaire"],
-  local:["location","bin","emplacement","casier"]
+  /* v0.94.1: "local" foi tirado desta lista. O arquivo real de um colecionador
+     — 99 vinhos, exportação do CellarTracker — tem uma coluna chamada
+     **Locale**, que é a hierarquia geográfica ("Portugal, Douro"), e a busca
+     por semelhança fazia "locale" casar com "local". O aplicativo ia oferecer
+     criar **44 adegas** chamadas "France, Champagne", "Portugal, Alentejano"…
+     e picar a adega do sujeito em pedaços com nome de região.
+     Aqui só entram palavras que não se confundem com geografia. */
+  local:["location","emplacement","casier local","adega fisica"],
+  /* v0.94: BIN é a posição DENTRO da adega — prateleira e casa. Antes vinha
+     junto de "local" e se perdia; é a informação que faz o mapa nascer pronto. */
+  casa:["bin","slot","position","posicao","casier","rack","prateleira"],
+  /* v0.95: três coisas que o arquivo real do colecionador trazia e nós
+     jogávamos fora. Ver o bloco impExtras, logo abaixo. */
+  tamanho:["size","bottle size","format","formato","volume","contenance","tamanho"],
+  /* "referencia", "minhanota" e "ondevi" são os cabeçalhos do NOSSO próprio CSV
+     de backup. Sem eles aqui, o backup era uma porta de mão única: a nota do
+     dono e a referência saíam no arquivo e não voltavam. */
+  notaFora:["cscore","community score","ct score","referencia","score","pontuacao","rating"],
+  notaPropria:["pscore","minhanota","my score","minha nota","your rating","personal score"],
+  refOnde:["ondevi","onde vi","fonte da nota"]
 };
+
+/* ============ v0.95: O QUE O ARQUIVO DO AMIGO DO JORGE ENSINOU ============
+   99 vinhos, exportação verdadeira do CellarTracker. Três achados, cada um
+   medido no próprio arquivo:
+
+   1. NOME REPETIDO — 99 de 99. O CellarTracker escreve o vinho já começando
+      pelo produtor: Wine="Adega da Cartuxa Pêra-Manca Branco",
+      Producer="Adega da Cartuxa". No cartão saía o produtor duas vezes, lado
+      a lado, em cem por cento dos rótulos. É a primeira tela que o
+      colecionador vê. `impNomeSemProdutor` apara o prefixo.
+
+   2. FORMATO DA GARRAFA — 7 de 99 fora do padrão: um magnum de Mouchão e
+      seis meias-garrafas (dois Portos Vintage, um Suduiraut, dois Latour).
+      Magnum não é garrafa comum: envelhece diferente, vale mais e ocupa outro
+      espaço. Entravam todos como 750 ml, calados.
+
+   3. NOTA DE FORA — 89 de 99 tinham CScore (nota da comunidade do
+      CellarTracker); PScore, a nota do próprio dono, estava vazia em TODOS.
+      Essa nota entra como REFERÊNCIA — o campo `v.ref` da v0.80, cinza e com
+      etiqueta REF — e nunca como nota do usuário. É exatamente a distinção
+      que nasceu no dia do 3,7 inventado do Sassicaia. */
+
+/* "Adega da Cartuxa Pêra-Manca Branco" + "Adega da Cartuxa" → "Pêra-Manca Branco" */
+function impNomeSemProdutor(nome,produtor){
+  const n=String(nome||"").trim(), p=String(produtor||"").trim();
+  if(!n||!p)return n;
+  const a=impNorm(n), b=impNorm(p);
+  if(!b||a===b)return n;                       /* nome IGUAL ao produtor: preserva */
+  if(a.indexOf(b)!==0)return n;                /* não começa com ele: nada a fazer */
+  /* a letra seguinte tem de ser separador. Sem isto, "Cartuxa" aparava
+     "Cartuxeiro Reserva" e o vinho virava "iro Reserva". */
+  if(!/[\s,.\-–—:]/.test(a.charAt(b.length)))return n;
+  const resto=n.slice(p.length).replace(/^[\s,.\-–—:]+/,"").trim();
+  return resto.length>=3?resto:n;              /* sobrou pouco? melhor deixar como estava */
+}
+/* "750ml" · "1.5L" · "375 ml" · "Magnum" → texto curto, ou "" se for o padrão */
+function impTamanhoLer(t){
+  const x=String(t||"").trim().toLowerCase().replace(",",".");
+  if(!x)return "";
+  if(/magnum/.test(x))return "1,5 L";
+  if(/jeroboam|double\s*magnum/.test(x))return "3 L";
+  if(/half|demi|meia/.test(x))return "375 ml";
+  const m=x.match(/^([\d.]+)\s*(ml|cl|l|lt|litro)?/);
+  if(!m)return "";
+  let v=parseFloat(m[1]); if(!isFinite(v)||v<=0)return "";
+  const u=m[2]||(v>10?"ml":"l");
+  let ml = u==="ml"?v : u==="cl"?v*10 : v*1000;
+  ml=Math.round(ml);
+  if(ml===750)return "";                       /* o padrão não precisa ser dito */
+  return ml>=1000?(ml/1000).toFixed(ml%1000?1:0).replace(".",",")+" L":ml+" ml";
+}
+/* Nota de fora, em qualquer escala, para a nossa de 0 a 5.
+   100 pontos (CellarTracker, Parker) · 20 (Jancis) · 5 (Vivino) */
+function impNotaFora(v){
+  const n=parseFloat(String(v||"").replace(",","."));
+  if(!isFinite(n)||n<=0)return 0;
+  let r = n>20 ? (n/100)*5 : n>5 ? (n/20)*5 : n;
+  r=Math.round(r*10)/10;
+  return (r>0&&r<=5)?r:0;
+}
 
 /* v0.63: cor e categoria juntas. A categoria só ganha quando ela diz algo que a
    cor não sabe dizer — espumante e fortificado. Nas demais ("Dry", "Sweet"), a
@@ -5751,12 +5839,14 @@ function impNormalizar(linhas,colunas,mapa){
   const convencao=impConvencaoDecimal(linhas,colunas);
   const regs=[];
   linhas.forEach(l=>{
-    const nome=pega(l,"nome");if(!nome)return;
+    const nomeCru=pega(l,"nome");if(!nomeCru)return;
     const vinicola=pega(l,"vinicola");
+    const nome=impNomeSemProdutor(nomeCru,vinicola);
     const ji=impSafra(pega(l,"janIni")),jf=impSafra(pega(l,"janFim"));
+    /* v0.94: o local deixa de ser só texto. Ver impPosLer, mais abaixo. */
     const local=pega(l,"local");
+    const casa=pega(l,"casa");
     let notas=pega(l,"notas");
-    if(local)notas=(notas?notas+" · ":"")+"No app anterior: "+local;
     regs.push({
       nome, vinicola:vinicola||"—",
       safra:impSafra(pega(l,"safra")),
@@ -5767,6 +5857,13 @@ function impNormalizar(linhas,colunas,mapa){
       preco:(p=>p||impNumero(pega(l,"valorMercado"),convencao)||0)(impNumero(pega(l,"preco"),convencao)),
       precoDeMercado:!impNumero(pega(l,"preco"),convencao)&&!!impNumero(pega(l,"valorMercado"),convencao),
       jan:(ji&&jf&&jf>=ji)?[ji,jf]:null,
+      local, casa,
+      tam:impTamanhoLer(pega(l,"tamanho")),
+      /* a nota do próprio dono é dele e vira nota; a da comunidade do outro
+         aplicativo é de fora e vira REFERÊNCIA. Nunca se misturam. */
+      nota:impNotaFora(pega(l,"notaPropria")),
+      refN:impNotaFora(pega(l,"notaFora")),
+      refOnde:pega(l,"refOnde").slice(0,60),
       notas
     });
   });
@@ -5774,7 +5871,13 @@ function impNormalizar(linhas,colunas,mapa){
   const porChave={};
   regs.forEach(r=>{
     const k=impNorm(r.nome)+"|"+(r.safra||"")+"|"+impNorm(r.vinicola);
-    if(porChave[k])porChave[k].qtd+=r.qtd; else porChave[k]=r;
+    if(porChave[k]){
+      const a=porChave[k];
+      a.qtd+=r.qtd;
+      /* exportação por garrafa: cada linha traz a SUA casa. Guardamos todas,
+         senão o mapa perderia justamente as garrafas repetidas. */
+      if(r.casa&&r.casa!==a.casa)a.casasExtra=(a.casasExtra||[]).concat([{local:r.local,casa:r.casa,qtd:r.qtd}]);
+    } else porChave[k]=r;
   });
   const saida=Object.values(porChave);
   saida.moedaArquivo=moedaArquivo;
@@ -5926,9 +6029,236 @@ function impAplicarMapeamento(){
   impMostrarPrevia();
 }
 
+/* ============ v0.94: O MAPA NASCE PRONTO ============
+   O colecionador que troca de aplicativo passou meses anotando ONDE cada
+   garrafa está. O CellarTracker guarda isso em duas colunas: `Location`
+   (qual adega) e `Bin` (prateleira e casa). Até a v0.93 nós líamos as duas,
+   jogávamos tudo numa observação de texto — "No app anterior: Cave" — e
+   mandávamos as 340 garrafas para uma adega só, com ZERO posições no mapa.
+
+   Medido no teste com 340 rótulos: o arquivo dizia Escritório 92, Cave 84,
+   Adega 85, Casa de Praia 79. O aplicativo criava uma adega chamada "Casa" e
+   um mapa vazio. Ou seja: a pessoa importava e encontrava, justamente na
+   nossa melhor tela — a que o Vivino não tem —, o convite para posicionar
+   trezentas garrafas na mão. Desiste no rótulo cinco.
+
+   Agora as adegas nascem separadas e as garrafas nascem nos lugares.
+
+   Sobre inventar: NÃO inventamos posição. Quando um rótulo tem 5 garrafas e
+   o arquivo dá uma casa só, colocamos a primeira na casa declarada e as
+   demais nas casas livres seguintes da mesma prateleira — que é onde elas
+   fisicamente estão. O resumo diz isso com todas as letras, e o que não for
+   entendido fica de fora em vez de virar palpite. */
+
+/* Lê "5-11", "A12", "R3C7", "Prateleira 2 Casa 9", "12" e devolve {linha,coluna}
+   em base 1. Devolve null quando não dá para afirmar nada. */
+function impPosLer(bin){
+  const t=String(bin==null?"":bin).trim();
+  if(!t)return null;
+  const n=t.toUpperCase().replace(/[_]/g," ");
+  let m;
+  /* letra + número: A12, B-3, C 7 */
+  if((m=n.match(/^([A-Z])\s*[-.\/ ]?\s*(\d{1,3})$/)))
+    return {linha:m[1].charCodeAt(0)-64, coluna:+m[2]};
+  /* dois números rotulados, em qualquer idioma: "Rack 2 Shelf 9",
+     "Prateleira 4 Casa 6", "R3C7", "Étagère 2 Casier 5". Em vez de listar
+     todas as palavras do mundo, pegamos qualquer palavra seguida de número —
+     a primeira é a prateleira, a segunda é a casa. */
+  const rotulados=[...n.matchAll(/([A-ZÀ-Ú]+)\s*[-.\/ ]?\s*(\d{1,3})/g)];
+  if(rotulados.length>=2)
+    return {linha:+rotulados[0][2], coluna:+rotulados[1][2]};
+  /* dois números separados: 5-11, 5/11, 5.11, 5 11 */
+  if((m=n.match(/^(\d{1,3})\s*[-.\/ ]\s*(\d{1,3})$/)))
+    return {linha:+m[1], coluna:+m[2]};
+  /* número solto: uma casa corrida, sem prateleira declarada */
+  if((m=n.match(/^(\d{1,4})$/)))
+    return {linha:0, coluna:+m[1]};      /* linha 0 = "resolver depois" */
+  return null;
+}
+function impCasaNome(linha,coluna){
+  const l=Math.max(1,Math.min(MAPA_MAX_LINHAS,linha|0));
+  const c=Math.max(1,Math.min(MAPA_MAX_COLUNAS,coluna|0));
+  return LETRAS[l-1]+c;
+}
+/* Quantas adegas distintas o arquivo declara, e quantas garrafas em cada. */
+function impLocaisDe(registros){
+  const m={};
+  (registros||[]).forEach(r=>{
+    const nomes=[[r.local,r.qtd]].concat((r.casasExtra||[]).map(x=>[x.local,x.qtd]));
+    nomes.forEach(([nome,q])=>{
+      const k=String(nome||"").trim();
+      if(!k)return;
+      m[k]=(m[k]||0)+(q||1);
+    });
+  });
+  return m;
+}
+/* Quantas garrafas do arquivo têm posição que sabemos ler. */
+function impCasasLegiveis(registros){
+  let sim=0,nao=0;
+  (registros||[]).forEach(r=>{
+    const todas=[[r.casa,r.qtd]].concat((r.casasExtra||[]).map(x=>[x.casa,x.qtd]));
+    todas.forEach(([c,q])=>{ if(!String(c||"").trim())return;
+      if(impPosLer(c))sim+=(q||1); else nao+=(q||1); });
+  });
+  return {sim,nao};
+}
+
+/* Monta adegas e mapa a partir do que o arquivo declarou.
+   Devolve o relatório do que fez — nada acontece em silêncio. */
+function impMontarMapa(registros,adegaPadraoId){
+  const locais=impLocaisDe(registros);
+  const nomes=Object.keys(locais);
+  const rel={adegasCriadas:[], posicionadas:0, semCasa:0, ilegiveis:0, estimadas:0};
+  if(!nomes.length)return rel;
+  /* uma adega por Location declarado; teto de 8 para não estourar a tela */
+  const ordem=nomes.sort((a,b)=>locais[b]-locais[a]).slice(0,8);
+  const idDe={};
+  ordem.forEach(nome=>{
+    const ja=ADEGAS.find(a=>impNorm(a.nome)===impNorm(nome));
+    if(ja){ idDe[nome]=ja.id; return }
+    const nova={id:"imp"+Date.now().toString(36)+Math.floor(Math.random()*1e4),
+                nome:nome.slice(0,40), icone:"🍇"};
+    ADEGAS.push(nova); idDe[nome]=nova.id; rel.adegasCriadas.push(nova.nome);
+  });
+  /* primeira passada: descobrir o tamanho de cada grade */
+  const dim={}, corridas={};
+  registros.forEach(r=>{
+    const todas=[{local:r.local,casa:r.casa,qtd:r.qtd}].concat(r.casasExtra||[]);
+    todas.forEach(x=>{
+      const id=idDe[String(x.local||"").trim()]||adegaPadraoId;
+      const p=impPosLer(x.casa);
+      if(!p)return;
+      dim[id]=dim[id]||{linhas:1,colunas:1};
+      if(p.linha===0){ corridas[id]=Math.max(corridas[id]||0,p.coluna); }
+      else{
+        dim[id].linhas=Math.max(dim[id].linhas,p.linha);
+        dim[id].colunas=Math.max(dim[id].colunas,p.coluna);
+      }
+    });
+  });
+  /* casas corridas (só um número): viram prateleiras de 12 casas */
+  Object.keys(corridas).forEach(id=>{
+    const n=corridas[id];
+    dim[id]=dim[id]||{linhas:1,colunas:1};
+    dim[id].colunas=Math.max(dim[id].colunas,12);
+    dim[id].linhas=Math.max(dim[id].linhas,Math.ceil(n/12));
+  });
+  /* Quantas garrafas vão para cada adega — a grade precisa caber TODAS.
+     O tamanho deduzido vem do maior número visto nos Bin, mas o arquivo pode
+     declarar 5 garrafas na mesma casa; sem esta conta, as irmãs ficavam de
+     fora do mapa em silêncio (descoberto no teste com 340 rótulos: só 64
+     entravam). Crescer a grade é mais honesto que descartar garrafa. */
+  const cabem={};
+  registros.forEach(r=>{
+    const todas=[{local:r.local,qtd:r.qtd}].concat(
+      (r.casasExtra||[]).map(x=>({local:x.local,qtd:x.qtd})));
+    todas.forEach(x=>{
+      const id=idDe[String(x.local||"").trim()]||adegaPadraoId;
+      cabem[id]=(cabem[id]||0)+(x.qtd||1);
+    });
+  });
+  Object.keys(dim).forEach(id=>{
+    const a=ADEGAS.find(x=>x.id===id); if(!a)return;
+    let linhas=Math.max(1,dim[id].linhas), colunas=Math.max(1,dim[id].colunas);
+    const precisa=cabem[id]||0;
+    if(precisa>linhas*colunas){
+      const novas=Math.ceil(precisa/colunas);
+      if(novas<=MAPA_MAX_LINHAS)linhas=novas;
+      else{ linhas=MAPA_MAX_LINHAS;
+            colunas=Math.min(MAPA_MAX_COLUNAS,Math.ceil(precisa/MAPA_MAX_LINHAS)); }
+      rel.grandeDemais=(rel.grandeDemais||0)+1;
+    }
+    const g={linhas:Math.min(MAPA_MAX_LINHAS,linhas),
+             colunas:Math.min(MAPA_MAX_COLUNAS,colunas)};
+    /* nunca encolhe uma grade que o usuário já tinha desenhado */
+    if(a.grade){ a.grade={linhas:Math.max(a.grade.linhas,g.linhas),
+                          colunas:Math.max(a.grade.colunas,g.colunas)} }
+    else a.grade=g;
+  });
+  return rel;
+}
+/* Coloca as garrafas nas casas. Roda depois de os vinhos existirem. */
+function impColocarNoMapa(pares,rel){
+  const ocupadas={};   /* adegaId -> Set de casas */
+  vinhos.forEach(v=>{(v.pos||[]).forEach(p=>{
+    (ocupadas[v.adega]=ocupadas[v.adega]||new Set()).add(p)})});
+  pares.forEach(({vinho,reg})=>{
+    const a=ADEGAS.find(x=>x.id===vinho.adega);
+    const g=a&&a.grade; if(!g)return;
+    const usadas=ocupadas[vinho.adega]=ocupadas[vinho.adega]||new Set();
+    const alvos=[{casa:reg.casa,qtd:vinho.qtd}].concat(
+      (reg.casasExtra||[]).map(x=>({casa:x.casa,qtd:x.qtd})));
+    const pos=[];
+    alvos.forEach(({casa,qtd})=>{
+      if(!String(casa||"").trim()){rel.semCasa+=qtd||1;return}
+      const p=impPosLer(casa);
+      if(!p){rel.ilegiveis+=qtd||1;return}
+      let linha=p.linha, coluna=p.coluna;
+      if(linha===0){ linha=Math.floor((coluna-1)/g.colunas)+1; coluna=((coluna-1)%g.colunas)+1 }
+      for(let i=0;i<(qtd||1)&&pos.length<vinho.qtd;i++){
+        /* a primeira vai na casa declarada; as irmãs, nas livres seguintes */
+        let l=linha, c=coluna+i, voltas=0;
+        let coube=false;
+        while(voltas<g.linhas*g.colunas){
+          while(c>g.colunas){c-=g.colunas;l++}
+          if(l>g.linhas){l=1}
+          const nome=impCasaNome(l,c);
+          if(!usadas.has(nome)){ usadas.add(nome); pos.push(nome);
+            if(i>0)rel.estimadas++; else rel.posicionadas++;
+            coube=true; break }
+          c++; voltas++;
+        }
+        if(!coube)rel.semEspaco=(rel.semEspaco||0)+1;
+      }
+    });
+    if(pos.length){ pos.sort(); vinho.pos=pos }
+  });
+}
+
+/* O resumo. Diz o que foi feito E o que não foi — inclusive quantas garrafas
+   ficaram ao lado da casa declarada em vez de nela. Importação que só conta
+   vitória ensina o usuário a desconfiar do mapa. */
+function impResumoMapa(rel){
+  const linhas=[];
+  if(rel.adegasCriadas.length)
+    linhas.push(`<b>${rel.adegasCriadas.length} adega${rel.adegasCriadas.length===1?"":"s"}</b> criada${rel.adegasCriadas.length===1?"":"s"} a partir do arquivo: ${rel.adegasCriadas.map(esc).join(" · ")}`);
+  if(rel.posicionadas)
+    linhas.push(`<b>${rel.posicionadas} garrafa${rel.posicionadas===1?"":"s"}</b> colocada${rel.posicionadas===1?"":"s"} exatamente na casa que o arquivo indicava`);
+  if(rel.estimadas)
+    linhas.push(`<b>${rel.estimadas}</b> garrafa${rel.estimadas===1?"":"s"} do mesmo rótulo ficaram nas casas livres ao lado — o arquivo só dava uma casa para todas`);
+  if(rel.ilegiveis)
+    linhas.push(`<b>${rel.ilegiveis}</b> não entraram no mapa: não consegui entender a posição escrita no arquivo`);
+  if(rel.semCasa)
+    linhas.push(`<b>${rel.semCasa}</b> não tinham posição registrada lá`);
+  if(rel.semEspaco)
+    linhas.push(`<b>${rel.semEspaco}</b> ficaram fora do mapa por falta de casa livre — dá para aumentar a adega no mapa`);
+  if(rel.grandeDemais)
+    linhas.push(`<small>Em ${rel.grandeDemais} adega${rel.grandeDemais===1?"":"s"} o arquivo declarava mais garrafas do que casas; aumentei o tamanho para caber.</small>`);
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif">🗺️ O seu mapa veio junto</h3>
+    <div class="sub">O arquivo dizia onde cada garrafa estava. Aproveitei.</div>
+    <div class="explain-box" style="margin-top:12px;border-left-color:var(--gold)">
+      ${linhas.map(l=>"• "+l).join("<br>")}
+    </div>
+    <div style="font-size:12.5px;color:var(--ink-2);margin-top:10px">
+      Confira antes de confiar: nenhuma posição foi inventada, mas o desenho da
+      adega foi deduzido dos números do arquivo. Dá para ajustar tudo no mapa.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('modal-detail');abrirMapaEscolha()">🗺️ Ver o mapa</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Depois</button>
+    </div>`;
+  $("#modal-detail").classList.add("open");
+}
+
 function impMostrarPrevia(){
   const {registros,origem}=impPend;
   const garrafas=registros.reduce((s,r)=>s+r.qtd,0);
+  const locais=impLocaisDe(registros);
+  const nLocais=Object.keys(locais).length;
+  const casas=impCasasLegiveis(registros);
   const semPais=registros.filter(r=>!r.pais).length;
   const semSafra=registros.filter(r=>!r.safra).length;
   const deMercado=registros.filter(r=>r.precoDeMercado).length;
@@ -5942,6 +6272,16 @@ function impMostrarPrevia(){
       <b>${garrafas} garrafa${garrafas===1?"":"s"}</b>
       ${semPais||semSafra?`<br><small>${semSafra?semSafra+" sem safra (ficam como NV)":""}${semPais&&semSafra?" · ":""}${semPais?semPais+" sem país":""} — dá para completar depois, na ficha.</small>`:""}
     </div>
+    ${(nLocais||casas.sim)?`<div class="explain-box" style="margin-top:10px;border-left-color:var(--gold)">
+      🗺️ <b>Este arquivo diz onde as suas garrafas estão.</b><br>
+      ${nLocais?`${nLocais} adega${nLocais===1?"":"s"}: ${Object.keys(locais).sort((a,b)=>locais[b]-locais[a]).slice(0,5).map(k=>esc(k)+" ("+locais[k]+")").join(" · ")}${nLocais>5?" …":""}<br>`:""}
+      ${casas.sim?`${casas.sim} garrafa${casas.sim===1?"":"s"} com posição que sei ler${casas.nao?` · ${casas.nao} em formato que não entendi`:""}<br>`:""}
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer">
+        <input type="checkbox" id="imp-mapa" checked style="width:18px;height:18px">
+        <span>Criar as adegas e montar o mapa a partir do arquivo</span>
+      </label>
+      <small style="color:var(--ink-3)">Desmarcado, tudo vai para uma adega só e o mapa fica vazio — como era antes.</small>
+    </div>`:""}
     ${outraMoeda?`<div class="explain-box" style="margin-top:10px;border-left-color:var(--wine)">
       💱 Esta planilha diz que os preços estão em <b>${esc(MOEDAS[outraMoeda].simbolo)} ${esc(MOEDAS[outraMoeda].nome)}</b>,
       e a sua adega hoje está em <b>${esc(simboloMoeda())}</b>.
@@ -5975,23 +6315,51 @@ function impMostrarPrevia(){
 }
 
 function impConfirmar(){
-  const {registros}=impPend||{};if(!registros||!registros.length)return;
+  const {registros,origem}=impPend||{};if(!registros||!registros.length)return;
   let adegaId=$("#imp-adega").value;
   if(adegaId==="__nova__"){
     const nova={id:"imp"+Date.now(),nome:"Adega Importada",icone:"📥"};
     ADEGAS.push(nova);adegaId=nova.id;
   }
+  /* v0.94: se o arquivo declara onde as garrafas estão, as adegas e o mapa
+     nascem daí. O usuário escolhe na prévia; o padrão é aproveitar. */
+  const cx=document.getElementById("imp-mapa");
+  const usarMapa=!!(cx&&cx.checked);
+  const rel={adegasCriadas:[],posicionadas:0,semCasa:0,ilegiveis:0,estimadas:0};
+  let idDe={};
+  if(usarMapa){
+    Object.assign(rel,impMontarMapa(registros,adegaId));
+    ADEGAS.forEach(a=>{idDe[impNorm(a.nome)]=a.id});
+  }
   let novos=0,somados=0;
+  const pares=[];
   registros.forEach(r=>{
-    const jaTem=vinhos.find(v=>v.adega===adegaId&&impNorm(v.nome)===impNorm(r.nome)&&(v.safra||null)===(r.safra||null));
-    if(jaTem){jaTem.qtd+=r.qtd;somados++;return}
-    vinhos.push({ id:NEXT_ID++, nome:r.nome, qtd:r.qtd, tipo:r.tipo, adega:adegaId,
+    const destino=(usarMapa&&r.local&&idDe[impNorm(r.local)])||adegaId;
+    /* v0.95: a VINÍCOLA entra na comparação. Sem ela, "Brunello di Montalcino
+       2019" do Belpoggio, do Ciacci Piccolomini e do Podere Paganico viravam
+       um único vinho com 3 garrafas — três produtores diferentes fundidos.
+       O defeito já existia; ficou visível quando passamos a aparar o nome do
+       produtor do começo do nome do vinho, e os nomes começaram a coincidir.
+       O agrupamento do impNormalizar sempre comparou vinícola; este aqui não. */
+    const jaTem=vinhos.find(v=>v.adega===destino
+      &&impNorm(v.nome)===impNorm(r.nome)
+      &&(v.safra||null)===(r.safra||null)
+      &&impNorm(v.vinicola||"")===impNorm(r.vinicola||""));
+    if(jaTem){jaTem.qtd+=r.qtd;somados++;pares.push({vinho:jaTem,reg:r});return}
+    const novo={ id:NEXT_ID++, nome:r.nome, qtd:r.qtd, tipo:r.tipo, adega:destino,
       preco:r.preco, safra:r.safra||null, jan:r.jan, regiao:r.regiao||"—", pais:r.pais||"—",
-      uvas:r.uvas, corpo:3, tanino:3, acidez:3, doc:1, vinicola:r.vinicola, notas:r.notas||"" });
+      uvas:r.uvas, corpo:3, tanino:3, acidez:3, doc:1, vinicola:r.vinicola,
+      ...(r.tam?{tam:r.tam}:{}),
+      ...(r.nota?{nota:r.nota}:{}),
+      ...(r.refN?{ref:{n:r.refN,txt:r.refOnde||origem||"outro aplicativo",de:"imp"}}:{}),
+      notas:(usarMapa?(r.notas||""):[r.notas,r.local?"No app anterior: "+r.local:""].filter(Boolean).join(" · ")) };
+    vinhos.push(novo); pares.push({vinho:novo,reg:r});
     novos++;
   });
+  if(usarMapa)impColocarNoMapa(pares,rel);
   impPend=null;
   persist();
+  if(usarMapa&&(rel.posicionadas||rel.adegasCriadas.length))setTimeout(()=>impResumoMapa(rel),700);
   try{refreshAdegaSelect();renderAdegaBar()}catch(e){}
   renderDash();renderColecao();
   closeModal("modal-detail");
@@ -7319,12 +7687,24 @@ function renderHarmResumo(){
       </div>`).join("")}`;
 }
 
+/* Acento fora, e todo sinal de pontuação vira um espaço só: "Pêra-Manca" e
+   "pera manca" passam a ser a mesma coisa. Hífen é decisão de quem escreveu o
+   rótulo, não de quem procura. */
+function buscaNorm(s){
+  return semAcento(String(s==null?"":s)).toLowerCase()
+    .replace(/[^a-z0-9]+/g," ").replace(/^ | $/g,"");
+}
+
 /* ================== COLEÇÃO ================== */
 function renderColecao(){
-  const q=($("#f-busca").value||"").toLowerCase();
+  /* v0.95: a busca deixa de exigir acento. O arquivo real do colecionador
+     trouxe 41 dos 99 rótulos acentuados — Pêra-Manca, Château, Viñedos — e
+     ninguém digita acento na caixa de busca com o polegar. Procurar "pera
+     manca" não achava nada, e a impressão que fica é que o vinho sumiu. */
+  const q=buscaNorm($("#f-busca").value);
   const ft=$("#f-tipo").value, fp=$("#f-pais").value, ord=$("#f-ordem").value;
   let lista=vinhosAtivos().filter(v=>{
-    const alvo=(v.nome+" "+v.vinicola+" "+v.regiao+" "+(Array.isArray(v.uvas)?v.uvas.join(" "):(v.uvas||""))).toLowerCase();
+    const alvo=buscaNorm(v.nome+" "+v.vinicola+" "+v.regiao+" "+(Array.isArray(v.uvas)?v.uvas.join(" "):(v.uvas||"")));
     return (!q||alvo.includes(q))&&(!ft||v.tipo===ft)&&(!fp||v.pais===fp);
   });
   const sorters={nome:(a,b)=>a.nome.localeCompare(b.nome),safra:(a,b)=>(a.safra||9999)-(b.safra||9999),preco:(a,b)=>b.preco-a.preco,qtd:(a,b)=>b.qtd-a.qtd,
@@ -7342,7 +7722,7 @@ function renderColecao(){
       <div style="flex:1;min-width:0"><h4>${esc(v.nome)} <span style="color:var(--ink-3);font-weight:400">${safraTxt(v)}</span></h4><div class="vin">${esc(v.vinicola)} · ${esc(v.regiao)}</div></div>
       <span class="badge" style="background:${CORES[v.tipo]||"#666"}">${esc(v.tipo)}</span></div>
       <div class="meta"><span>${esc(v.pais)}</span><span>${esc((v.uvas||[]).join(", "))}</span><span class="tag ${s.k}" style="padding:3px 8px">${s.txt}</span>${adegaAtiva==="todas"?`<span class="adega-loc">${esc(adegaDe(v.adega).icone)} ${esc(adegaDe(v.adega).nome)}</span>`:""}</div>
-      <div class="bottom"><span class="qty">${v.qtd} <small>garrafa${v.qtd>1?"s":""}</small></span>${(r=>r
+      <div class="bottom"><span class="qty">${v.qtd} <small>garrafa${v.qtd>1?"s":""}</small>${v.tam?`<small style="margin-left:6px;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ink-2)">${esc(v.tam)}</small>`:""}</span>${(r=>r
         ?`<span title="${r.origem==="sua"?"A sua nota para este vinho":"Média no Apotheca"}"><b style="font-size:17px;color:var(--wine)">${notaTxt(r.valor)}</b> <span style="font-size:12px">${estrelasHTML(r.valor)}</span></span>`
         :(x=>x?`<span title="Referência que você anotou — não é a sua nota" style="color:var(--ink-3)"><span style="font-size:9.5px;letter-spacing:.6px;border:1px solid var(--line);border-radius:4px;padding:1px 4px;vertical-align:2px">REF</span> <b style="font-size:15px;font-weight:600">${notaTxt(x.n)}</b></span>`:"")(refDoVinho(v))
         )(notaExibida(v))}</div>
@@ -7384,7 +7764,7 @@ function openDetail(id){
         :`<button class="btn btn-ghost btn-sm" style="padding:2px 10px" onclick="perguntarMinhaNota(${v.id})">dar a minha nota</button>`)(notaExibida(v))}</div>
       ${(x=>x?`<div><b>Referência</b><span style="font-size:9.5px;letter-spacing:.6px;border:1px solid var(--line);border-radius:4px;padding:1px 4px;color:var(--ink-3)">REF</span>
         <b style="font-size:17px;color:var(--ink-2);margin-left:4px">${notaTxt(x.n)}</b>
-        <span style="color:var(--ink-3);font-size:11.5px;margin-left:6px">${x.txt?esc(x.txt)+" · ":""}anotado por você</span></div>`:"")(refDoVinho(v))}
+        <span style="color:var(--ink-3);font-size:11.5px;margin-left:6px">${x.txt?esc(x.txt)+" · ":""}${x.de==="imp"?"veio na importação":"anotado por você"}</span></div>`:"")(refDoVinho(v))}
     </div>
     <div class="notes">“${esc(v.notas)}”</div>
     <div class="explain-box" style="margin-top:14px">
