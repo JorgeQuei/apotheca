@@ -247,6 +247,12 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
 .toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--wine);color:#fdf3e7;padding:13px 22px;border-radius:12px;font-size:14px;z-index:120;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .3s,transform .3s,visibility .3s;box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:90vw;text-align:center}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible}
+/* v0.93: a tarja do arquivo solto (ver comentário em avisarArquivoSolto) */
+#tarja-solto{position:fixed;top:0;left:0;right:0;z-index:140;background:#8a6d1f;color:#fff8e7;
+  padding:9px 14px;font-size:12.5px;line-height:1.45;text-align:center;
+  box-shadow:0 2px 10px rgba(0,0,0,.25)}
+#tarja-solto a{color:#ffe9a8;font-weight:700}
+#tarja-solto b{color:#ffe9a8}
 /* v0.87: o selo discreto da fila. Fica no alto, não cobre botão nenhum e não
    pede nada — é informação, não interrupção. */
 #nuvem-pill{position:fixed;top:10px;right:12px;z-index:119;
@@ -773,7 +779,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.91"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.93"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -918,6 +924,39 @@ function baixarJSON(u){
     }catch(e){res(null)}
   });
 }
+/* ====== v0.93: O ARQUIVO SOLTO NÃO PODE SE PASSAR PELO APLICATIVO ======
+   O Jorge abriu duas vezes o apotheca.html baixado na pasta Downloads e
+   estranhou o que viu: "a base mundial voltou para 100 vinhos" e "sempre me
+   pede para cadastrar um novo usuário". Nenhum dos dois era defeito.
+
+   Aberto assim, o arquivo:
+   · não acha os base-1/2/3.json, que moram ao lado dele no site e dentro do
+     APK — e cai na amostra de 100 vinhos embutida;
+   · começa com memória vazia, porque o navegador trata cada arquivo baixado
+     (apotheca_2, _3, _4, _5…) como um aplicativo diferente — daí o cadastro
+     de novo, e a adega de demonstração no lugar da dele;
+   · não conversa com o servidor, porque o navegador bloqueia chamadas de rede
+     saindo de um arquivo local.
+
+   Três sintomas assustadores, causa nenhuma. O risco real é ele — ou alguém a
+   quem ele encaminhe o arquivo — julgar o produto por essa versão manca. Um
+   arquivo que se sabe incompleto tem obrigação de dizer isso.
+
+   A condição é precisa: protocolo file: E sem a ponte do APK (que também roda
+   em file:, mas com tudo no lugar). */
+function avisarArquivoSolto(){
+  try{
+    if(location.protocol!=="file:"||window.Apk)return;
+    if(document.getElementById("tarja-solto"))return;
+    const d=document.createElement("div");
+    d.id="tarja-solto";
+    d.innerHTML='📄 Você está vendo o <b>arquivo solto</b>, sem a base mundial e sem a sua adega. '+
+      'O Apotheca de verdade está em <a href="https://apotheca.app.br" target="_blank" rel="noopener">apotheca.app.br</a>.';
+    document.body.appendChild(d);
+    document.body.style.paddingTop="38px";
+  }catch(e){}
+}
+setTimeout(avisarArquivoSolto,900);
 (function carregarBaseExterna(){
   baixarJSON("base-1.json").then(function(j){
     const b=expandirBase(j);
@@ -4977,8 +5016,8 @@ function abrirAjuda(){
       <p style="margin-bottom:10px"><b>📷 Dicas do scanner:</b> boa luz, rótulo de frente, celular firme. O app tenta várias leituras e junta o melhor de cada uma. O que ele não identificar, você completa — e passa a valer para sempre.</p>
       <p style="margin-bottom:10px"><b>🍽️ Harmonizar:</b> escolha o prato (ou descreva) e o app aponta as melhores garrafas DA SUA adega, explicando o porquê.</p>
       <p style="margin-bottom:10px"><b>🥂 Encontros:</b> siga apreciadores na sua Rede, funde ou entre numa confraria, crie o evento e registre as garrafas de cada um — o app monta a ordem de serviço da noite.</p>
-      <p style="margin-bottom:10px"><b>💾 Seus dados:</b> ficam salvos neste aparelho. Para recomeçar com os dados de demonstração, use "Restaurar" no fim da tela de Histórico.</p>
-      <p><b>💬 Suporte:</b> no aplicativo final, aqui haveria chat e e-mail de suporte. Neste protótipo, fale com o Jorge. 😄</p>
+      <p style="margin-bottom:10px"><b>💾 Seus dados:</b> ficam salvos neste aparelho. Se você ligar a sincronização em Configurações, a mesma adega aparece no celular, no tablet e no computador.</p>
+      <p><b>💬 Suporte:</b> escreva para <b>contato@apotheca.app.br</b> — quem responde é gente, e rápido.</p>
     </div>`;
   $("#modal-detail").classList.add("open");
 }
@@ -5132,10 +5171,10 @@ function abrirSobre(){
     <div style="font-size:13.5px;line-height:1.65;margin-top:14px">
       <p style="margin-bottom:10px">Apotheca <b>v${APP_VERSION}</b> · agosto de 2026<br>Idealizador: <b>Jorge Queiroz</b></p>\n      <p style="margin-bottom:10px">Conta: <b>${perfil?"@"+perfil.user+" · 📍 "+perfil.cidade+" (via "+perfil.provedor+")":"não conectada"}</b></p>
       <p style="margin-bottom:10px">Sua adega hoje: <b>${vinhos.length} rótulos · ${tot} garrafas · ${ADEGAS.length} adegas</b></p>
-      <p style="margin-bottom:10px">Base mundial offline: <b>${baseMundialPronta.length.toLocaleString("pt-BR")} vinhos</b> ${baseMundialPronta.length>1000?"— carregada ✓":"— amostra (a base completa vive no APK)"}
+      <p style="margin-bottom:10px">Base mundial offline: <b>${baseMundialPronta.length.toLocaleString("pt-BR")} vinhos</b> ${baseMundialPronta.length>1000?"— carregada ✓":"— <b>amostra</b>: os arquivos da base não foram encontrados ao lado do aplicativo"}
         <br><small style="color:var(--ink-3)">X-Wines (domínio público) + <b>LWIN</b>, por Liv-ex, adaptado — <a href="https://creativecommons.org/licenses/by/4.0/deed.pt-br" target="_blank" rel="noopener" style="color:var(--wine-3)">CC BY 4.0</a></small></p>
       <p style="margin-bottom:10px">Comunidade na nuvem: <b>${nuvemOK?"conectada ✅ (banco real Supabase)":"offline — modo local ⚪"}</b></p>\n      <p style="margin-bottom:10px">Leitor de rótulos: <b>${getIaKey()?"chave própria ✅ (ilimitado)":"pronto ✅ (leitor do Apotheca)"}</b></p>
-      <p style="color:var(--ink-2)">Este é um protótipo de validação: dados de comunidade simulados.</p>
+      <p style="color:var(--ink-2)">Suporte: <a href="mailto:contato@apotheca.app.br" style="color:var(--wine-3)">contato@apotheca.app.br</a></p>
       ${(()=>{try{if(window.Apk&&Apk.diagnosticoTela){const d=JSON.parse(Apk.diagnosticoTela());
         return `<p style="font-size:11.5px;color:var(--ink-3)">🔧 Ajuste de tela (${d.modo||"?"}): Android ${d.sdk} · barras informadas: topo ${d.declT}, base ${d.declB} · barra de status ${d.barraStatus} · <b>aplicado: topo ${d.padT}, base ${d.padB}</b></p>`}}catch(e){}return ""})()}
       <p style="margin-top:10px"><a href="#" onclick="abrirPolitica();return false" style="color:var(--wine-3)">📜 Política de privacidade</a></p>
