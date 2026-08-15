@@ -779,7 +779,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.95"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.97"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1192,7 +1192,33 @@ const PRATOS = [
 
 /* Palavras-chave para busca livre → prato de referência */
 const KEYWORDS = [
+ /* A ORDEM É A REGRA: o primeiro que casar vence. Por isso o INGREDIENTE vem
+    antes do MÉTODO de cocção. "Cordeiro assado" tem de cair em cordeiro, não
+    em "assado" — foi assim que ele caía em Churrasco no primeiro teste desta
+    versão. Prato com nome próprio (moqueca, feijoada) vem antes de tudo. */
  [/moqueca|capixaba|peixada/i,"moqueca"],[/feijoada|feijão/i,"feijoada"],
+
+ /* ===== v0.96: o que faltava, descoberto por dois usuários no mesmo almoço =====
+    "Cordeiro" e "Arroz de pato" caíam no "ainda não conheço". Conferi os
+    backups: nunca estiveram nesta lista, nem na v0.57. Quem achava que
+    funcionava tinha a IA de visão ligada, e ela cobria o buraco. Prato
+    clássico não pode depender de chave de API.
+    Cada linha aponta para uma categoria que JÁ existia, com as uvas e regiões
+    que ela já recomendava — não inventei harmonização nenhuma. */
+ [/cordeiro|carneiro|borrego|cabrito|ovelha|lamb/i,"cozidos"],
+ [/\bpato\b|marreco|magret|confit|codorna/i,"cozidos"],
+ [/coelho|lebre|javali|cervo|veado|\bcaça\b/i,"cozidos"],
+ [/vitela|novilho/i,"filet"],
+ [/hamb[úu]rguer|hamburguer|burger/i,"churrasco"],
+ [/lingui[çc]a|salsich|chouri[çc]o|calabresa/i,"churrasco"],
+ [/carne de sol|carne seca|charque|escondidinho|bai[ãa]o|tropeiro|carreteiro/i,"feijoada"],
+ [/parmegiana|milanesa/i,"ragu"],
+ [/nhoque|gnocchi|ravioli|tortellini|talharim|penne|fettuccine|carbonara|alfredo|canelone/i,"ragu"],
+ [/paella|ceviche|vieira|siri|caranguejo|badejo|pescada|namorado/i,"frutosmar"],
+ [/bob[óo]|vatap[áa]|caruru|acaraj[ée]/i,"moqueca"],
+ [/sopa|caldo|canja/i,"cozidos"],
+ [/quiche|torta salgada|empada|folhado/i,"antipasti"],
+
  [/churrasco|picanha|costela|barbecue|bife|carne vermelha|assado/i,"churrasco"],
  [/bacalhau/i,"bacalhau"],[/coq au vin|frango ao vinho/i,"coq"],
  [/bourguignon|cozido de carne|ensopado/i,"boeuf"],[/ossobuco|osso buco/i,"ossobuco"],
@@ -1205,13 +1231,19 @@ const KEYWORDS = [
  [/dobradinha|moela|f[íi]gado|bucho|buchada|mi[úu]do|rabada|l[íi]ngua|coração de galinha/i,"miudos"],
  [/picadinho|estrogonofe|strogonoff|t[áa]rtar|tartar|[àa] minuta|iscas de/i,"minuta"],
  [/cozido|carne de panela|panelada|pot au feu|assado de|carne assada|pernil assado/i,"cozidos"],
+ /* chocolate ANTES de sobremesa: "sobremesa de chocolate" — que é o nome do
+    próprio cartão na tela — casava em "sobremesa" e perdia o Porto Tawny. */
+ [/chocolate|brigadeiro|cacau/i,"chocolate"],
  [/sorvete|gelato|pudim|torta doce|cheesecake|petit gateau|mousse|sobremesa|doce de|romeu e julieta/i,"sobremesas"],
- [/queijo|fondue/i,"queijos"],[/chocolate|brigadeiro|cacau/i,"chocolate"],
+ [/queijo|fondue/i,"queijos"],
  [/salada|entrada|leve|verão|piquenique/i,"salada"],
  [/peixe|tilápia|robalo|salmão|atum/i,"frutosmar"],
  [/fil[eé]t?|chateaubriand|mignon|tournedos|entrec[oô]te|steak|medalh[aã]o/i,"filet"],
- [/grelhado/i,"frutosmar"],
- [/frango|ave|galinha/i,"coq"],[/porco|leitão|pernil/i,"feijoada"]
+ [/frango|ave|galinha/i,"coq"],[/porco|leitão|pernil/i,"feijoada"],
+ /* "grelhado" sozinho mandava TUDO para frutos do mar — "carne grelhada" e
+    "cordeiro grelhado" viravam ostra. Peixe casa nas linhas de cima, que vêm
+    antes; o que sobra aqui, no Brasil, é carne na brasa. */
+ [/grelhad/i,"churrasco"]
 ];
 /* ================== ENCONTROS ================== */
 /* Garrafas dos amigos: fichas mínimas para a ordem de serviço (inspiradas na sua foto de sexta!) */
@@ -3408,6 +3440,25 @@ function consultarFora(onde,id){
      quando a pessoa voltar */
   marcar();
   location.href=url;
+  return true;
+}
+
+/* v0.97: abrir um endereço de fora para um vinho que NÃO está na adega.
+   Mesmo caminho do consultarFora — inclusive o desvio do WebView do Android,
+   que foi a causa do "não abre nada" da v0.81 — mas sem a marca de referência
+   pendente, porque não há ficha nossa para voltar e preencher. */
+function abrirLinkFora(url){
+  if(window.Apk){
+    if(typeof Apk.abrirFora!=="function"){
+      toast("Esta versão do aplicativo ainda não abre sites de fora. Atualize o Apotheca. 🔄");
+      return false;
+    }
+    let ok=false; try{ok=Apk.abrirFora(url)}catch(e){ok=false}
+    if(!ok){toast("Não consegui abrir o navegador deste aparelho. 📡");return false}
+    return true;
+  }
+  const w=window.open(url,"_blank","noopener");
+  if(!w)location.href=url;
   return true;
 }
 
@@ -8189,6 +8240,69 @@ function clearForm(){
   adegaAnterior=($("#a-adega").value&&$("#a-adega").value!=="__nova")?$("#a-adega").value:null;
   $("#form-title").textContent="Ficha do vinho";lastEan=null;lastFotoRotulo=null;editandoId=null;
 }
+/* ---------- v0.96: o guarda do rótulo repetido ----------
+   Compara pelo NOME e pela SAFRA dentro da MESMA adega, ignorando a vinícola —
+   porque é justamente a vinícola que costuma vir escrita de dois jeitos (o
+   nome comercial na base mundial, o nome do produtor no rótulo). Ignorar a
+   vinícola aqui é o oposto do que fiz na importação, e de propósito: lá eu
+   comparava para NÃO fundir sozinho; aqui eu comparo para PERGUNTAR. */
+let dupLiberado=null;   /* chave que o dono já autorizou cadastrar em separado */
+function dupChave(nome,safra,adega){ return buscaNorm(nome)+"|"+(safra||0)+"|"+adega }
+function dupProcurar(nome,safra,adega){
+  const n=buscaNorm(nome);
+  if(!n)return null;
+  return vinhos.find(v=>v.adega===adega&&(v.safra||0)===(safra||0)&&buscaNorm(v.nome)===n)||null;
+}
+let dupPend=null;
+function dupPerguntar(v,dados){
+  dupPend={id:v.id,...dados};
+  const difere=buscaNorm(v.vinicola||"")!==buscaNorm(dados.vinicola||"");
+  $("#nota-pop-corpo").innerHTML=`
+    <button class="close" style="position:absolute;top:10px;right:12px" onclick="dupCancelar()"
+      aria-label="Fechar">✕</button>
+    <div style="font-size:34px;line-height:1;margin-bottom:6px">🍷</div>
+    <h3 class="serif" style="font-size:20px;margin-bottom:6px">Você já tem este vinho na sua adega</h3>
+    <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:10px">
+      <b>${esc(dados.nome)}</b>${dados.safra?" "+dados.safra:""} está em
+      ${adegaDe(dados.adega).icone} ${esc(adegaDe(dados.adega).nome)},
+      com ${v.qtd} garrafa${v.qtd>1?"s":""}.
+      <b>Quer acrescentar mais ${dados.qtd>1?dados.qtd:"uma"}?</b></p>
+    ${difere?`<div style="text-align:left;font-size:12.5px;background:var(--paper-2);
+      border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <div style="color:var(--ink-3);margin-bottom:4px">A vinícola está diferente:</div>
+      <div>já cadastrada: <b>${esc(v.vinicola||"—")}</b></div>
+      <div>a que você digitou: <b>${esc(dados.vinicola||"—")}</b></div>
+    </div>`:""}
+    <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="dupSomar()">
+      ➕ Sim, acrescentar ${dados.qtd} garrafa${dados.qtd>1?"s":""}</button>
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:10px" onclick="dupSeparado()">
+      Não, é outro vinho — cadastrar separado</button>
+    <div style="font-size:11px;color:var(--ink-3)">Rótulo separado é o certo quando são
+      produtores ou cuvées diferentes com o mesmo nome — acontece em Bordeaux e em
+      Montalcino. Na dúvida, some: dá para separar depois.</div>`;
+  $("#nota-pop").classList.add("open");
+}
+function dupCancelar(){ dupPend=null; $("#nota-pop").classList.remove("open") }
+function dupSeparado(){
+  if(!dupPend)return;
+  dupLiberado=dupPend.chave;   /* só esta gravação passa direto */
+  dupPend=null;
+  $("#nota-pop").classList.remove("open");
+  saveWine();
+}
+function dupSomar(){
+  const p=dupPend; if(!p)return;
+  const v=vinhos.find(x=>x.id===p.id);
+  dupPend=null; $("#nota-pop").classList.remove("open");
+  if(!v)return;
+  v.qtd=(v.qtd||0)+p.qtd;
+  filaAnotar({op:"qtd",id:v.id,d:p.qtd});
+  if(lastFotoRotulo&&!v.fotoId)definirFotoVinho(v,lastFotoRotulo).then(()=>{try{renderColecao()}catch(e){}}).catch(()=>{});
+  toast(`${v.nome} agora tem ${v.qtd} garrafa${v.qtd>1?"s":""}. 🍾`);
+  clearForm();persist();renderAdegaBar();
+  go("colecao");
+}
+
 function saveWine(){
   const nome=$("#a-nome").value.trim();
   if(!nome){toast("Informe ao menos o nome do vinho. 🍷");return}
@@ -8223,6 +8337,25 @@ function saveWine(){
     go("colecao");
     return;
   }
+  /* ===== v0.96: DUAS VEZES O MESMO RÓTULO =====
+     Jorge mandou a foto: "Premier Rendez-Vous Chardonnay Belle Cuvée 2024"
+     duas vezes na Coleção, uma com vinícola "LGI Wines" (veio da base mundial)
+     e outra com "Premier Rendez-Vous" (veio do rótulo). Para o banco eram
+     vinhos diferentes; para os olhos do dono, o mesmo vinho duas vezes.
+
+     Não conserto isso somando calado: foi exatamente somar calado que fundiu
+     três Brunello di Montalcino 2019 de três produtores na importação. Aqui o
+     aplicativo PERGUNTA, mostrando lado a lado o que difere, e quem decide é
+     quem tem a garrafa na mão. */
+  const _safraNova=+$("#a-safra").value||0;
+  const _chaveDup=dupChave(nome,_safraNova,adegaSel);
+  if(dupLiberado!==_chaveDup){
+    const _igual=dupProcurar(nome,_safraNova,adegaSel);
+    if(_igual){ dupPerguntar(_igual,{nome,adega:adegaSel,safra:_safraNova,
+        vinicola:$("#a-vinicola").value||"—",qtd:Math.max(1,+$("#a-qtd").value||1),
+        chave:_chaveDup}); return; }
+  }
+  dupLiberado=null;
   assumirAdegaReal(); /* a partir do primeiro vinho cadastrado, a adega é de verdade */
   const _novoId=NEXT_ID++;
   if(lastFotoRotulo){const _f=lastFotoRotulo;setTimeout(()=>{const nv=vinhos.find(x=>x.id===_novoId);if(nv)definirFotoVinho(nv,_f).then(()=>{try{renderColecao()}catch(e){}}).catch(()=>{})},0)}
@@ -8763,6 +8896,157 @@ function scoreWine(v,p){
   if(s.k==="guardar")pts-=3;
   return {pts,why};
 }
+/* ===================== v0.97: O VINHO QUE VOCÊ AINDA NÃO TEM =====================
+   Pedido que veio dos usuários, na palavra deles: "e se eu quiser COMPRAR um
+   vinho ideal para a galinha à cabidela que estou preparando?". Até aqui o
+   Harmonizar só sabia responder com o que já estava na adega — o que é ótimo
+   na quinta à noite e inútil na véspera do almoço de domingo.
+
+   A resposta NÃO vem de IA, e isso é uma escolha, não uma limitação:
+     · a base mundial já viaja dentro do aplicativo — 206 mil rótulos reais,
+       com uva, região e país conferidos. Responder por ela é instantâneo,
+       funciona sem internet, não custa chave de API e não inventa vinho;
+     · os critérios são OS MESMOS que o aplicativo usa para a adega (tipo,
+       corpo, acidez, uva clássica, região histórica). Ninguém paga para
+       aparecer aqui, e a explicação de cada escolha fica à vista.
+   O que a base não tem — tanino, doçura e safra — simplesmente não entra na
+   conta, em vez de ser chutado. Por isso a porcentagem sai de um total menor
+   e nunca é comparável, número a número, com a da sua adega. */
+/* A conta roda 206.776 vezes a cada toque num prato. Por isso ela é só
+   aritmética: nenhuma frase é montada aqui dentro. No primeiro teste desta
+   versão eu montava o "porquê" de cada candidato e a harmonização levava
+   356 ms — num celular seria mais de um segundo de tela parada. As frases
+   passaram para porqueDeFora, que roda três vezes, no fim. */
+function ptsDeFora(w,p,uvasLow,regsLow){
+  const wt=p.tipos[w[1]]||0;
+  if(!wt)return 0;                          /* tipo que o prato não pede: fora */
+  let pts=wt;
+  pts+=Math.max(0,20-6*Math.abs((+w[6]||3)-p.corpo));
+  const ac=+w[7]||3;
+  pts+= ac>=p.acidezMin ? 15 : Math.max(0,15-6*(p.acidezMin-ac));
+  if(w[2]){ const u=w[2].toLowerCase(); for(let i=0;i<uvasLow.length;i++)if(u.indexOf(uvasLow[i])>=0){pts+=10;break} }
+  if(w[4]){ const r=w[4].toLowerCase(); for(let i=0;i<regsLow.length;i++)if(r.indexOf(regsLow[i])>=0){pts+=6;break} }
+  return pts;
+}
+function porqueDeFora(w,p){
+  const why=[];
+  const wt=p.tipos[w[1]]||0;
+  if(wt>=34)why.push(`O tipo <b>${esc(String(w[1]||"").toLowerCase())}</b> é a escolha clássica para este prato.`);
+  const corpo=+w[6]||3, acidez=+w[7]||3;
+  if(Math.abs(corpo-p.corpo)<=1)why.push(`Corpo ${corpo}/5, na medida da intensidade do prato.`);
+  if(acidez>=p.acidezMin&&p.acidezMin>=4)why.push(`Acidez ${acidez}/5 — o frescor que este prato exige.`);
+  const uvas=String(w[2]||"").toLowerCase();
+  const uvaHit=p.uvasBonus.find(bn=>uvas.includes(bn.toLowerCase()));
+  if(uvaHit)why.push(`A uva <b>${esc(uvaHit)}</b> é referência mundial de harmonização com este prato.`);
+  const reg=String(w[4]||"").toLowerCase();
+  const regHit=p.regioesBonus.find(r=>reg.includes(r.toLowerCase()));
+  if(regHit)why.push(`Harmonização regional: <b>${esc(regHit)}</b> é o par histórico deste prato.`);
+  return why;
+}
+const FORA_MAX=40+20+15+10+6;   /* o teto do que dá para pontuar com o que a base tem */
+function sugestoesDeFora(p,quantos){
+  const base=(typeof baseMundialPronta!=="undefined"&&Array.isArray(baseMundialPronta))?baseMundialPronta:[];
+  if(base.length<500)return [];   /* arquivo solto, sem a base: não invento lista */
+  /* o que já está na adega não é sugestão de compra */
+  const tenho=new Set(vinhos.map(v=>buscaNorm(v.nome)));
+  const uvasLow=p.uvasBonus.map(x=>x.toLowerCase());
+  const regsLow=p.regioesBonus.map(x=>x.toLowerCase());
+  /* O corte sobe sozinho: quando a lista de candidatos passa de 600, ela é
+     ordenada, cortada nos 120 melhores, e o piso vira a nota do 120º. Sem isso
+     um prato de tinto junta dezenas de milhares de candidatos e a ordenação
+     final é que fica cara. Guardo 800 e não 120: os empates no topo são muitos
+     — num prato de tinto os primeiros cem podem ser todos da mesma região, e
+     o filtro de variedade logo abaixo ficaria sem candidatos para escolher. */
+  let corte=60;
+  let achados=[];
+  for(let i=0;i<base.length;i++){
+    const pts=ptsDeFora(base[i],p,uvasLow,regsLow);
+    if(pts<corte)continue;
+    achados.push({w:base[i],pts});
+    if(achados.length>=4000){
+      achados.sort((a,b)=>b.pts-a.pts);
+      achados=achados.slice(0,800);
+      corte=Math.max(corte,achados[achados.length-1].pts);
+    }
+  }
+  achados.sort((a,b)=>b.pts-a.pts||a.w[0].length-b.w[0].length);
+  /* Variedade: no máximo um por vinícola e um por região — senão as três
+     sugestões saem do mesmo produtor e a tela vira catálogo de uma casa só.
+     A região é comparada pela RAIZ: no primeiro teste desta versão a galinha à
+     cabidela devolveu "Beaujolais-Villages", "Beaujolais" e "Beaujolais
+     Nouveau" — três regiões diferentes para o código, a mesma coisa para quem
+     vai à loja. As palavras de enfeite saem antes ("Vale do Rhône" e "Vale do
+     Loire" não podem colidir em "vale"). */
+  const RAIZ_FORA=new Set(["vale","do","da","de","dos","das","regiao","aoc","doc","docg","igp","ac","the"]);
+  const raizRegiao=r=>{
+    const t=buscaNorm(r).split(" ").filter(x=>x&&!RAIZ_FORA.has(x));
+    return t.length?t[0]:"";
+  };
+  const out=[],vistasV=new Set(),vistasR=new Set();
+  for(const c of achados){
+    /* o que já está na adega não é sugestão de compra — conferido só aqui,
+       sobre poucas dezenas de candidatos, e não sobre os 206 mil */
+    if(tenho.has(buscaNorm(nomeExibicao(c.w))))continue;
+    const vi=buscaNorm(c.w[5]||""), rg=raizRegiao(c.w[4]||"");
+    if(vi&&vistasV.has(vi))continue;
+    if(rg&&vistasR.has(rg))continue;
+    vistasV.add(vi); vistasR.add(rg);
+    c.why=porqueDeFora(c.w,p);   /* só agora, para os três que vão à tela */
+    out.push(c);
+    if(out.length>=quantos)break;
+  }
+  return out;
+}
+function foraBusca(i,onde){
+  const c=(window.__fora||[])[i]; if(!c)return;
+  abrirLinkFora(refURL(onde,{nome:nomeExibicao(c.w),vinicola:c.w[5]||"",safra:0}));
+}
+function foraQuero(i){
+  const c=(window.__fora||[])[i]; if(!c)return;
+  go("add");            /* o nome da tela é "add" — "adicionar" não existe em VIEWS */
+  setTimeout(()=>{ try{preencherDaBase(c.w)}catch(e){} },60);
+  toast("Ficha preenchida pela base mundial — confira a safra e a quantidade. 📝");
+}
+function blocoDeFora(p){
+  const lista=sugestoesDeFora(p,3);
+  window.__fora=lista;
+  if(!lista.length)return "";
+  return `
+    <div class="explain-box" style="margin-top:14px">🌍 <b>Fora da sua adega</b> —
+      se você quiser comprar para este prato, estas ${lista.length===1?"é a garrafa":"são as "+lista.length+" garrafas"}
+      que a base mundial do Apotheca aponta.
+      <span style="font-size:12px">Mesmos critérios usados na sua adega, sem propaganda: ninguém paga para aparecer aqui.</span></div>
+    ${lista.map((c,i)=>`
+      <div class="pair-card">
+        <div class="medal" style="font-size:20px">🌍</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+            <div><h4 class="serif">${esc(nomeExibicao(c.w))}</h4>
+              <div class="vin">${esc(c.w[5]||"—")} · ${esc(c.w[4]||"—")} · ${esc(c.w[3]||"—")}${c.w[2]?" · "+esc(c.w[2]):""}</div></div>
+            <!-- v0.97: AQUI NÃO VAI PORCENTAGEM.
+                 Na primeira foto desta tela, o vinho de fora aparecia com noventa e
+                 nove por cento logo abaixo do Quinta do Crasto da propria adega, com
+                 setenta e cinco. Os dois
+                 números saem de contas diferentes — o de fora não tem tanino, doçura
+                 nem janela de guarda para pontuar — mas ninguém lê rodapé antes de
+                 comparar 99 com 75. É o mesmo erro do 3,7 inventado do Sassicaia,
+                 agora em forma de percentual. O motivo da escolha fica nas frases
+                 abaixo, que é onde ele pode ser conferido. -->
+          </div>
+          <ul class="why">${c.why.slice(0,3).map(x=>`<li>${x}</li>`).join("")||"<li>Perfil compatível com o prato.</li>"}</ul>
+          <div class="pair-actions">
+            <button class="btn btn-primary btn-sm" onclick="foraBusca(${i},'ws')">🔎 Onde comprar</button>
+            <button class="btn btn-ghost btn-sm" onclick="foraBusca(${i},'vivino')">Ver no Vivino</button>
+            <button class="btn btn-ghost btn-sm" onclick="foraQuero(${i})">Já tenho / comprei</button>
+          </div>
+        </div>
+      </div>`).join("")}
+    <div class="explain-box" style="font-size:12px">Estas sugestões saem da base mundial que viaja dentro do aplicativo,
+      sem consultar nenhum site. Não levam porcentagem de propósito: a base não guarda tanino, doçura nem safra, então
+      qualquer número aqui seria <b>calculado com menos critérios</b> do que o da sua adega — e daria a impressão errada
+      ao lado dele. Os motivos de cada escolha estão acima, à vista. Preço e disponibilidade quem informa é a loja.</div>`;
+}
+
 function harmonizar(pratoId,rotulo){
   const p=PRATOS.find(x=>x.id===pratoId);if(!p)return;
   document.querySelectorAll(".dish").forEach(d=>d.classList.toggle("sel",d.dataset.id===pratoId));
@@ -8786,7 +9070,8 @@ function harmonizar(pratoId,rotulo){
           </div>
         </div>
       </div>`).join("")}
-    <div class="explain-box">💡 <b>Como o Apotheca decidiu:</b> cada garrafa da sua adega recebeu uma pontuação combinando o tipo de vinho indicado para o prato, corpo, taninos, acidez e doçura, com bônus para uvas e regiões classicamente harmonizadas — e até para garrafas que estão no fim da janela ideal de consumo.</div>`;
+    <div class="explain-box">💡 <b>Como o Apotheca decidiu:</b> cada garrafa da sua adega recebeu uma pontuação combinando o tipo de vinho indicado para o prato, corpo, taninos, acidez e doçura, com bônus para uvas e regiões classicamente harmonizadas — e até para garrafas que estão no fim da janela ideal de consumo.</div>
+    ${blocoDeFora(p)}`;
   $("#pair-results").scrollIntoView({behavior:"smooth",block:"start"});
 }
 async function freeSearch(){
