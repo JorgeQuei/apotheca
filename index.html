@@ -542,7 +542,7 @@ button.foto-vinho.vazia span{font-size:26px}
       <div class="add-modes">
         <div class="mode-card sel" onclick="document.getElementById('form-panel').scrollIntoView({behavior:'smooth'});setTimeout(()=>document.getElementById('a-nome').focus(),400)">
           <div class="big">🌍</div><h4>Buscar na base mundial</h4>
-          <p><b>O caminho mais rápido:</b> digite 3+ letras do nome no campo abaixo e escolha entre 100 mil vinhos — a ficha completa se preenche sozinha.</p>
+          <p><b>O caminho mais rápido:</b> digite 3+ letras do nome no campo abaixo e escolha entre 206 mil vinhos — a ficha completa se preenche sozinha.</p>
         </div>
         <div class="mode-card" onclick="openScanner()">
           <div class="big">📷</div><h4>Fotografar o rótulo</h4>
@@ -552,7 +552,7 @@ button.foto-vinho.vazia span{font-size:26px}
       <div class="panel" id="form-panel">
         <h3 id="form-title">Ficha do vinho</h3>
         <div class="formgrid">
-          <div class="field wide sug-wrap"><label>Nome do vinho * <span style="font-weight:400;text-transform:none;letter-spacing:0">· digite: busca na base de 100 mil vinhos — e na IA, se você pedir</span></label><input id="a-nome" placeholder="Ex.: Catena, Esporão, Miolo…" autocomplete="off"><div class="sug-box hidden" id="nome-sug"></div></div>
+          <div class="field wide sug-wrap"><label>Nome do vinho * <span style="font-weight:400;text-transform:none;letter-spacing:0">· digite: busca na base de 206 mil vinhos — e na IA, se você pedir</span></label><input id="a-nome" placeholder="Ex.: Catena, Esporão, Miolo…" autocomplete="off"><div class="sug-box hidden" id="nome-sug"></div></div>
           <div class="field"><label>Vinícola / Produtor</label><input id="a-vinicola" placeholder="Ex.: Vinícola Miolo"></div>
           <div class="field"><label>País</label><select id="a-pais"></select></div>
           <div class="field"><label>Região</label><input id="a-regiao" placeholder="Ex.: Vale dos Vinhedos"></div>
@@ -8919,7 +8919,7 @@ async function capturarRotulo(){
   cc.width=Math.round(v.videoWidth*ec);cc.height=Math.round(v.videoHeight*ec);
   cc.getContext("2d").drawImage(v,0,0,cc.width,cc.height);
   await analisarRotuloDeCanvas(cc,t,
-    "Não reconheci um vinho nesta foto — enquadre o rótulo de frente, com boa luz, e tente de novo.<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+    "Não reconheci um vinho nesta foto — enquadre o rótulo de frente, com boa luz, e tente de novo.<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 206 mil vinhos.");
   ocrBusy=false;travarBotoesScan(false);
 }
 /* ---------- v0.67: ler o rótulo de uma foto que já está no aparelho ----------
@@ -9008,7 +9008,7 @@ async function rotuloDoArquivo(inp){
      está vendo qual foto o app pegou */
   mostrarPrevia(dataAlta);
   await analisarRotuloDeCanvas(alta,mini,
-    "Não reconheci o vinho nesta foto.<br>Toque em <b>🖼️ Usar uma foto do aparelho</b> para tentar outra, ou em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.",
+    "Não reconheci o vinho nesta foto.<br>Toque em <b>🖼️ Usar uma foto do aparelho</b> para tentar outra, ou em <b>⌨️ Prefiro digitar</b> para buscar na base de 206 mil vinhos.",
     dataAlta);
   if(img.close)img.close();
   ocrBusy=false;travarBotoesScan(false);
@@ -9034,11 +9034,11 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
     if(m==="SEM_LOGIN"){
       setScan("🔑 <b>A sua sessão expirou</b> — entre de novo para usar o leitor de rótulos.<br>É o que garante as leituras gratuitas de cada pessoa."
         +'<br><button class="btn btn-gold btn-sm" style="margin-top:10px" onclick="entrarGoogleReal()">Entrar com o Google</button>'
-        +"<br><span style=\"font-size:12px\">Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.</span>");
+        +"<br><span style=\"font-size:12px\">Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 206 mil vinhos.</span>");
     }else if(m==="LIMITE"){
-      setScan("📸 <b>Você usou as suas leituras deste mês.</b><br>Elas voltam no dia 1º. Enquanto isso, use <b>⌨️ Prefiro digitar</b> (base de 100 mil vinhos) — ou, se quiser leituras ilimitadas, configure a sua própria chave em ☰ → 🔑 IA de visão.");
+      setScan("📸 <b>Você usou as suas leituras deste mês.</b><br>Elas voltam no dia 1º. Enquanto isso, use <b>⌨️ Prefiro digitar</b> (base de 206 mil vinhos) — ou, se quiser leituras ilimitadas, configure a sua própria chave em ☰ → 🔑 IA de visão.");
     }else{
-      setScan("❌ <b>Não consegui ler agora:</b> "+m+"<br>Tente de novo em instantes, ou use <b>⌨️ Prefiro digitar</b> para buscar na base de 100 mil vinhos.");
+      setScan("❌ <b>Não consegui ler agora:</b> "+m+"<br>Tente de novo em instantes, ou use <b>⌨️ Prefiro digitar</b> para buscar na base de 206 mil vinhos.");
     }
     return false;
   }
