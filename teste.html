@@ -779,7 +779,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.97"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "0.99"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -944,9 +944,185 @@ function baixarJSON(u){
 
    A condição é precisa: protocolo file: E sem a ponte do APK (que também roda
    em file:, mas com tudo no lugar). */
+/* ==================== v0.98: A PONTE ÚNICA ====================
+   Até aqui o aplicativo perguntava `window.Apk` em VINTE E DOIS lugares. Cada
+   um decidia por conta própria o que fazer quando a ponte não existia, e o
+   caminho de reserva era sempre o do navegador. Isso funcionou enquanto só
+   havia Android e site.
+
+   O iPhone quebra isso de três formas, todas já conhecidas por nós:
+
+   1. ABRIR SITE DE FORA — no Android o `window.open` era engolido pelo
+      WebView, e foi o defeito da v0.81 ("não abre nada do Vivino nem do
+      Wine-Searcher"). O WKWebView do iOS faz o mesmo. O caminho de reserva
+      levaria o botão novo "Onde comprar" a não abrir nada.
+   2. SALVAR ARQUIVO — quatro pontos usam Apk.arqParaDownloads. Sem eles, o
+      backup falharia CALADO no iPhone, que é o pior jeito de falhar e foi
+      contra o que nasceu o bkPasso da v0.71.5.
+   3. O CONVITE DE INSTALAR — `podeInstalarNaTela` só olhava se é iOS e se já
+      está em modo tela cheia. Dentro do aplicativo baixado da App Store ele
+      convidaria a pessoa a instalar o aplicativo pelo Safari. Um aplicativo
+      da loja pedindo para ser instalado por fora é a definição de "site
+      empacotado" para quem revisa — Guideline 4.2, rejeição na hora.
+
+   A resposta não é acrescentar um `if` de iOS em vinte e dois lugares: é ter
+   UM lugar que sabe onde está rodando. `window.Apk` continua intocado como o
+   transporte do Android — o APK publicado não muda um byte de comportamento.
+   O que muda é que ninguém mais pergunta por ele diretamente.
+
+   Capacidades declaradas, nunca deduzidas: cada método pergunta se a coisa
+   existe antes de usá-la, e devolve false quando não dá. Nada aqui promete o
+   que não pode cumprir. */
+const Ponte = (function(){
+  const cap = () => (typeof window!=="undefined" && window.Capacitor) || null;
+  const plug = nome => { const c=cap(); return (c && c.Plugins && c.Plugins[nome]) || null };
+
+  function qual(){
+    if(typeof window==="undefined")return "web";
+    if(window.Apk)return "android";
+    const c=cap();
+    if(c){
+      try{ if(typeof c.getPlatform==="function"){const p=c.getPlatform(); if(p==="ios"||p==="android")return p} }catch(e){}
+      return "ios";   /* Capacitor presente sem plataforma legível: tratamos como iOS */
+    }
+    return "web";
+  }
+  const nativo = () => qual()!=="web";
+
+  return {
+    qual, nativo,
+    /* nome do aparelho para a lista de aparelhos sincronizados */
+    nome(){
+      const q=qual();
+      if(q==="android")return "Apotheca no Android";
+      if(q==="ios")return "Apotheca no iPhone";
+      return null;    /* o navegador se identifica pelo userAgent, como antes */
+    },
+
+    /* ---------- abrir um endereço FORA do aplicativo ----------
+       No Android são DUAS pontes diferentes, e juntá-las foi um erro meu que o
+       t083 pegou na hora: `abrirNavegador` existe desde sempre e serve ao login
+       OAuth; `abrirFora` nasceu na v0.81 para os sites de vinho. Um APK antigo
+       tem só a primeira — e, se eu aceitasse ela aqui, o aplicativo diria que
+       abriu o Wine-Searcher sem ter aberto nada. Fingir é pior do que avisar. */
+    podeAbrirFora(){
+      const q=qual();
+      if(q==="android")return !!(window.Apk&&Apk.abrirFora);
+      if(q==="ios")return !!plug("Browser");
+      return true;    /* navegador: sempre pode */
+    },
+    abrirFora(url){
+      const q=qual();
+      if(q==="android"){
+        if(!(window.Apk&&Apk.abrirFora))return false;
+        let ok=false; try{ ok=!!Apk.abrirFora(url) }catch(e){ ok=false }
+        return ok;    /* devolveu falso? falhou. Undefined também. */
+      }
+      if(q==="ios"){
+        const B=plug("Browser");
+        if(B&&typeof B.open==="function"){ try{ B.open({url}); return true }catch(e){ return false } }
+        return false;
+      }
+      const w=window.open(url,"_blank","noopener");
+      if(!w)location.href=url;
+      return true;
+    },
+
+    /* ---------- sair para o login do Google/Apple ----------
+       Caminho próprio: no Android é o `abrirNavegador`, que existe em todos os
+       APK publicados. Sem isto, quem está numa versão anterior à v0.81 perderia
+       o login — um defeito muito pior do que o que eu estava consertando. */
+    podeAbrirLogin(){
+      const q=qual();
+      if(q==="android")return !!(window.Apk&&Apk.abrirNavegador);
+      if(q==="ios")return !!plug("Browser");
+      return false;   /* no navegador o login segue pelo próprio navegador */
+    },
+    abrirLogin(url){
+      const q=qual();
+      if(q==="android"&&window.Apk&&Apk.abrirNavegador){
+        try{ Apk.abrirNavegador(url); return true }catch(e){ return false }
+      }
+      if(q==="ios")return this.abrirFora(url);
+      return false;
+    },
+
+    /* ---------- endereço nosso (política, site): qualquer porta serve ---------- */
+    abrirQualquer(url){
+      if(this.abrirFora(url))return true;
+      if(this.abrirLogin(url))return true;
+      const w=window.open(url,"_blank","noopener");
+      if(!w)location.href=url;
+      return true;
+    },
+
+    /* ---------- aviso no sistema ---------- */
+    podeNotificar(){
+      const q=qual();
+      if(q==="android")return !!(window.Apk&&Apk.notificar);
+      if(q==="ios")return !!plug("LocalNotifications");
+      return false;   /* no navegador quem manda é a API Notification, como antes */
+    },
+    notificar(titulo,corpo){
+      const q=qual();
+      if(q==="android"&&window.Apk&&Apk.notificar){ try{ Apk.notificar(titulo,corpo); return true }catch(e){ return false } }
+      if(q==="ios"){
+        const N=plug("LocalNotifications");
+        if(N&&typeof N.schedule==="function"){
+          try{ N.schedule({notifications:[{title:titulo,body:corpo,id:Date.now()%100000}]}); return true }catch(e){ return false }
+        }
+      }
+      return false;
+    },
+
+    /* ---------- arquivos: backup e restauração ---------- */
+    arqInicio(){
+      if(qual()==="android"&&window.Apk&&Apk.arqInicio){ try{ return Apk.arqInicio() }catch(e){ return null } }
+      return null;
+    },
+    podeSalvarArquivo(){
+      const q=qual();
+      if(q==="android")return !!(window.Apk&&Apk.arqParaDownloads);
+      if(q==="ios")return !!(plug("Filesystem")&&plug("Share"));
+      return false;
+    },
+    podeDiagnosticar(){ return qual()==="android"&&!!(window.Apk&&Apk.arqDiagnostico) },
+    diagnostico(){
+      if(!this.podeDiagnosticar())return null;
+      try{ return JSON.parse(Apk.arqDiagnostico()||"{}") }catch(e){ return {erro:String(e)} }
+    },
+    diagnosticoTela(){
+      if(qual()!=="android"||!(window.Apk&&Apk.diagnosticoTela))return null;
+      try{ return JSON.parse(Apk.diagnosticoTela()) }catch(e){ return null }
+    }
+  };
+})();
+
+/* v0.98: O RETORNO DO LOGIN NO iPHONE.
+   No Android, quando o navegador devolve o usuário pelo endereço
+   apotheca://auth#tokens, é a ponte Java que chama processarTokensExternos.
+   No iPhone quem entrega esse endereço é o plugin App do Capacitor, e sem
+   este ouvinte o login do Google e da Apple abriria o Safari e nunca
+   voltaria — a pessoa ficaria olhando para uma página em branco sem
+   entender por quê. É o mesmo silêncio da v0.74, e não se repete. */
+(function ligarRetornoDoLogin(){
+  try{
+    const A=(window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App)||null;
+    if(!A||typeof A.addListener!=="function")return;
+    A.addListener("appUrlOpen",ev=>{
+      const url=String((ev&&ev.url)||"");
+      const i=url.indexOf("#");
+      if(i<0)return;
+      /* fecha a janela do navegador que ficou por cima */
+      try{ const B=window.Capacitor.Plugins.Browser; if(B&&B.close)B.close() }catch(e){}
+      try{ processarTokensExternos(url.slice(i)) }catch(e){}
+    });
+  }catch(e){ /* sem Capacitor: nada a ligar */ }
+})();
+
 function avisarArquivoSolto(){
   try{
-    if(location.protocol!=="file:"||window.Apk)return;
+    if(location.protocol!=="file:"||Ponte.nativo())return;
     if(document.getElementById("tarja-solto"))return;
     const d=document.createElement("div");
     d.id="tarja-solto";
@@ -1302,8 +1478,8 @@ function entrarComProvedor(prov){
      Agora a escolha do caminho mora aqui dentro, e vale para todos. */
   const p=(prov==="Apple")?"apple":"google";
   const marca=(prov==="Apple")?"a Apple":"o Google";
-  if(window.Apk&&Apk.abrirNavegador){
-    Apk.abrirNavegador(SB_BASE+"/auth/v1/authorize?provider="+p+"&redirect_to="+encodeURIComponent("apotheca://auth"));
+  if(Ponte.nativo()&&Ponte.podeAbrirLogin()){
+    Ponte.abrirLogin(SB_BASE+"/auth/v1/authorize?provider="+p+"&redirect_to="+encodeURIComponent("apotheca://auth"));
     toast("🌐 Complete o login no navegador que abriu — eu trago você de volta. 🍷");
     return;
   }
@@ -1564,8 +1740,8 @@ async function vincularIdentidade(prov){
       else toast("Não consegui iniciar o vínculo: "+m+" 📡");
       return;
     }
-    if(window.Apk&&Apk.abrirNavegador){
-      Apk.abrirNavegador(d.url);
+    if(Ponte.nativo()&&Ponte.podeAbrirLogin()){
+      Ponte.abrirLogin(d.url);
       toast("🌐 Conclua no navegador que abriu — eu trago você de volta.");
       return;
     }
@@ -2903,7 +3079,7 @@ function sincLigada(){return !!(sinc.on&&sessao&&sessao.uid)}
 
 function nomeAparelho(){
   const u=navigator.userAgent||"";
-  if(window.Apk)return "Apotheca no Android";
+  const nomePonte=Ponte.nome(); if(nomePonte)return nomePonte;
   if(/iPhone/.test(u))return "iPhone";
   if(/iPad/.test(u))return "iPad";
   if(/Android/.test(u))return "Android";
@@ -3423,14 +3599,12 @@ function consultarFora(onde,id){
   if(vistos.indexOf(onde)<0)vistos.push(onde);
   const marcar=()=>{try{localStorage.setItem(REF_PENDENTE,JSON.stringify({id,ts:Date.now(),onde,vistos}))}catch(e){}};
 
-  if(window.Apk){
-    if(typeof Apk.abrirFora!=="function"){
+  if(Ponte.nativo()){
+    if(!Ponte.podeAbrirFora()){
       toast("Esta versão do aplicativo ainda não abre sites de fora. Atualize o Apotheca — no site já funciona. 🔄");
       return false;
     }
-    let ok=false;
-    try{ok=Apk.abrirFora(url)}catch(e){ok=false}
-    if(!ok){toast("Não consegui abrir o navegador deste aparelho. 📡");return false}
+    if(!Ponte.abrirFora(url)){toast("Não consegui abrir o navegador deste aparelho. 📡");return false}
     marcar();return true;
   }
 
@@ -3448,17 +3622,11 @@ function consultarFora(onde,id){
    que foi a causa do "não abre nada" da v0.81 — mas sem a marca de referência
    pendente, porque não há ficha nossa para voltar e preencher. */
 function abrirLinkFora(url){
-  if(window.Apk){
-    if(typeof Apk.abrirFora!=="function"){
-      toast("Esta versão do aplicativo ainda não abre sites de fora. Atualize o Apotheca. 🔄");
-      return false;
-    }
-    let ok=false; try{ok=Apk.abrirFora(url)}catch(e){ok=false}
-    if(!ok){toast("Não consegui abrir o navegador deste aparelho. 📡");return false}
-    return true;
+  if(Ponte.nativo()&&!Ponte.podeAbrirFora()){
+    toast("Esta versão do aplicativo ainda não abre sites de fora. Atualize o Apotheca. 🔄");
+    return false;
   }
-  const w=window.open(url,"_blank","noopener");
-  if(!w)location.href=url;
+  if(!Ponte.abrirFora(url)){toast("Não consegui abrir o navegador deste aparelho. 📡");return false}
   return true;
 }
 
@@ -4029,7 +4197,9 @@ const ehIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)
   ||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);   /* iPad moderno se diz Mac */
 const jaInstalado=()=>!!(navigator.standalone
   ||(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches));
-const podeInstalarNaTela=()=>ehIOS()&&!jaInstalado()&&!(window.Apk&&Apk.notificar);
+/* v0.98: e NUNCA dentro do aplicativo nativo — um app da loja convidando a
+   pessoa a instalá-lo pelo Safari é a leitura literal de "site empacotado". */
+const podeInstalarNaTela=()=>ehIOS()&&!jaInstalado()&&!Ponte.nativo();
 
 function instDispensar(){
   try{localStorage.setItem(INST_DISPENSADO,String(Date.now()))}catch(e){}
@@ -4248,7 +4418,7 @@ function bkPassoFim(){
    ponte Apk existe. Serve para NUNCA cair no caminho de download do navegador
    ali dentro — ele falha em silêncio, e silêncio aqui custou uma adega. */
 function dentroDoAplicativo(){
-  return location.protocol==="file:" || !!(window.Apk&&Apk.arqInicio);
+  return location.protocol==="file:" || Ponte.nativo();
 }
 
 /* ---------- a entrega: quem escolhe o destino é o dono ---------- */
@@ -4256,7 +4426,11 @@ async function entregarArquivo(nome,texto,mime){
   /* APK: a ponte abre o seletor do Android, onde aparecem Drive, Dropbox,
      OneDrive e o que mais estiver instalado. Vai em pedaços para não estourar
      a memória quando o backup levar as fotos junto. */
-  if(window.Apk&&Apk.arqInicio){
+  /* Único ponto do aplicativo que ainda fala com a ponte do Android sem
+     passar pela Ponte, e de propósito: daqui para baixo é transporte de
+     arquivo em pedaços, específico do Android. Quem DECIDE se é este o
+     caminho continua sendo a Ponte, na linha acima. */
+  if(Ponte.qual()==="android"&&window.Apk&&Apk.arqInicio){
     try{
       /* ---------- v0.71.5: a conversão deixou de ser feita a mão ----------
          O laço antigo montava o base64 caractere por caractere: para um backup
@@ -4449,11 +4623,10 @@ function avisoArquivoAndroid(estado,onde){
    diagnósticos num dia por deduzir do código em vez de perguntar à máquina,
    este botão passa a ser o primeiro passo de qualquer investigação de backup. */
 function bkDiagnosticar(){
-  if(!(window.Apk&&Apk.arqDiagnostico)){
+  if(!Ponte.podeDiagnosticar()){
     alert("Este diagnóstico só existe dentro do aplicativo Android.");return;
   }
-  let d={};
-  try{ d=JSON.parse(Apk.arqDiagnostico()||"{}") }catch(e){ d={erro:String(e)} }
+  const d=Ponte.diagnostico()||{};
   const linhas=[
     "DIAGNÓSTICO DO BACKUP",
     "",
@@ -4490,7 +4663,7 @@ function bkPerguntarFormato(){
   const comFotos=!!($("#bk-fotos")&&$("#bk-fotos").checked);
   const el=document.getElementById("modal-consume-body");
   if(!el){bkSalvar("json");return}
-  const noApk=!!(window.Apk&&Apk.arqParaDownloads);
+  const noApk=Ponte.podeSalvarArquivo();
   el.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
       <h2 style="margin:0">💾 Como quer salvar?</h2>
@@ -4525,7 +4698,7 @@ function bkPerguntarFormato(){
    e o que sempre diz onde o arquivo ficou. */
 function bkEscolherDestino(tipo,comFotos){
   const el=document.getElementById("modal-consume-body");
-  if(!el||!(window.Apk&&Apk.arqParaDownloads)){
+  if(!el||!Ponte.podeSalvarArquivo()){
     /* navegador, ou aplicativo antigo: segue o caminho de sempre */
     bkDestinoEscolhido="perguntar";
     closeModal("modal-consume");bkSalvar(tipo,comFotos);return;
@@ -4727,7 +4900,7 @@ function abrirBackup(){
       <small>${esc(d.onde||d.nome)}</small></div>
     </div>`:""})()}
 
-    ${(window.Apk&&Apk.arqDiagnostico)?`
+    ${Ponte.podeDiagnosticar()?`
     <button class="btn btn-ghost btn-sm" style="width:100%;margin-bottom:4px" onclick="bkDiagnosticar()">
       🩺 Testar o salvamento neste aparelho
     </button>
@@ -4957,7 +5130,7 @@ function aplicarMoedaUI(){
 
 function abrirConfiguracoes(){
   const tv=travaLer().modo;
-  const permissao=(window.Apk&&Apk.notificar)?"granted":permissaoNotif();
+  const permissao=Ponte.podeNotificar()?"granted":permissaoNotif();
   const som=localStorage.getItem("apotheca_som")==="0";
   const nAdegas=ADEGAS.length;
   const temReal=vinhos.length>0&&!adegaDemo;
@@ -5218,8 +5391,7 @@ async function sincEscolher(qual){
 
 function abrirPolitica(){
   const u=SITE_URL+"politica-privacidade.html";
-  if(window.Apk&&Apk.abrirNavegador)Apk.abrirNavegador(u);
-  else window.open(u,"_blank","noopener");
+  Ponte.abrirQualquer(u);
 }
 function abrirSobre(){
   const tot=vinhos.reduce((s,v)=>s+v.qtd,0);
@@ -5235,7 +5407,7 @@ function abrirSobre(){
         <br><small style="color:var(--ink-3)">X-Wines (domínio público) + <b>LWIN</b>, por Liv-ex, adaptado — <a href="https://creativecommons.org/licenses/by/4.0/deed.pt-br" target="_blank" rel="noopener" style="color:var(--wine-3)">CC BY 4.0</a></small></p>
       <p style="margin-bottom:10px">Comunidade na nuvem: <b>${nuvemOK?"conectada ✅ (banco real Supabase)":"offline — modo local ⚪"}</b></p>\n      <p style="margin-bottom:10px">Leitor de rótulos: <b>${getIaKey()?"chave própria ✅ (ilimitado)":"pronto ✅ (leitor do Apotheca)"}</b></p>
       <p style="color:var(--ink-2)">Suporte: <a href="mailto:contato@apotheca.app.br" style="color:var(--wine-3)">contato@apotheca.app.br</a></p>
-      ${(()=>{try{if(window.Apk&&Apk.diagnosticoTela){const d=JSON.parse(Apk.diagnosticoTela());
+      ${(()=>{try{const d=Ponte.diagnosticoTela(); if(d){
         return `<p style="font-size:11.5px;color:var(--ink-3)">🔧 Ajuste de tela (${d.modo||"?"}): Android ${d.sdk} · barras informadas: topo ${d.declT}, base ${d.declB} · barra de status ${d.barraStatus} · <b>aplicado: topo ${d.padT}, base ${d.padB}</b></p>`}}catch(e){}return ""})()}
       <p style="margin-top:10px"><a href="#" onclick="abrirPolitica();return false" style="color:var(--wine-3)">📜 Política de privacidade</a></p>
     </div>
@@ -7299,7 +7471,7 @@ function sairSessao(){
      Google — desfazendo, em tempo de execução, o que o HTML dizia certo.
      Quem saísse da conta uma vez via a versão antiga até recarregar a página. */
   const nota=$("#login-nota");
-  if(nota)nota.textContent=(ehSite()||window.Apk)
+  if(nota)nota.textContent=(ehSite()||Ponte.nativo())
     ?"Login verdadeiro: você autoriza na tela oficial do Google ou da Apple, e o app recebe apenas a sua identificação verificada. Nenhuma senha passa pelo Apotheca."
     :"Neste visualizador local a entrada é pelo nome de usuário. Os logins Google e Apple funcionam no site e no aplicativo Android.";
   $("#login-p1").classList.remove("hidden");$("#login-p2").classList.add("hidden");
@@ -7404,7 +7576,7 @@ function iniciarLogin(prov){
 function iniciarLoginDireto(prov){
   provPendente=prov;
   /* site e APK: entrarComProvedor() já sabe escolher o caminho de cada um */
-  if((prov==="Google"||prov==="Apple")&&(ehSite()||(window.Apk&&Apk.abrirNavegador))){entrarComProvedor(prov);return}
+  if((prov==="Google"||prov==="Apple")&&(ehSite()||(Ponte.nativo()&&Ponte.podeAbrirLogin()))){entrarComProvedor(prov);return}
   if(perfil){ /* APK: conta já existe neste aparelho, entra direto */
     $("#login-screen").classList.remove("open");go("dashboard");
     toast(`Bem-vindo de volta, @${perfil.user}! 🍷`);
@@ -9972,7 +10144,7 @@ function permissaoNotif(){
 }
 async function pedirPermissaoNotif(silencioso){
   /* Android empacotado: quem manda o aviso é o próprio aplicativo */
-  if(window.Apk&&Apk.notificar)return true;
+  if(Ponte.podeNotificar())return true;
   if(typeof Notification==="undefined"){
     if(!silencioso)toast("Este navegador não suporta avisos do sistema. 🔕");
     return false;
@@ -9991,7 +10163,7 @@ async function pedirPermissaoNotif(silencioso){
 /* Mostra o aviso no sistema do celular */
 async function avisoDoSistema(titulo,corpo){
   try{
-    if(window.Apk&&Apk.notificar){Apk.notificar(titulo,corpo);return true}
+    if(Ponte.notificar(titulo,corpo))return true;
     if(typeof Notification==="undefined"||Notification.permission!=="granted")return false;
     const opc={body:corpo,icon:"icon-192.png",badge:"icon-192.png",tag:"apotheca",renotify:true};
     /* No iPhone instalado na tela de início o aviso precisa sair pelo service worker.
@@ -10024,7 +10196,7 @@ async function avisarNovidades(){
   avisoDoSistema(titulo,corpo);
 }
 function abrirConfigAvisos(){
-  const noApk=!!(window.Apk&&Apk.notificar);
+  const noApk=Ponte.podeNotificar();
   const p=noApk?"granted":permissaoNotif();
   const iOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
   const instalado=window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches||navigator.standalone;
@@ -10034,7 +10206,7 @@ function abrirConfigAvisos(){
     <div class="sub">Para você saber na hora quando comentarem sua garrafa, brindarem, começarem a te seguir ou mandarem uma mensagem.</div>
     <div class="explain-box" style="margin:12px 0">
       Situação agora: <b>${p==="granted"?"ligados ✅":p==="denied"?"bloqueados pelo aparelho ⛔":"ainda não ativados"}</b>
-      ${noApk?" · aplicativo Android":iOS?" · iPhone":""}
+      ${Ponte.nome()?" · "+Ponte.nome():iOS?" · iPhone":""}
     </div>
     ${p!=="granted"?`<button class="btn btn-primary" style="width:100%;margin-bottom:10px" onclick="ativarAvisos()">Ativar avisos agora</button>`:
       `<button class="btn btn-gold" style="width:100%;margin-bottom:10px" onclick="testarAviso()">🔔 Testar o aviso</button>`}
@@ -10090,6 +10262,114 @@ function calcularBadges(){
     {em:"💬",nome:"Boa Conversa",desc:"Mandou mensagem num encontro",ok:eventos.some(e=>(e.chat||[]).some(m=>m.de==="Você"))}
   ];
 }
+/* ================== v0.99: A ADEGA DO AMIGO ==================
+   Pedido do Jorge, 15/08/2026: "fazer com que a adega de todo o usuário faça
+   parte de todos os seus amigos próximos. Um jantar, os amigos possam ter essa
+   facilidade de interação, sem a necessidade de criar grupos em WhatsApp".
+
+   Antes disto, a tela de privacidade deixava escolher quem podia ver a adega —
+   e ninguém podia ver adega nenhuma. O amigo via quatro números e mais nada.
+   A promessa estava na tela e não estava no produto.
+
+   Quem decide se pode ver é o SERVIDOR (função adega_do_amigo), nunca este
+   arquivo: aqui só se pede e se desenha. E o que chega já vem aparado — sem
+   preço, sem anotação e sem a posição no mapa, que é segurança física, não
+   privacidade.
+
+   As três respostas possíveis têm telas diferentes de propósito. Dizer "adega
+   vazia" a quem simplesmente não ligou a sincronia seria constrangedor para os
+   dois lados. */
+let adegaAmigo=null;   /* {user,nome,vinhos,filtro:{tipo,pais}} */
+
+async function verAdegaDoAmigo(user){
+  adegaAmigoUser=user;
+  if(!naNuvem()){toast("Entre na sua conta para ver a adega dos amigos. 🔐");return}
+  const nome=nomeDe(user)||user;
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif" style="font-size:20px">🍷 A adega de ${esc(nome)}</h3>
+    <div class="explain-box" style="margin-top:12px">Consultando…</div>`;
+  $("#modal-detail").classList.add("open");
+  let r=null;
+  try{ r=await rpc("adega_do_amigo",{alvo:user}) }catch(e){ r=null }
+  if(!r){ adegaAmigoErro(nome,"rede"); return }
+  if(!r.ok){ adegaAmigoErro(nome, r.erro||"erro"); return }
+  if(r.sem_nuvem){ adegaAmigoErro(nome,"sem_nuvem"); return }
+  adegaAmigo={user, nome, vinhos:(r.vinhos||[]), filtro:{tipo:"",pais:""},
+              atualizado:r.atualizado||null};
+  pintarAdegaAmigo();
+}
+
+function adegaAmigoErro(nome,motivo){
+  const cx={
+    sem_login:["🔐","Entre na sua conta para ver a adega dos amigos."],
+    nao_amigo:["🤝",`A adega de ${esc(nome)} é visível só entre <b>amigos próximos</b> — quando vocês dois se seguem. Siga ${esc(nome)} e peça para ser seguido de volta.`],
+    reservada:["🔒",`${esc(nome)} escolheu manter a adega reservada. É um direito de quem coleciona, e nós respeitamos.`],
+    sem_nuvem:["☁️",`${esc(nome)} ainda não guarda a adega na nuvem, então não há o que mostrar. Isso é diferente de ter a adega vazia — a sincronia é opcional, e quem não a ligou tem os vinhos só no próprio aparelho.`],
+    rede:["📡","Não consegui falar com o servidor agora. Tente daqui a pouco."]
+  }[motivo]||["🤔","Não consegui abrir esta adega agora."];
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <div class="empty" style="padding:26px 6px"><div class="big">${cx[0]}</div>${cx[1]}</div>
+    <button class="btn btn-ghost" style="width:100%" onclick="closeModal('modal-detail');abrirPerfil('${escJS(adegaAmigoUser||"")}')">← Voltar ao perfil</button>`;
+}
+let adegaAmigoUser=null;
+
+function adegaAmigoFiltrar(campo,valor){
+  if(!adegaAmigo)return;
+  adegaAmigo.filtro[campo]=valor;
+  pintarAdegaAmigo();
+}
+
+function pintarAdegaAmigo(){
+  const a=adegaAmigo; if(!a)return;
+  const f=a.filtro;
+  const lista=a.vinhos.filter(v=>(!f.tipo||v.tipo===f.tipo)&&(!f.pais||v.pais===f.pais));
+  const garrafas=lista.reduce((s,v)=>s+(v.qtd||0),0);
+  const tipos=[...new Set(a.vinhos.map(v=>v.tipo).filter(Boolean))].sort();
+  const paises=[...new Set(a.vinhos.map(v=>v.pais).filter(x=>x&&x!=="—"))].sort();
+  /* o que ELE tem e eu não: a pergunta que interessa numa mesa */
+  const meus=new Set(vinhos.map(v=>buscaNorm(v.nome)));
+  $("#modal-detail-body").innerHTML=`
+    <button class="close" onclick="closeModal('modal-detail')">✕</button>
+    <h3 class="serif" style="font-size:20px;margin-bottom:2px">🍷 A adega de ${esc(a.nome)}</h3>
+    <div style="font-size:12.5px;color:var(--ink-2);margin-bottom:12px">
+      ${a.vinhos.length} rótulo${a.vinhos.length===1?"":"s"} ·
+      ${a.vinhos.reduce((s,v)=>s+(v.qtd||0),0)} garrafa${a.vinhos.reduce((s,v)=>s+(v.qtd||0),0)===1?"":"s"}
+      ${a.atualizado?" · atualizada em "+esc(String(a.atualizado).slice(8,10)+"/"+String(a.atualizado).slice(5,7)):""}</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <select onchange="adegaAmigoFiltrar('tipo',this.value)" style="flex:1;min-width:120px">
+        <option value="">Todos os tipos</option>
+        ${tipos.map(t=>`<option value="${esc(t)}" ${f.tipo===t?"selected":""}>${esc(t)}</option>`).join("")}
+      </select>
+      <select onchange="adegaAmigoFiltrar('pais',this.value)" style="flex:1;min-width:120px">
+        <option value="">Todos os países</option>
+        ${paises.map(p=>`<option value="${esc(p)}" ${f.pais===p?"selected":""}>${esc(p)}</option>`).join("")}
+      </select>
+    </div>
+    ${(f.tipo||f.pais)?`<div style="font-size:12px;color:var(--ink-3);margin:-6px 0 10px">${lista.length} rótulo${lista.length===1?"":"s"} · ${garrafas} garrafa${garrafas===1?"":"s"} no filtro</div>`:""}
+    <div style="max-height:52vh;overflow:auto;margin-bottom:12px">
+      ${lista.map(v=>{
+        const novo=!meus.has(buscaNorm(v.nome));
+        return `<div style="border-left:3px solid ${CORES[v.tipo]||"#666"};background:var(--paper-2);
+          border-radius:8px;padding:9px 11px;margin-bottom:7px">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+            <b class="serif" style="font-size:14.5px">${esc(v.nome)}${v.safra?` <span style="color:var(--ink-3);font-weight:400">${v.safra}</span>`:""}</b>
+            <span style="font-size:12px;color:var(--ink-2);white-space:nowrap">${v.qtd} gf.${v.tam?" · "+esc(v.tam):""}</span>
+          </div>
+          <div style="font-size:12px;color:var(--ink-2)">${esc(v.vinicola||"—")}${v.regiao&&v.regiao!=="—"?" · "+esc(v.regiao):""}${v.pais&&v.pais!=="—"?" · "+esc(v.pais):""}</div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap">
+            <span class="badge" style="background:${CORES[v.tipo]||"#666"};font-size:9.5px">${esc(v.tipo||"")}</span>
+            ${v.nota?`<span style="font-size:11.5px;color:var(--ink-2)">★ ${esc(notaTxt(v.nota))} <span style="color:var(--ink-3)">— nota de ${esc(a.nome.split(" ")[0])}</span></span>`:""}
+            ${novo?`<span style="font-size:10.5px;color:var(--gold-2);border:1px solid var(--line);border-radius:4px;padding:1px 5px">você não tem</span>`:""}
+          </div>
+        </div>`}).join("")||`<div class="empty" style="padding:20px"><div class="big">🔍</div>Nenhum rótulo com esse filtro.</div>`}
+    </div>
+    <div class="explain-box" style="font-size:11.5px">Esta lista vem da adega que ${esc(a.nome)} guarda na nuvem.
+      Preço, anotações pessoais e a posição das garrafas na casa <b>nunca</b> saem do aparelho do dono — nem para amigos.</div>
+    <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="closeModal('modal-detail');abrirPerfil('${escJS(a.user)}')">← Voltar ao perfil</button>`;
+}
+
 function abrirPerfil(user){
   const sou=perfil&&user===perfil.user;
   const u=USUARIOS_APP.find(x=>x.user===user);
@@ -10134,8 +10414,9 @@ function abrirPerfil(user){
     </div>`:""}
     ${sou?`<div class="explain-box">Selos apagados são metas a conquistar — cada um vira uma atividade no feed da comunidade quando desbloqueado.</div>
       <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="closeModal('modal-detail');abrirPrivacidadeAdega()">🔒 Quem pode ver minha adega</button>`:
-      jaSigo?`<button class="btn btn-ghost" style="width:100%" onclick="closeModal('modal-detail');deixarDeSeguir(seguindo.findIndex(a=>a.user==='${escJS(user)}'))">✓ Seguindo — deixar de seguir</button>`:
-      `<button class="btn btn-gold" style="width:100%" onclick="closeModal('modal-detail');seguir('${escJS(user)}')">＋ Seguir${segMe?" de volta":""}</button>`}
+      `${(jaSigo&&segMe)?`<button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="verAdegaDoAmigo('${escJS(user)}')">🍷 Ver a adega de ${esc((u&&u.nome||user).split(" ")[0])}</button>`:""}
+       ${jaSigo?`<button class="btn btn-ghost" style="width:100%" onclick="closeModal('modal-detail');deixarDeSeguir(seguindo.findIndex(a=>a.user==='${escJS(user)}'))">✓ Seguindo — deixar de seguir</button>`
+               :`<button class="btn btn-gold" style="width:100%" onclick="closeModal('modal-detail');seguir('${escJS(user)}')">＋ Seguir${segMe?" de volta":""}</button>`}`}
   `;
   $("#modal-detail").classList.add("open");
 }
@@ -10232,7 +10513,12 @@ function versaoMaior(a, b){
   return false;
 }
 
-function noApk(){ return typeof window !== "undefined" && !!window.Apk }
+/* v0.98: "dentro do aplicativo" deixou de ser sinônimo de Android. No iPhone
+   os arquivos também viajam embutidos, mas quem atualiza é a App Store — e
+   prometer "Baixar" a um usuário de iPhone seria mentira, que é exatamente o
+   que este trecho nasceu para evitar. */
+function noApk(){ return Ponte.qual()==="android" }
+function noIOS(){ return Ponte.qual()==="ios" }
 
 async function conferirVersaoNova(){
   try{
@@ -10255,11 +10541,13 @@ function mostrarTarjaVersao(d){
      No navegador basta recarregar furando a cópia guardada. Dois textos, porque
      prometer "toque para atualizar" a quem precisa reinstalar seria mentira. */
   const dentroDoApk = noApk();
+  const dentroDoIOS = noIOS();
   const temArquivo = !!d.apk;
   /* Caso chato mas real: estamos no APK e o arquivo novo ainda não foi
      publicado. Botão que leva a lugar nenhum é pior do que nenhum botão —
      então aqui a tarja só informa, e diz o que fazer. */
-  const semCaminho = dentroDoApk && !temArquivo;
+  /* no iPhone nunca há caminho próprio: a atualização vem pela App Store */
+  const semCaminho = (dentroDoApk && !temArquivo) || dentroDoIOS;
   const acao = dentroDoApk ? "Baixar" : "Atualizar";
   /* v0.49: a garantia é fixa e aparece SEMPRE, não depende do texto da versão.
      Motivo: o resumo do que mudou fala de funções, e função nova pode ter nome
@@ -10271,7 +10559,8 @@ function mostrarTarjaVersao(d){
   t.innerHTML =
     `<div class="txt"><b>Versão ${esc(d.versao)} disponível</b>` +
     (d.novidades ? `<small>${esc(d.novidades)}</small>` : "") +
-    (semCaminho ? `<small>Peça o arquivo novo a quem lhe enviou o aplicativo.</small>` : "") +
+    (dentroDoIOS ? `<small>Atualize o Apotheca pela App Store.</small>`
+       : semCaminho ? `<small>Peça o arquivo novo a quem lhe enviou o aplicativo.</small>` : "") +
     `<small class="garantia">🔒 Sua adega não é alterada.</small>` +
     `</div>` +
     (semCaminho ? "" : `<button class="agora" onclick="atualizarAgora()">${acao}</button>`) +
