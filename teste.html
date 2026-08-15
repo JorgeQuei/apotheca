@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Apotheca — Sua adega, inteligente (teste)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#5c1a2e">
@@ -25,6 +25,30 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
+
+/* ===== v1.00 — a área segura do iPhone ==========================================
+   O que estava errado: a etiqueta de viewport não trazia viewport-fit=cover, e
+   sem ela o env() devolve ZERO em qualquer navegador. Consequência: aquele
+   calc(6px + env(safe-area-inset-bottom)) da .bottomnav, escrito lá atrás para
+   proteger a barra de gestos, sempre resultou em 6px e nunca fez nada. Era
+   código que parecia certo e não era.
+
+   Com o cover ligado, o env() passa a valer de verdade — a borda de baixo se
+   conserta sozinha, sem tocar naquela linha.
+
+   Falta então o topo. No iOS o conteúdo passa POR BAIXO da barra de status
+   quando a página rola; isso é comportamento normal do sistema, e os apps
+   nativos convivem com ele porque têm uma barra opaca ali. Nós não tínhamos —
+   por isso o relógio e a ilha dinâmica colidiam com o cabeçalho.
+
+   A faixa abaixo é essa barra que faltava: fixa, da altura EXATA do recorte, na
+   cor de fundo que o Capacitor já pinta atrás da página (#5c1a2e). O conteúdo
+   passa atrás dela em vez de por cima do relógio. Em telas sem recorte — web,
+   desktop, Android sem entalhe — o env() devolve 0, a faixa fica com altura
+   zero e nada muda. =========================================================== */
+:root{--topo-seguro:env(safe-area-inset-top,0px)}
+body::before{content:"";position:fixed;top:0;left:0;right:0;
+  height:var(--topo-seguro);background:var(--wine);z-index:200;pointer-events:none}
 body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--page);color:var(--ink);min-height:100vh}
 .serif{font-family:Georgia,"Times New Roman",serif}
 
@@ -249,7 +273,7 @@ input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible}
 /* v0.93: a tarja do arquivo solto (ver comentário em avisarArquivoSolto) */
 #tarja-solto{position:fixed;top:0;left:0;right:0;z-index:140;background:#8a6d1f;color:#fff8e7;
-  padding:9px 14px;font-size:12.5px;line-height:1.45;text-align:center;
+  padding:calc(9px + var(--topo-seguro)) 14px 9px;font-size:12.5px;line-height:1.45;text-align:center;
   box-shadow:0 2px 10px rgba(0,0,0,.25)}
 #tarja-solto a{color:#ffe9a8;font-weight:700}
 #tarja-solto b{color:#ffe9a8}
@@ -394,7 +418,7 @@ button.foto-vinho.vazia span{font-size:26px}
   .app{grid-template-columns:minmax(0,1fr)} /* 1fr puro não encolhe abaixo do conteúdo — era a causa da rolagem lateral em Encontros */
   .sidebar{display:none}
   .bottomnav{display:flex}
-  .main{padding:20px 16px 110px;min-width:0;overflow-x:clip}
+  .main{padding:calc(20px + var(--topo-seguro)) 16px 110px;min-width:0;overflow-x:clip}
   .grid2{grid-template-columns:1fr}
   .add-modes{grid-template-columns:1fr}
 }
@@ -779,7 +803,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "0.99"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.00"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
