@@ -803,7 +803,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.00"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.01"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -10077,9 +10077,27 @@ async function salvarPrivacidadeAdega(nivel){
   }catch(e){toast("Sem conexão para salvar agora. 📡")}
 }
 /* ---------- Notificações ---------- */
+/* v1.01: convite de encontro e pedido de vaga não carregam data própria do
+   servidor — e antes recebiam Date.now() a CADA renderização. Resultado: eram
+   eternamente "novos". O sino nunca zerava e o celular repetia o mesmo aviso
+   em toda sincronização, mesmo depois do aceite. Agora o relógio marca a
+   PRIMEIRA vez que o item apareceu neste aparelho — e para de correr. */
+const AVISO_TS="apotheca_aviso_ts";
+let _tsMapa=null;
+function tsPrimeiraVez(chave){
+  if(!_tsMapa){try{_tsMapa=JSON.parse(localStorage.getItem(AVISO_TS))||{}}catch(e){_tsMapa={}}}
+  if(!_tsMapa[chave]){
+    _tsMapa[chave]=Date.now();
+    try{localStorage.setItem(AVISO_TS,JSON.stringify(_tsMapa))}catch(e){}
+  }
+  return _tsMapa[chave];
+}
 function notificacoes(){
   if(!perfil)return [];
   const eu=perfil.user, n=[];
+  /* as chaves pendentes desta rodada — o que sumiu daqui sai do mapa no fim */
+  const pendentesAgora=new Set();
+  const tsP=chave=>{pendentesAgora.add(chave);return tsPrimeiraVez(chave)};
   REDE.filter(s=>s.para===eu&&s.de!==eu).forEach(s=>n.push({
     ts:s.ts||0,em:"👤",txt:`<b>${esc(nomeDe(s.de))}</b> começou a seguir você`,
     acao:sigoEle(s.de)?"":`<button class="btn btn-gold btn-sm" style="flex:none" onclick="seguir('${escJS(s.de)}')">Seguir de volta</button>`,
@@ -10093,7 +10111,7 @@ function notificacoes(){
     n.push({ts:c.ts||0,em:"💬",txt:`<b>${esc(nomeDe(c.user))}</b> comentou: “${esc(c.txt)}”`,acao:"",user:c.user}));
   /* v0.44: convite de encontro aparece no sino, com resposta ali mesmo */
   (typeof CONVITES!=="undefined"?CONVITES:[]).forEach(ev=>
-    n.push({ts:Date.now(),em:"✉️",
+    n.push({ts:tsP("convite-encontro:"+(ev.sid||ev.id)),em:"✉️",
       txt:`<b>${esc(nomeDe(ev.criador))}</b> convidou você para <b>${esc(ev.nome)}</b>`,
       acao:`<button class="btn btn-gold btn-sm" style="flex:none" onclick="abrirEncontro(${ev.id})">Ver convite</button>`,
       user:ev.criador}));
@@ -10104,8 +10122,14 @@ function notificacoes(){
       acao:`<button class="btn btn-gold btn-sm" style="flex:none" onclick="abrirConversa('${escJS(m.de)}')">Abrir</button>`,
       user:m.de}));
   CONFRARIAS.filter(c=>ehDiretoria(c)).forEach(c=>(c.pendentes||[]).forEach(p=>
-    n.push({ts:Date.now(),em:"⏳",txt:`<b>${esc(nomeDe(p))}</b> pediu vaga na confraria <b>${esc(c.nome)}</b>`,
+    n.push({ts:tsP("vaga-confraria:"+c.id+":"+p),em:"⏳",txt:`<b>${esc(nomeDe(p))}</b> pediu vaga na confraria <b>${esc(c.nome)}</b>`,
       acao:`<button class="btn btn-primary btn-sm" style="flex:none" onclick="abrirGestaoConfraria('${escJS(c.id)}')">Ver pedido</button>`,user:p})));
+  /* faxina do relógio: convite aceito ou recusado sai do mapa e não deixa lixo */
+  if(_tsMapa){
+    let mudou=false;
+    Object.keys(_tsMapa).forEach(k=>{if(!pendentesAgora.has(k)){delete _tsMapa[k];mudou=true}});
+    if(mudou){try{localStorage.setItem(AVISO_TS,JSON.stringify(_tsMapa))}catch(e){}}
+  }
   return n.sort((a,b)=>b.ts-a.ts).slice(0,60);
 }
 function renderNotificacoes(){
