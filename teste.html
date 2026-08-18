@@ -101,6 +101,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .sug-item .inf{flex:1;min-width:0}
 .sug-item .inf small{display:block;color:var(--ink-2);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sug-head{padding:7px 13px;font-size:10.5px;font-weight:700;letter-spacing:1px;color:var(--ink-3);background:var(--cream)}
+/* v1.02: o círculo que gira enquanto a IA pesquisa — sem ele, espera parece falha */
+.sug-spinner{width:18px;height:18px;border:3px solid var(--cream);border-top-color:var(--gold);border-radius:50%;animation:girar .8s linear infinite;flex:none}
+.scan-spinner{display:inline-block;width:15px;height:15px;border:3px solid rgba(201,162,39,.25);border-top-color:var(--gold);border-radius:50%;animation:girar .8s linear infinite;vertical-align:-2px;margin-right:7px}
+@keyframes girar{to{transform:rotate(360deg)}}
 
 /* ===== Menu pop-up ===== */
 .menu-btn{background:var(--card);border:1px solid var(--line);border-radius:12px;width:42px;height:42px;font-size:19px;cursor:pointer;box-shadow:var(--shadow);color:var(--wine);flex:none}
@@ -576,6 +580,14 @@ button.foto-vinho.vazia span{font-size:26px}
           <div class="field"><label>Beber entre (início)</label><input id="a-jan1" type="number" placeholder="2024"></div>
           <div class="field"><label>Beber até (fim)</label><input id="a-jan2" type="number" placeholder="2030"></div>
           <div class="field wide"><label>Notas de degustação</label><textarea id="a-notas" rows="2" style="width:100%" placeholder="Aromas, sabores, impressões…"></textarea></div>
+          <div class="field wide"><label>Nota de fora (referência) <span style="font-weight:400;text-transform:none;letter-spacing:0">· confira antes de salvar — o Apotheca abre o site, você anota o que viu</span></label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="consultarAntesDeSalvar('ws')">🔎 Ver no Wine-Searcher</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="consultarAntesDeSalvar('vivino')">🍷 Ver no Vivino</button>
+              <input id="a-ref-n" type="text" inputmode="decimal" placeholder="Nota (ex.: 4,2)" style="width:110px">
+              <select id="a-ref-de" style="width:auto"><option value="">visto onde?</option><option value="no Wine-Searcher">no Wine-Searcher</option><option value="no Vivino">no Vivino</option></select>
+            </div>
+          </div>
         </div>
         <div style="margin-top:16px;display:flex;gap:10px">
           <button class="btn btn-primary" onclick="saveWine()">Salvar na adega</button>
@@ -803,7 +815,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.01"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.02"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1290,12 +1302,33 @@ function avisoBusca(titulo,detalhe){
   box.classList.remove("hidden");
 }
 
+/* v1.02: espera VIVA. Um testador procurou um vinho fora da base e, sem nenhum
+   movimento na tela, achou que a busca tinha morrido \u2014 ela s\u00f3 estava demorando.
+   Agora h\u00e1 um c\u00edrculo girando e a mensagem muda com o passar do tempo, contando
+   ao usu\u00e1rio em que etapa a pesquisa est\u00e1. */
+function avisoBuscando(titulo,detalhe){
+  const box=$("#nome-sug");
+  box.innerHTML=`<div class="sug-head">\ud83d\udd0e BUSCA COM IA</div>
+    <div class="sug-item" style="cursor:default"><span class="sug-spinner"></span>
+    <div class="inf"><b id="busca-ia-titulo">${esc(titulo)}</b><small id="busca-ia-detalhe" style="white-space:normal">${esc(detalhe)}</small></div></div>`;
+  box.classList.remove("hidden");
+}
 async function buscarNomeComIA(){
   if(iaBuscaBusy)return;
   const q=($("#a-nome").value||"").trim();
   if(q.length<3){toast("Escreva ao menos 3 letras do nome. \u270d\ufe0f");return}
   iaBuscaBusy=true;
-  avisoBusca("Consultando o sommelier-IA sobre \u201c"+q+"\u201d\u2026","Leva alguns segundos. Se ele n\u00e3o tiver certeza, faz uma pesquisa de verdade na web.");
+  avisoBuscando("Consultando o sommelier-IA sobre \u201c"+q+"\u201d\u2026","Leva alguns segundos \u2014 a busca est\u00e1 em andamento.");
+  const etapas=[
+    "Ainda pesquisando \u2014 o sommelier est\u00e1 conferindo o que sabe\u2026",
+    "Agora pesquisando na web de verdade \u2014 mais alguns segundos\u2026",
+    "Quase l\u00e1 \u2014 redes lentas levam at\u00e9 meio minuto. Segura firme. \ud83c\udf77"
+  ];
+  let etapa=0;
+  const relogio=setInterval(()=>{
+    const el=$("#busca-ia-detalhe");
+    if(el&&etapa<etapas.length)el.textContent=etapas[etapa++];
+  },8000);
   try{
     const r=await buscarVinhoNoServidor(q);
     mostrarResultadoIA(q,r);
@@ -1310,7 +1343,7 @@ async function buscarNomeComIA(){
           ?"A busca por nome ainda n\u00e3o foi ligada no servidor."
           :e.message;
     avisoBusca(m,"Voc\u00ea pode preencher a ficha \u00e0 m\u00e3o normalmente \u2014 nada se perde.");
-  }finally{iaBuscaBusy=false}
+  }finally{clearInterval(relogio);iaBuscaBusy=false}
 }
 
 function mostrarResultadoIA(q,r){
@@ -3652,6 +3685,27 @@ function abrirLinkFora(url){
   }
   if(!Ponte.abrirFora(url)){toast("Não consegui abrir o navegador deste aparelho. 📡");return false}
   return true;
+}
+
+/* v1.02, pedido de testador: consultar a nota lá fora ANTES de salvar o vinho.
+   Ele estava com a garrafa na mão, queria ver a nota no Vivino/Wine-Searcher e
+   já salvar a ficha com ela — e o aplicativo só oferecia a viagem DEPOIS do
+   salvamento. A regra de sempre continua intacta: o Apotheca ABRE o site,
+   nunca lê nada dele; quem vê a nota e digita é a pessoa. */
+function consultarAntesDeSalvar(onde){
+  const nome=($("#a-nome").value||"").trim();
+  if(nome.length<3){toast("Escreva o nome do vinho primeiro. ✍️");return}
+  const v={nome,vinicola:($("#a-vinicola").value||"").trim(),safra:+$("#a-safra").value||0};
+  if(abrirLinkFora(refURL(onde,v))){
+    const sel=$("#a-ref-de");
+    if(sel&&!sel.value)sel.value=onde==="ws"?"no Wine-Searcher":"no Vivino";
+  }
+}
+function refDoFormulario(){
+  const bruto=String((($("#a-ref-n")||{}).value)||"").replace(",",".").trim();
+  const n=Math.round(Math.max(0,Math.min(5,parseFloat(bruto)||0))*10)/10;
+  if(!n)return null;
+  return {n,txt:((($("#a-ref-de")||{}).value)||""),de:"sua"};
 }
 
 /* v0.83, pedido do Jorge: "se quando procurar no Wine, ver a classificação e
@@ -8274,6 +8328,8 @@ function editarVinho(id){
   ["corpo","acidez","tanino"].forEach(k=>{$("#a-"+k).value=v[k]||3;$("#v-"+k).textContent=v[k]||3});
   $("#a-jan1").value=v.jan?v.jan[0]:"";$("#a-jan2").value=v.jan?v.jan[1]:"";
   $("#a-notas").value=v.notas==="Sem notas registradas."?"":v.notas;
+  $("#a-ref-n").value=(v.ref&&v.ref.n)?String(v.ref.n).replace(".",","):"";
+  $("#a-ref-de").value=(v.ref&&["no Wine-Searcher","no Vivino"].includes(v.ref.txt))?v.ref.txt:"";
   $("#form-title").textContent="✏️ Corrigindo: "+v.nome+" — altere e salve";
   $("#form-panel").scrollIntoView({behavior:"smooth"});
 }
@@ -8427,7 +8483,8 @@ function cancelarNovaAdega(){
   toast("Cancelado — o vinho vai para "+(d?d.icone+" "+d.nome:"a adega atual")+". 🍷");
 }
 function clearForm(){
-  ["a-nome","a-vinicola","a-regiao","a-safra","a-uvas","a-preco","a-jan1","a-jan2","a-notas"].forEach(i=>$("#"+i).value="");
+  ["a-nome","a-vinicola","a-regiao","a-safra","a-uvas","a-preco","a-jan1","a-jan2","a-notas","a-ref-n"].forEach(i=>$("#"+i).value="");
+  $("#a-ref-de").value="";
   $("#a-qtd").value=1;["corpo","acidez","tanino"].forEach(k=>{$("#a-"+k).value=3;$("#v-"+k).textContent=3});
   /* zera também os seletores — antes eles guardavam o valor do cadastro anterior */
   $("#a-pais").value=PAISES[0];$("#a-tipo").value=TIPOS[0];
@@ -8524,6 +8581,9 @@ function saveWine(){
         corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,adega:adegaSel,
         qtd:Math.max(1,+$("#a-qtd").value||1),preco:+$("#a-preco").value||0,
         jan:[+$("#a-jan1").value||ANO,+$("#a-jan2").value||ANO+5],notas:$("#a-notas").value||"Sem notas registradas."});
+      /* nota de referência do formulário — sem apagar texto personalizado antigo */
+      const _refForm=refDoFormulario();
+      if(_refForm){if(!_refForm.txt&&v.ref&&v.ref.txt)_refForm.txt=v.ref.txt;v.ref=_refForm}
       if(lastFotoRotulo)definirFotoVinho(v,lastFotoRotulo).catch(()=>{});
     }
     editandoId=null;
@@ -8560,6 +8620,8 @@ function saveWine(){
     corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,doc:1,
     qtd:Math.max(1,+$("#a-qtd").value||1),preco:+$("#a-preco").value||0,
     jan:[+$("#a-jan1").value||ANO,+$("#a-jan2").value||ANO+5],notas:$("#a-notas").value||"Sem notas registradas."});
+  const _refNovo=refDoFormulario();
+  if(_refNovo)vinhos[vinhos.length-1].ref=_refNovo;
   filaAnotar({op:"novo",id:_novoId,v:vinhos[vinhos.length-1]});
   addAtividade(`adicionou <b>${nome}</b> à adega`);
   toast(`${nome} adicionado em ${adegaDe(adegaSel).icone} ${adegaDe(adegaSel).nome}! 🍾`);
@@ -9016,7 +9078,19 @@ async function rotuloDoArquivo(inp){
 /* O coração do reconhecimento, comum aos dois caminhos */
 async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
   lastFotoRotulo=mini.toDataURL("image/jpeg",0.72);
-  setScan(getIaKey()?"🧠 IA de visão analisando o rótulo…":"🧠 Lendo o rótulo…");
+  /* v1.02: a mesma espera VIVA da busca por nome, agora no leitor de rótulo —
+     círculo girando e mensagem que avança, para a leitura longa não parecer
+     leitura morta. */
+  setScan(`<span class="scan-spinner"></span>${getIaKey()?"🧠 IA de visão analisando o rótulo…":"🧠 Lendo o rótulo…"}<br><span id="scan-etapa" style="font-size:12.5px">a leitura está em andamento…</span>`);
+  const etapasScan=[
+    "ainda lendo — rótulos artísticos levam mais tempo…",
+    "quase lá — redes lentas levam até meio minuto. Segura firme. 🍷"
+  ];
+  let etapaScan=0;
+  const relScan=setInterval(()=>{
+    const el=$("#scan-etapa");
+    if(el&&etapaScan<etapasScan.length)el.textContent=etapasScan[etapaScan++];
+  },9000);
   try{
     const o=await analisarComIA((dataAlta||alta.toDataURL("image/jpeg",0.85)).split(",")[1]);
     if(o&&o.nome&&(+o.confianca||0)>=25){
@@ -9041,7 +9115,7 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
       setScan("❌ <b>Não consegui ler agora:</b> "+m+"<br>Tente de novo em instantes, ou use <b>⌨️ Prefiro digitar</b> para buscar na base de 206 mil vinhos.");
     }
     return false;
-  }
+  }finally{clearInterval(relScan)}
 }
 function scanDemo(){
   const w=BASE_SCANNER[Math.floor(Math.random()*BASE_SCANNER.length)];
