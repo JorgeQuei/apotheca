@@ -580,12 +580,12 @@ button.foto-vinho.vazia span{font-size:26px}
           <div class="field"><label>Beber entre (início)</label><input id="a-jan1" type="number" placeholder="2024"></div>
           <div class="field"><label>Beber até (fim)</label><input id="a-jan2" type="number" placeholder="2030"></div>
           <div class="field wide"><label>Notas de degustação</label><textarea id="a-notas" rows="2" style="width:100%" placeholder="Aromas, sabores, impressões…"></textarea></div>
-          <div class="field wide"><label>Nota de fora (referência) <span style="font-weight:400;text-transform:none;letter-spacing:0">· confira antes de salvar — o Apotheca abre o site, você anota o que viu</span></label>
+          <div class="field wide"><label>Nota do vinho <span style="font-weight:400;text-transform:none;letter-spacing:0">· a sua, ou uma de fora para referência — consulte antes de salvar, se quiser</span></label>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
               <button type="button" class="btn btn-ghost btn-sm" onclick="consultarAntesDeSalvar('ws')">🔎 Ver no Wine-Searcher</button>
               <button type="button" class="btn btn-ghost btn-sm" onclick="consultarAntesDeSalvar('vivino')">🍷 Ver no Vivino</button>
               <input id="a-ref-n" type="text" inputmode="decimal" placeholder="Nota (ex.: 4,2)" style="width:110px">
-              <select id="a-ref-de" style="width:auto"><option value="">visto onde?</option><option value="no Wine-Searcher">no Wine-Searcher</option><option value="no Vivino">no Vivino</option></select>
+              <select id="a-ref-de" style="width:auto"><option value="">de quem é a nota?</option><option value="minha">é a minha nota ⭐</option><option value="no Wine-Searcher">no Wine-Searcher</option><option value="no Vivino">no Vivino</option></select>
             </div>
           </div>
         </div>
@@ -3705,7 +3705,11 @@ function refDoFormulario(){
   const bruto=String((($("#a-ref-n")||{}).value)||"").replace(",",".").trim();
   const n=Math.round(Math.max(0,Math.min(5,parseFloat(bruto)||0))*10)/10;
   if(!n)return null;
-  return {n,txt:((($("#a-ref-de")||{}).value)||""),de:"sua"};
+  const onde=((($("#a-ref-de")||{}).value)||"");
+  /* v1.02, pedido do Jorge: a terceira opção é "é a minha nota" — aí o número
+     não é referência de fora, é a nota PRÓPRIA (v.nota), a mesma do popup. */
+  if(onde==="minha")return {minha:n};
+  return {n,txt:onde,de:"sua"};
 }
 
 /* v0.83, pedido do Jorge: "se quando procurar no Wine, ver a classificação e
@@ -8033,7 +8037,11 @@ function renderColecao(){
 }
 ["f-busca","f-tipo","f-pais","f-ordem"].forEach(id=>$("#"+id).addEventListener("input",renderColecao));
 $("#a-nome").addEventListener("input",()=>{clearTimeout(sugTimer);sugTimer=setTimeout(buscarSugestoes,250)});
-document.addEventListener("click",e=>{if(!e.target.closest(".sug-wrap"))$("#nome-sug").classList.add("hidden")});
+/* v1.02: clique em elemento que o PRÓPRIO clique desmontou (a linha da IA
+   redesenha a caixa por dentro) não é "clique fora" — sem esta condição, o
+   vigia fechava a caixa no exato instante em que o spinner nascia, e a busca
+   parecia morta. Era este o silêncio que o testador relatou. */
+document.addEventListener("click",e=>{if(e.target.isConnected&&!e.target.closest(".sug-wrap"))$("#nome-sug").classList.add("hidden")});
 
 /* ================== DETALHE / CONSUMO ================== */
 function meter(n){let h="";for(let i=1;i<=5;i++)h+=`<i class="${i<=n?"on":""}"></i>`;return `<span class="meter">${h}</span>`}
@@ -8328,8 +8336,13 @@ function editarVinho(id){
   ["corpo","acidez","tanino"].forEach(k=>{$("#a-"+k).value=v[k]||3;$("#v-"+k).textContent=v[k]||3});
   $("#a-jan1").value=v.jan?v.jan[0]:"";$("#a-jan2").value=v.jan?v.jan[1]:"";
   $("#a-notas").value=v.notas==="Sem notas registradas."?"":v.notas;
-  $("#a-ref-n").value=(v.ref&&v.ref.n)?String(v.ref.n).replace(".",","):"";
-  $("#a-ref-de").value=(v.ref&&["no Wine-Searcher","no Vivino"].includes(v.ref.txt))?v.ref.txt:"";
+  if(v.ref&&v.ref.n){
+    $("#a-ref-n").value=String(v.ref.n).replace(".",",");
+    $("#a-ref-de").value=["no Wine-Searcher","no Vivino"].includes(v.ref.txt)?v.ref.txt:"";
+  }else if(minhaNota(v)){
+    $("#a-ref-n").value=String(minhaNota(v)).replace(".",",");
+    $("#a-ref-de").value="minha";
+  }else{$("#a-ref-n").value="";$("#a-ref-de").value=""}
   $("#form-title").textContent="✏️ Corrigindo: "+v.nome+" — altere e salve";
   $("#form-panel").scrollIntoView({behavior:"smooth"});
 }
@@ -8583,7 +8596,10 @@ function saveWine(){
         jan:[+$("#a-jan1").value||ANO,+$("#a-jan2").value||ANO+5],notas:$("#a-notas").value||"Sem notas registradas."});
       /* nota de referência do formulário — sem apagar texto personalizado antigo */
       const _refForm=refDoFormulario();
-      if(_refForm){if(!_refForm.txt&&v.ref&&v.ref.txt)_refForm.txt=v.ref.txt;v.ref=_refForm}
+      if(_refForm){
+        if(_refForm.minha)v.nota=_refForm.minha;
+        else{if(!_refForm.txt&&v.ref&&v.ref.txt)_refForm.txt=v.ref.txt;v.ref=_refForm}
+      }
       if(lastFotoRotulo)definirFotoVinho(v,lastFotoRotulo).catch(()=>{});
     }
     editandoId=null;
@@ -8621,7 +8637,10 @@ function saveWine(){
     qtd:Math.max(1,+$("#a-qtd").value||1),preco:+$("#a-preco").value||0,
     jan:[+$("#a-jan1").value||ANO,+$("#a-jan2").value||ANO+5],notas:$("#a-notas").value||"Sem notas registradas."});
   const _refNovo=refDoFormulario();
-  if(_refNovo)vinhos[vinhos.length-1].ref=_refNovo;
+  if(_refNovo){
+    if(_refNovo.minha)vinhos[vinhos.length-1].nota=_refNovo.minha;
+    else vinhos[vinhos.length-1].ref=_refNovo;
+  }
   filaAnotar({op:"novo",id:_novoId,v:vinhos[vinhos.length-1]});
   addAtividade(`adicionou <b>${nome}</b> à adega`);
   toast(`${nome} adicionado em ${adegaDe(adegaSel).icone} ${adegaDe(adegaSel).nome}! 🍾`);
