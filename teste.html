@@ -815,7 +815,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.02"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.03"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2536,6 +2536,10 @@ function redesenharSocial(){
   try{if(typeof renderRede==="function"&&!$("#ctab-rede").classList.contains("hidden"))renderRede()}catch(e){}
   try{renderFeed()}catch(e){}
   try{atualizarSinoNotif()}catch(e){}
+  /* v1.03: a lista de Avisos também depende da rede — sem esta linha, o botão
+     "Seguir de volta" continuava na tela depois do toque, até a pessoa trocar
+     de aba. Relato do Jorge, véspera do lançamento. */
+  try{if(typeof renderNotificacoes==="function")renderNotificacoes()}catch(e){}
   try{if(!$("#view-encontros").classList.contains("hidden"))renderConfraria()}catch(e){}
 }
 function addGarrafaAmigo(evId,ai){
