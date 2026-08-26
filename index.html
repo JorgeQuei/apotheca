@@ -395,9 +395,11 @@ button.foto-vinho.vazia span{font-size:26px}
   font-size:14px;font-weight:600;color:var(--ink-2);cursor:pointer;white-space:nowrap;font-family:inherit;display:flex;gap:6px;align-items:center}
 .stab.active{color:var(--wine);border-bottom-color:var(--wine)}
 .seg{display:inline-flex;background:var(--cream);border-radius:99px;padding:3px;gap:2px;margin-bottom:12px;flex-wrap:wrap}
-/* v0.43: com 4 abas a linha estourava no celular — vira faixa deslizante em vez de quebrar */
-.seg.rolar{display:flex;flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-.seg.rolar::-webkit-scrollbar{display:none}
+/* v0.43 fez desta fileira uma faixa deslizante com a rolagem escondida; no
+   celular a 4ª aba (💬 Conversas) ficava fora da tela SEM NENHUMA PISTA de que
+   existia — os testadores só a viam no dobrável aberto. v1.04: a fileira volta
+   a QUEBRAR linha quando não cabe — as quatro abas ficam sempre visíveis. */
+.seg.rolar{display:flex;flex-wrap:wrap;max-width:100%}
 .seg.rolar .seg-b{white-space:nowrap;flex:none;padding:7px 13px}
 .seg-b{background:none;border:none;border-radius:99px;padding:7px 15px;font-size:13px;font-weight:600;
   color:var(--ink-2);cursor:pointer;font-family:inherit}
@@ -639,6 +641,9 @@ button.foto-vinho.vazia span{font-size:26px}
           <label style="font-size:12px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.5px">Quem participa deste encontro?</label>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
             <button class="btn btn-ghost btn-sm" onclick="abrirEscolherParticipantes()">👥 Escolher participantes</button>
+            <!-- v1.04: na mesa do restaurante ninguém achava onde seguir os amigos —
+                 o atalho agora mora onde a falta dele dói -->
+            <button class="btn btn-gold btn-sm" onclick="go('comunidade');abaComunidade('rede');setAbaRede('descobrir')">🔍 Encontrar pessoas</button>
             <span id="e-resumo-part" style="font-size:13px;color:var(--ink-2)">ninguém selecionado ainda</span>
           </div>
           <div id="e-amigos" class="hidden"></div>
@@ -677,14 +682,17 @@ button.foto-vinho.vazia span{font-size:26px}
       </div>
 
       <div id="ctab-rede" class="hidden">
+        <!-- v1.04: o Descobrir era a ÚLTIMA aba de uma fileira rolável — na mesa
+             do restaurante, 7 pessoas não o acharam. Agora é a primeira. -->
         <div class="seg rolar">
+          <button class="seg-b" id="rd-descobrir" onclick="setAbaRede('descobrir')">🔍 Descobrir</button>
           <button class="seg-b active" id="rd-seguindo" onclick="setAbaRede('seguindo')">Seguindo</button>
           <button class="seg-b" id="rd-seguidores" onclick="setAbaRede('seguidores')">Seguidores</button>
           <button class="seg-b" id="rd-conversas" onclick="setAbaRede('conversas')">💬 Conversas</button>
-          <button class="seg-b" id="rd-descobrir" onclick="setAbaRede('descobrir')">🔍 Descobrir</button>
         </div>
+        <!-- v1.04b, pedido do Jorge: o filtro de cidade saiu — com a comunidade
+             quase toda numa cidade só, ele era ruído; a busca por nome basta. -->
         <div id="rede-busca" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-          <select id="rd-cidade" style="min-width:130px"></select>
           <input id="rd-busca" oninput="renderRede()" placeholder="🔍 Nome ou @usuário" style="flex:1;min-width:150px">
         </div>
         <div id="rede-lista"></div>
@@ -798,7 +806,7 @@ button.foto-vinho.vazia span{font-size:26px}
   <input id="scan-arquivo" type="file" accept="image/*" class="hidden" onchange="rotuloDoArquivo(this)">
   <button id="btn-galeria" class="btn btn-gold" onclick="document.getElementById('scan-arquivo').click()">🖼️ Usar uma foto do aparelho</button>
   <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-    <button class="btn btn-ghost" style="color:#f0e2d0;border-color:#f0e2d0" onclick="closeScanner();document.getElementById('a-nome').focus();toast('Digite 3+ letras do nome — a base mundial completa o resto. 🌍')">⌨️ Prefiro digitar</button>
+    <button class="btn btn-ghost" style="color:#f0e2d0;border-color:#f0e2d0" onclick="closeScanner();document.getElementById('a-nome').focus();toast('Digite 3+ letras — a base mundial sugere, e 🔎 Procurar com a IA acha o resto. 🌍')">⌨️ Prefiro digitar</button>
     <button class="btn btn-ghost" style="color:#f0e2d0;border-color:#f0e2d0" onclick="scanDemo()">🎬 Demo</button>
     <button class="btn btn-ghost" style="color:#f0e2d0;border-color:#f0e2d0" onclick="closeScanner()">Cancelar</button>
   </div>
@@ -815,7 +823,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.03"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.04"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1133,6 +1141,22 @@ const Ponte = (function(){
     }
   };
 })();
+
+/* v1.04 — O ZOOM PRESO DO iPHONE (teste do restaurante). Um beliscão ou o
+   foco num campo pequeno faziam o WKWebView dar zoom — e não havia como
+   voltar sem fechar o aplicativo. DENTRO do app, zoom de página não faz
+   sentido (o layout é o do celular); no NAVEGADOR ele fica livre, porque lá
+   é recurso de acessibilidade. Por isso a trava só entra quando há ponte
+   nativa. O WKWebView respeita user-scalable=no; o navegador o ignora. */
+function travarZoomNoApp(){
+  try{
+    if(!Ponte.nativo())return;
+    const m=document.querySelector('meta[name="viewport"]');
+    if(m&&m.content.indexOf("maximum-scale")<0)
+      m.content+=", maximum-scale=1.0, user-scalable=no";
+  }catch(e){}
+}
+travarZoomNoApp();
 
 /* v0.98: O RETORNO DO LOGIN NO iPHONE.
    No Android, quando o navegador devolve o usuário pelo endereço
@@ -2126,7 +2150,34 @@ function ordemServico(ev){
   (ev.minhas||[]).forEach(id=>{const v=vinhos.find(x=>x.id===id);if(v)todas.push({nome:`${v.nome} ${safraTxt(v)}`,tipo:v.tipo,corpo:v.corpo,tanino:v.tanino,origem:v.regiao+", "+v.pais,quem:"Você"})});
   (ev.minhasN||[]).forEach(g=>todas.push({...g,quem:"Você"}));
   const fase=t=>FASES.findIndex(f=>f[0]===t);
-  return todas.sort((a,b)=>fase(a.tipo)-fase(b.tipo)||(a.corpo+(a.tanino||0))-(b.corpo+(b.tanino||0)));
+  /* v1.04 — O CASO DO VINHO SEMPRE EM 6º (teste do restaurante, 7 iPhones).
+     Dois defeitos numa tacada:
+     1) O servidor não guarda corpo/tanino, então toda garrafa da nuvem volta
+        com o padrão do TIPO — seis tintos, seis chaves idênticas, e o
+        desempate era a ordem de inserção, que punha as garrafas dos outros
+        primeiro e AS SUAS por último. Cada conviva via o próprio vinho em
+        último, e cada um via uma lista diferente.
+     2) Sem perfil por garrafa, não havia ordenação balizada nenhuma.
+     A resposta às duas: o perfil de cada garrafa vem da BASE EMBUTIDA de 206
+     mil vinhos — o corpo DO Vega Sicilia, não o corpo "de tinto em geral".
+     Mesma base em todo aparelho = mesma lista em toda a mesa. O protocolo é o
+     do sommelier: fases do serviço; dentro da fase, corpo+taninos crescentes;
+     no empate, o mais jovem antes do mais velho; e só no fim, o alfabeto. */
+  const perfilServico=g=>{
+    let corpo=+g.corpo||3, tanino=+g.tanino||0;
+    try{
+      if(typeof baseMundialPronta!=="undefined"&&baseMundialPronta&&baseMundialPronta.length){
+        const w=matchBaseMundial(g.nome);
+        if(w&&(!g.tipo||w[1]===g.tipo))corpo=+w[6]||corpo;
+      }
+    }catch(e){}
+    const safra=+((String(g.nome||"").match(/\b(19|20)\d{2}\b/)||[])[0]||0);
+    return {corpo,tanino,safra};
+  };
+  return todas.map(g=>({...g,__p:perfilServico(g)})).sort((a,b)=>fase(a.tipo)-fase(b.tipo)
+    ||(a.__p.corpo+a.__p.tanino)-(b.__p.corpo+b.__p.tanino)
+    ||(b.__p.safra)-(a.__p.safra)
+    ||String(a.nome||"").localeCompare(String(b.nome||""),"pt"));
 }
 function dicaCobertura(ordem){
   const tem=t=>ordem.some(g=>g.tipo===t);
@@ -4298,17 +4349,23 @@ function instDispensadoAgora(){
     return t&&(Date.now()-t)<30*24*3600*1000;
   }catch(e){return false}
 }
+/* v1.05 — 26/08/2026: o Apotheca FOI APROVADO na App Store. A faixa que
+   ensinava a "instalar pela tela de início" (nosso jeitinho da era sem loja)
+   agora oferece a loja de verdade — e o passo a passo do Safari vira
+   alternativa para quem prefere sem loja. */
+const APP_STORE_URL="https://apps.apple.com/br/app/id6801920574";
+function abrirAppStore(){try{window.open(APP_STORE_URL,"_blank")}catch(e){location.href=APP_STORE_URL}}
 function renderFaixaInstalar(){
   const el=$("#faixa-instalar");if(!el)return;
   const backupFalando=$("#faixa-backup")&&!$("#faixa-backup").classList.contains("hidden");
   if(!podeInstalarNaTela()||instDispensadoAgora()||backupFalando||adegaDemo){
     el.classList.add("hidden");el.innerHTML="";return;
   }
-  el.innerHTML=`<span style="font-size:17px;flex:none">📱</span>
-    <div style="flex:1;min-width:170px"><b>No iPhone, o Safari apaga os dados de sites parados há 7 dias.</b>
-      Instalar na tela de início tira o Apotheca dessa regra — leva quinze segundos.</div>
-    <button class="btn btn-gold btn-sm" style="flex:none" onclick="abrirInstalarIOS()">Como faço</button>
-    <button class="btn btn-ghost btn-sm" style="flex:none" onclick="instDispensar()">agora não</button>`;
+  el.innerHTML=`<span style="font-size:17px;flex:none">🍎</span>
+    <div style="flex:1;min-width:170px"><b>O Apotheca chegou à App Store!</b>
+      Instale o aplicativo de verdade — avisos, câmera e sua adega protegida.</div>
+    <button class="btn btn-gold btn-sm" style="flex:none" onclick="abrirAppStore()">Baixar na App Store</button>
+    <button class="btn btn-ghost btn-sm" style="flex:none" onclick="abrirInstalarIOS()">outros jeitos</button>`;
   el.classList.remove("hidden");
 }
 
@@ -4323,8 +4380,14 @@ function abrirInstalarIOS(){
   const temAdega=!adegaDemo&&vinhos.length>0;
   $("#modal-detail-body").innerHTML=`
     <button class="close" onclick="closeModal('modal-detail')">✕</button>
-    <h3 class="serif">📱 Apotheca na tela de início</h3>
-    <div class="sub">No iPhone e no iPad, o Apotheca se instala pelo próprio Safari — sem loja, sem cadastro, sem ocupar espaço.</div>
+    <h3 class="serif">📱 Apotheca no seu iPhone</h3>
+    <div class="sub">Agora tem o jeito oficial — e um alternativo, pelo próprio Safari.</div>
+    <div class="explain-box" style="margin:14px 0;text-align:center">
+      <b>🍎 O Apotheca está na App Store!</b><br>
+      <span style="font-size:13px">O aplicativo completo, com avisos, câmera e atualizações automáticas.</span><br>
+      <button class="btn btn-gold" style="margin-top:10px" onclick="abrirAppStore()">Baixar na App Store</button>
+    </div>
+    <div class="sub" style="margin-top:16px"><b>Prefere sem loja?</b> O Apotheca também se instala pelo próprio Safari — sem cadastro, sem ocupar espaço:</div>
     <div class="explain-box" style="margin:14px 0">
       <b>No iPhone, instalar não é enfeite — é o que protege a sua adega.</b>
       O Safari apaga sozinho os dados de qualquer site que passe <b>sete dias sem ser
@@ -9004,7 +9067,7 @@ async function capturarRotulo(){
   cc.width=Math.round(v.videoWidth*ec);cc.height=Math.round(v.videoHeight*ec);
   cc.getContext("2d").drawImage(v,0,0,cc.width,cc.height);
   await analisarRotuloDeCanvas(cc,t,
-    "Não reconheci um vinho nesta foto — enquadre o rótulo de frente, com boa luz, e tente de novo.<br>Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 206 mil vinhos.");
+    "Não reconheci um vinho nesta foto — enquadre o rótulo de frente, com boa luz, e tente de novo.<br>Ou toque em <b>⌨️ Prefiro digitar</b> e use <b>🔎 Procurar com a IA</b>: pelo nome, ela acha até o que a foto não revelou.");
   ocrBusy=false;travarBotoesScan(false);
 }
 /* ---------- v0.67: ler o rótulo de uma foto que já está no aparelho ----------
@@ -9093,7 +9156,7 @@ async function rotuloDoArquivo(inp){
      está vendo qual foto o app pegou */
   mostrarPrevia(dataAlta);
   await analisarRotuloDeCanvas(alta,mini,
-    "Não reconheci o vinho nesta foto.<br>Toque em <b>🖼️ Usar uma foto do aparelho</b> para tentar outra, ou em <b>⌨️ Prefiro digitar</b> para buscar na base de 206 mil vinhos.",
+    "Não reconheci o vinho nesta foto.<br>Toque em <b>🖼️ Usar uma foto do aparelho</b> para tentar outra — ou em <b>⌨️ Prefiro digitar</b> e use <b>🔎 Procurar com a IA</b>: pelo nome, ela acha até o que a foto não revelou.",
     dataAlta);
   if(img.close)img.close();
   ocrBusy=false;travarBotoesScan(false);
@@ -9133,9 +9196,9 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
         +'<br><button class="btn btn-gold btn-sm" style="margin-top:10px" onclick="entrarGoogleReal()">Entrar com o Google</button>'
         +"<br><span style=\"font-size:12px\">Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 206 mil vinhos.</span>");
     }else if(m==="LIMITE"){
-      setScan("📸 <b>Você usou as suas leituras deste mês.</b><br>Elas voltam no dia 1º. Enquanto isso, use <b>⌨️ Prefiro digitar</b> (base de 206 mil vinhos) — ou, se quiser leituras ilimitadas, configure a sua própria chave em ☰ → 🔑 IA de visão.");
+      setScan("📸 <b>Você usou as suas leituras de foto deste mês.</b><br>Elas voltam no dia 1º — mas a busca digitada tem cota própria: toque em <b>⌨️ Prefiro digitar</b> e use <b>🔎 Procurar com a IA</b>. Para leituras ilimitadas, configure a sua própria chave em ☰ → 🔑 IA de visão.");
     }else{
-      setScan("❌ <b>Não consegui ler agora:</b> "+m+"<br>Tente de novo em instantes, ou use <b>⌨️ Prefiro digitar</b> para buscar na base de 206 mil vinhos.");
+      setScan("❌ <b>Não consegui ler agora:</b> "+m+"<br>Tente de novo em instantes — ou toque em <b>⌨️ Prefiro digitar</b>: a busca na base de 206 mil vinhos funciona até sem internet, e <b>🔎 Procurar com a IA</b> tenta pelo outro caminho.");
     }
     return false;
   }finally{clearInterval(relScan)}
@@ -9541,7 +9604,9 @@ function abaComunidade(a){
     $("#ctab-"+x).classList.toggle("hidden",x!==a);
   });
   if(a==="notif"){marcarVisto();renderNotificacoes();atualizarSinoNotif()}
-  if(a==="rede")renderRede();
+  /* v1.04: quem não segue ninguém abre a rede direto no Descobrir —
+     é a única coisa útil que essa tela tem a oferecer a essa pessoa */
+  if(a==="rede"){if(!seguindo.length)setAbaRede("descobrir");else renderRede()}
   if(a==="feed")renderFeed();
 }
 function renderComunidade(){
@@ -9579,12 +9644,6 @@ function renderRede(){
   if(!perfil){el.innerHTML='<div class="empty">Entre com sua conta para montar sua rede.</div>';return}
   /* os três contadores ficam sempre certos, mesmo com outra aba aberta */
   atualizarAbasRede();
-  const sel=$("#rd-cidade");
-  if(sel&&!sel.dataset.pronto){
-    const cidades=[...new Set(USUARIOS_APP.map(u=>u.cidade).filter(Boolean))].sort();
-    sel.innerHTML='<option value="">🌎 Todas as cidades</option>'+cidades.map(c=>`<option ${c===perfil.cidade?"selected":""}>${esc(c)}</option>`).join("");
-    sel.dataset.pronto="1";sel.onchange=renderRede;
-  }
   if(abaRede==="seguindo"){
     const lista=seguindo.map(a=>a.user);
     el.innerHTML=lista.map(u=>pessoaHtml(u,btnDeixar(u))).join("")||
@@ -9596,17 +9655,22 @@ function renderRede(){
     el.innerHTML=lista.map(u=>pessoaHtml(u,sigoEle(u)?btnDeixar(u):btnSeguir(u,true))).join("")||
       '<div class="empty"><div class="big">🙋</div>Ninguém te segue ainda.<br>Convide seus amigos de confraria — quando eles entrarem, aparecem aqui.</div>';
   }else{
+    /* v1.04b: o Descobrir escondia quem você já segue — para quem seguia todo
+       mundo (o fundador na frente), a tela ficava VAZIA e parecia quebrada.
+       Agora é o diretório completo do aplicativo: quem você ainda não segue
+       vem primeiro (com ＋ Seguir), quem você já segue vem depois (Seguindo ✓). */
     const busca=(($("#rd-busca")&&$("#rd-busca").value)||"").toLowerCase();
-    const cidade=(sel&&sel.value)||"";
-    let lista=USUARIOS_APP.filter(u=>u.user!==perfil.user&&!sigoEle(u.user)
-      &&(!cidade||u.cidade===cidade)
+    let lista=USUARIOS_APP.filter(u=>u.user!==perfil.user
       &&(!busca||(u.nome||"").toLowerCase().includes(busca)||u.user.toLowerCase().includes(busca)));
-    /* quem já te segue aparece primeiro: é o convite mais natural para retribuir */
-    lista.sort((a,b)=>(meSegue(b.user)?1:0)-(meSegue(a.user)?1:0)||contaSeguidores(b.user)-contaSeguidores(a.user));
+    /* novos primeiro; entre os novos, quem já te segue (retribuir é o convite
+       mais natural); no fim, a popularidade desempata */
+    lista.sort((a,b)=>(sigoEle(a.user)?1:0)-(sigoEle(b.user)?1:0)
+      ||(meSegue(b.user)?1:0)-(meSegue(a.user)?1:0)
+      ||contaSeguidores(b.user)-contaSeguidores(a.user));
     const total=lista.length;lista=lista.slice(0,40);
-    el.innerHTML=lista.map(u=>pessoaHtml(u.user,btnSeguir(u.user,meSegue(u.user)))).join("")
+    el.innerHTML=lista.map(u=>pessoaHtml(u.user,sigoEle(u.user)?btnDeixar(u.user):btnSeguir(u.user,meSegue(u.user)))).join("")
       +(total>40?`<div style="font-size:12px;color:var(--ink-2);padding:6px">Mostrando 40 de ${total} — refine pela busca.</div>`:"")
-      ||'<div class="empty"><div class="big">🔍</div>Nenhum apreciador novo com esse filtro.</div>';
+      ||'<div class="empty"><div class="big">🔍</div>Ninguém com esse nome por aqui.</div>';
   }
 }
 /* ===================== ENCONTRO DE VERDADE (v0.44) =====================
@@ -10197,15 +10261,23 @@ function notificacoes(){
   const tsP=chave=>{pendentesAgora.add(chave);return tsPrimeiraVez(chave)};
   REDE.filter(s=>s.para===eu&&s.de!==eu).forEach(s=>n.push({
     ts:s.ts||0,em:"👤",txt:`<b>${esc(nomeDe(s.de))}</b> começou a seguir você`,
-    acao:sigoEle(s.de)?"":`<button class="btn btn-gold btn-sm" style="flex:none" onclick="seguir('${escJS(s.de)}')">Seguir de volta</button>`,
+    /* v1.04b: quando já retribuiu, o aviso mostra o estado em vez de nada —
+       sem isso parecia que o botão "Seguir de volta" tinha sumido do app */
+    acao:sigoEle(s.de)
+      ?'<span style="flex:none;font-size:12px;color:var(--ink-2);white-space:nowrap">Seguindo ✓</span>'
+      :`<button class="btn btn-gold btn-sm" style="flex:none" onclick="seguir('${escJS(s.de)}')">Seguir de volta</button>`,
     user:s.de}));
   const meusPosts=feed.filter(f=>f.user===eu).map(f=>f.id);
   BRINDES.filter(b=>meusPosts.includes(b.fid)&&b.user!==eu).forEach(b=>{
     const f=feed.find(x=>x.id===b.fid);
-    n.push({ts:b.ts||0,em:"🥂",txt:`<b>${esc(nomeDe(b.user))}</b> brindou: ${escB(f?f.txt:"")}`,acao:"",user:b.user});
+    n.push({ts:b.ts||0,em:"🥂",txt:`<b>${esc(nomeDe(b.user))}</b> brindou: ${escB(f?f.txt:"")}`,
+      acao:`<button class="btn btn-ghost btn-sm" style="flex:none" onclick="verPublicacao('${escJS(String(b.fid))}')">Ver</button>`,user:b.user});
   });
+  /* v1.04b, pedido do Jorge: cada aviso ganha a sua resposta ali mesmo —
+     comentário tem "Responder", que leva direto à caixa da publicação */
   COMENTARIOS.filter(c=>meusPosts.includes(c.fid)&&c.user!==eu).forEach(c=>
-    n.push({ts:c.ts||0,em:"💬",txt:`<b>${esc(nomeDe(c.user))}</b> comentou: “${esc(c.txt)}”`,acao:"",user:c.user}));
+    n.push({ts:c.ts||0,em:"💬",txt:`<b>${esc(nomeDe(c.user))}</b> comentou: “${esc(c.txt)}”`,
+      acao:`<button class="btn btn-gold btn-sm" style="flex:none" onclick="verPublicacao('${escJS(String(c.fid))}',true)">Responder</button>`,user:c.user}));
   /* v0.44: convite de encontro aparece no sino, com resposta ali mesmo */
   (typeof CONVITES!=="undefined"?CONVITES:[]).forEach(ev=>
     n.push({ts:tsP("convite-encontro:"+(ev.sid||ev.id)),em:"✉️",
@@ -10229,10 +10301,38 @@ function notificacoes(){
   }
   return n.sort((a,b)=>b.ts-a.ts).slice(0,60);
 }
+/* v1.04, pedido da mesa do restaurante: retribuir os seguidores novos em UM
+   toque. Auto-seguir sem perguntar seria demais — seguir é decisão de quem
+   segue —, mas juntar todos os pendentes num botão só é o meio-termo certo
+   para uma mesa com sete pessoas se seguindo ao mesmo tempo. */
+function seguirTodosDeVolta(){
+  if(!perfil)return;
+  const eu=perfil.user;
+  const lista=[...new Set(REDE.filter(s=>s.para===eu&&s.de!==eu&&!sigoEle(s.de)).map(s=>s.de))];
+  lista.forEach(u=>{seguir(u)});
+}
+/* v1.04b: dos Avisos direto à publicação — rola até a garrafa e, se for para
+   responder, já deixa o cursor piscando na caixa de comentário. */
+function verPublicacao(fid,focar){
+  abaComunidade("feed");
+  setTimeout(()=>{
+    const inp=document.getElementById("cm-"+fid);
+    if(!inp){toast("Essa publicação não está mais no seu feed. 📜");return}
+    inp.scrollIntoView({behavior:"smooth",block:"center"});
+    if(focar)inp.focus();
+  },200);
+}
 function renderNotificacoes(){
   const el=$("#notif-lista");if(!el)return;
   const lista=notificacoes();
-  el.innerHTML=lista.map(x=>`<div class="pessoa">
+  const eu=perfil?perfil.user:"";
+  const pendSeg=[...new Set(REDE.filter(s=>s.para===eu&&s.de!==eu&&!sigoEle(s.de)).map(s=>s.de))];
+  const barraSeg=pendSeg.length?`<div class="pessoa" style="cursor:default;background:var(--cream)">
+      <span style="font-size:20px;flex:none">🤝</span>
+      <div class="inf"><b style="font-size:13.5px">${pendSeg.length===1?"1 pessoa começou":pendSeg.length+" pessoas começaram"} a seguir você</b><small>retribua todo mundo com um toque</small></div>
+      <button class="btn btn-gold btn-sm" style="flex:none" onclick="seguirTodosDeVolta()">Seguir de volta</button>
+    </div>`:"";
+  el.innerHTML=barraSeg+lista.map(x=>`<div class="pessoa">
       <span style="font-size:20px;flex:none">${x.em}</span>
       <div class="inf"><b style="font-weight:500;font-size:13.5px">${x.txt}</b><small>${x.ts?tempoRel(x.ts):""}</small></div>
       ${x.acao}
