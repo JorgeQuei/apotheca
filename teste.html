@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Apotheca — Sua adega, inteligente</title>
+<title>Apotheca (teste) — Sua adega, inteligente</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#5c1a2e">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -823,7 +823,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.04"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.05"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1912,6 +1912,10 @@ async function aposLoginGoogle(){
       renderDash();renderColecao();renderHist();refreshAdegaSelect&&refreshAdegaSelect();
       $("#login-screen").classList.remove("open");go("dashboard");
       toast("🍷 Bem-vindo de volta, @"+r[0].usuario+"! Conta Google verificada.");
+      /* v1.05: é AQUI que a pessoa que acabou de instalar o app da loja chega —
+         logada, com a adega vazia e sem saber que a dela está guardada. */
+      registrarAcesso(true);
+      setTimeout(()=>{try{boasVindasAdega()}catch(e){}},1200);
       return;
     }
     /* 2) já existe perfil local (criado antes do login real)? vincula à conta Google.
@@ -3378,6 +3382,7 @@ function sincRedesenhar(){
       oferece uma vez — e continua sendo você quem decide. */
 async function sincAoAbrir(){
   if(!sessao||!sessao.uid)return;
+  registrarAcesso();                       /* v1.05: presença, no máximo 1x a cada 6h */
   if(!sinc.on)return await sincOferecer();
   try{
     const r=await rpc("ler_adega",{});
@@ -3407,9 +3412,18 @@ async function sincAoAbrir(){
     }else if(fila.length){
       await sincronizar();
     }
+    /* v1.05: sincronia ligada e, ainda assim, adega vazia neste aparelho —
+       acontece quando o servidor também está vazio (a pessoa nunca gravou).
+       A pergunta vale aqui do mesmo jeito: há o arquivo e a cópia de socorro. */
+    if(!vinhos.length||adegaDemo)await boasVindasAdega();
   }catch(e){}
 }
 async function sincOferecer(){
+  /* v1.05: com a adega VAZIA quem manda é a tela de boas-vindas — ela mostra
+     todos os caminhos de volta, não só a nuvem, e não se cala depois da
+     primeira vez. O convite antigo continua valendo para quem já tem coleção
+     no aparelho: aí sim, uma oferta só, para não incomodar. */
+  if(!vinhos.length||adegaDemo)return await boasVindasAdega();
   if(localStorage.getItem("apotheca_sinc_convite")==="1")return;
   try{
     const r=await rpc("ler_adega",{});
@@ -3450,6 +3464,155 @@ async function sincAceitarConvite(){
   window.__sincConvite=null;
   closeModal("modal-detail");
   toast("Pronto! Sua adega está neste aparelho também ☁️✓");
+}
+
+/* ============ v1.05: A TELA DE BOAS-VINDAS (as quatro portas) ============
+   O que aconteceu em 27/08/2026: pessoas que usavam o Apotheca no Safari do
+   iPhone instalaram o aplicativo da App Store e encontraram a adega vazia —
+   inclusive a de demonstração. Não houve perda de dado nenhum: o app da loja
+   tem armazenamento PRÓPRIO, separado do navegador, e a adega delas continuava
+   inteira nos dois lugares onde sempre esteve (o Safari e, para quem ligou a
+   sincronia, o servidor). O que faltou foi alguém dizer isso na hora certa.
+
+   O convite da nuvem existia, mas tinha três defeitos que só aparecem no dia
+   da mudança de aparelho:
+     1. só era disparado na ABERTURA do app — e numa instalação nova ninguém
+        está logado na abertura, então ele voltava calado antes de tentar;
+     2. convidava UMA vez por aparelho e nunca mais, mesmo com a adega vazia;
+     3. oferecia um caminho só. Quem nunca ligou a sincronia — e é a maioria —
+        não tinha nuvem para trazer, e o app não dizia que existiam o arquivo
+        de backup e a cópia de socorro.
+
+   A correção não é técnica, é de conversa: adega vazia + pessoa identificada é
+   uma PERGUNTA, não um estado. E a pergunta se repete enquanto a adega estiver
+   vazia, porque quem ainda não trouxe nada não foi atendido. Só o "Começar do
+   zero" — decisão explícita — cala a tela neste aparelho. */
+let __bvAberta=false;                       /* não reabrir na mesma sessão */
+const BV_DISPENSADA="apotheca_boasvindas_ok";
+
+async function boasVindasAdega(forcar){
+  try{
+    if(!forcar){
+      if(__bvAberta)return;
+      if(!sessao||!sessao.uid||!perfil)return;      /* sem dono, sem pergunta */
+      if(vinhos.length&&!adegaDemo)return;          /* adega cheia: não incomoda */
+      if(localStorage.getItem(BV_DISPENSADA)===perfil.user)return;
+    }
+    /* o que existe para oferecer? */
+    let nuvem=null;
+    try{
+      const r=await rpc("ler_adega",{});
+      if(r&&r.estado==="ok"&&r.dados&&(r.dados.vinhos||[]).length){
+        nuvem=r; window.__sincConvite=r;
+      }
+    }catch(e){}
+    const soc=(typeof socorroDisponivel==="function")?socorroDisponivel():null;
+    __bvAberta=true;
+
+    const porta=(icone,titulo,linha,acao,destaque)=>`
+      <button class="btn ${destaque?"btn-primary":"btn-ghost"}"
+        style="width:100%;margin-top:8px;text-align:left;display:flex;gap:11px;align-items:center;padding:13px 14px"
+        onclick="${acao}">
+        <span style="font-size:21px;flex:none">${icone}</span>
+        <span style="line-height:1.35"><b>${titulo}</b>
+        <small style="display:block;font-weight:400;opacity:.85">${linha}</small></span>
+      </button>`;
+
+    $("#modal-detail-body").innerHTML=`
+      <button class="close" onclick="bvFechar()">✕</button>
+      <h3 class="serif">🍷 Bem-vindo, @${esc(perfil.user)}</h3>
+      <div class="sub">Sua adega ainda está vazia neste aparelho. De onde ela vem?</div>
+
+      ${nuvem?`<div class="explain-box" style="margin-top:14px">
+        <b>Encontrei a sua adega guardada na sua conta:</b><br>
+        ${(nuvem.dados.vinhos||[]).length} rótulo${(nuvem.dados.vinhos||[]).length===1?"":"s"} · ${nuvem.garrafas} garrafa${nuvem.garrafas===1?"":"s"}
+        ${nuvem.aparelho?"<br>Gravada por: "+esc(nuvem.aparelho):""}
+        ${nuvem.atualizado?"<br>Atualizada em "+esc(new Date(nuvem.atualizado).toLocaleString("pt-BR")):""}
+      </div>`:`<div class="explain-box" style="margin-top:14px" id="bv-semnuvem">
+        <b>Trocou de aparelho ou instalou o app da loja?</b><br>
+        Nada se perdeu: o aplicativo da loja tem memória própria, separada do
+        navegador. A sua adega continua onde estava — traga-a por um dos
+        caminhos abaixo.
+      </div>`}
+
+      ${nuvem?porta("☁️","Trazer a minha adega da nuvem",
+        "vem inteira e os dois aparelhos ficam iguais daqui em diante",
+        "sincAceitarConvite()",true):""}
+      ${soc?porta("🛟","Devolver a cópia de socorro",
+        soc.rotulos+" rótulos · "+soc.garrafas+" garrafas, guardada em "+new Date(soc.quando).toLocaleDateString("pt-BR"),
+        "bvSocorro()",!nuvem):""}
+      ${porta("📂","Restaurar de um arquivo",
+        "o backup do Apotheca que você salvou — ou uma planilha de outro app",
+        "bvArquivo()",!nuvem&&!soc)}
+      ${porta("🎬","Ver a demonstração",
+        "153 garrafas de exemplo para passear antes de começar a sua",
+        "bvDemo()")}
+      ${porta("✍️","Começar do zero",
+        "cadastrar os meus vinhos agora — não pergunte de novo neste aparelho",
+        "bvZero()")}
+
+      <div style="font-size:11.5px;color:var(--ink-3);margin-top:12px;line-height:1.5">
+        Na dúvida, escolha <b>Ver a demonstração</b>: ela não apaga nada e pode
+        ser encerrada a qualquer momento. Esta pergunta volta sempre que a adega
+        estiver vazia — menos se você escolher "Começar do zero".
+      </div>`;
+    $("#modal-detail").classList.add("open");
+  }catch(e){}
+}
+function bvFechar(){ closeModal("modal-detail") }   /* fechar no ✕ NÃO dispensa: volta na próxima abertura */
+function bvSocorro(){ socorroRestaurar() }
+function bvArquivo(){ closeModal("modal-detail"); try{bkEscolherArquivo()}catch(e){toast("Não consegui abrir o seletor de arquivos aqui. 😕")} }
+function bvDemo(){ closeModal("modal-detail"); carregarDemo() }
+function bvZero(){
+  try{ if(perfil)localStorage.setItem(BV_DISPENSADA,perfil.user) }catch(e){}
+  closeModal("modal-detail");
+  adegaDemo=false; persist();
+  try{renderDash();renderColecao()}catch(e){}
+  go("dashboard");
+  toast("Combinado! Toque em ＋ para o primeiro vinho da sua adega. 🍷");
+}
+
+/* ============ v1.05: DE ONDE ESTÃO ENTRANDO (plataforma e presença) ============
+   Até aqui o cadastro sabia QUEM entrou e não sabia POR ONDE. Sem isso não dá
+   para responder três perguntas que aparecem toda semana: quanto a App Store
+   está de fato rendendo, quais testadores de Android estão mesmo usando o app,
+   e quem migrou de plataforma (a origem do susto das adegas vazias).
+
+   A leitura é feita pelo que o próprio aparelho declara, sem rastrear ninguém:
+   nenhum identificador novo, nenhum dado de navegação — só o tipo de casca em
+   que o app está rodando, gravado na linha que já é da pessoa. Uma coisa a
+   leitura NÃO consegue distinguir, e é honesto registrar: no Android, um APK
+   instalado à mão e o mesmo app vindo da Play Store se apresentam igual. */
+function plataformaAtual(){
+  try{
+    const ua=navigator.userAgent||"";
+    const nativo=!!(window.Capacitor&&(typeof window.Capacitor.isNativePlatform==="function"
+      ? window.Capacitor.isNativePlatform() : true));
+    const iOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+    const android=/Android/.test(ua);
+    const instalado=(()=>{try{return window.matchMedia("(display-mode: standalone)").matches}catch(e){return false}})();
+    if(nativo)return iOS?"ios-app":(android?"android-app":"app");
+    if(android)return /\bwv\b/.test(ua)?"android-apk":(instalado?"android-pwa":"android-web");
+    if(iOS)return (navigator.standalone===true||instalado)?"ios-pwa":"ios-safari";
+    return instalado?"web-pwa":"web";
+  }catch(e){return "?"}
+}
+/* Grava plataforma, versão e último acesso na própria linha do usuário.
+   Falha em silêncio: enquanto a função não existir no servidor, o app segue
+   igual — nenhuma tela depende disto. Registra no máximo uma vez a cada 6h. */
+async function registrarAcesso(forcar){
+  try{
+    if(!sessao||!sessao.uid||!perfil)return;
+    const agora=Date.now();
+    if(!forcar){
+      const ult=parseInt(localStorage.getItem("apotheca_acesso_ts")||"0",10);
+      if(agora-ult<6*3600*1000)return;
+    }
+    const p=plataformaAtual();
+    try{localStorage.setItem("apotheca_plataforma",p)}catch(e){}
+    await rpc("registrar_acesso",{p_plataforma:p,p_versao:APP_VERSION});
+    try{localStorage.setItem("apotheca_acesso_ts",String(agora))}catch(e){}
+  }catch(e){}
 }
 
 /* Devolve a adega guardada pela cópia de socorro. Só o usuário manda nisso. */
@@ -7792,6 +7955,7 @@ async function confirmarNome(){
   aplicarPerfilUI();
   go("dashboard");
   toast(`🍷 Bem-vindo à comunidade, @${u}! Seu nome agora é definitivo.`);
+  registrarAcesso(true);
 }
 function aplicarPerfilUI(){
   const f=$("#foot-user");if(f)f.textContent=perfil?"@"+perfil.user:"Jorge";
