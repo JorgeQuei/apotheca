@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Apotheca (teste) — Sua adega, inteligente</title>
+<title>Apotheca — Sua adega, inteligente</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#5c1a2e">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -838,7 +838,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.06"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.07"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -2322,10 +2322,22 @@ async function abrirGestaoConfraria(id){
     <div class="sub">📍 ${esc(c.cidade)} · ${TIPO_LABEL[c.tipo]||c.tipo} · você é ${sou?"👑 fundador":"🛡️ moderador"}</div>
     ${pend.length?`<div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">⏳ PEDIDOS DE VAGA (${pend.length})</div>
       ${pend.map(p=>{const u=USUARIOS_APP.find(x=>x.user===p);return `<div class="sug-item" style="border:1px solid var(--gold,#b8860b);border-radius:10px;margin-bottom:6px"><span style="cursor:pointer" onclick="abrirPerfil('${escJS(p)}')">${avatarDe(p,30)}</span><div class="inf"><b>${u?esc(u.nome):esc(p)}</b><small>@${esc(p)}${u?" · 📍 "+esc(u.cidade):""}</small></div><span style="display:flex;gap:6px;flex:none"><button class="btn btn-gold btn-sm" onclick="aprovarPendente('${escJS(c.id)}','${escJS(p)}')">✓ Aprovar</button><button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="recusarPendente('${escJS(c.id)}','${escJS(p)}')">✕</button></span></div>`}).join("")}`:""}
+    ${/* v1.07: confraria recém-fundada nasce só com o fundador. O modelo mental
+          que todo mundo traz é o do grupo de WhatsApp — "eu adiciono as
+          pessoas" —, e aqui é o contrário: elas entram pelo convite. Foi
+          exatamente aí que a primeira usuária de fora travou. */
+      (c.membrosLista.length<=1?`<div class="explain-box" style="margin-top:12px;border-left-color:var(--gold)">
+      <b>Confraria criada. Falta o mais importante.</b><br>
+      Aqui ninguém é adicionado à força: cada pessoa entra pelo convite.
+      Mande o link no grupo e elas entram sozinhas.
+      <button class="btn btn-gold" style="width:100%;margin-top:10px"
+        onclick="convidarConfraria('${escJS(c.id)}')">👥 Convidar o meu grupo</button>
+    </div>`:"")}
     <div style="font-size:12px;font-weight:700;letter-spacing:.8px;color:var(--ink-3);margin:12px 0 6px">🎟️ CONVITE DA CONFRARIA</div>
     <div style="background:var(--cream);border-radius:12px;padding:12px;margin-bottom:10px">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <b style="font-size:20px;letter-spacing:2px">${c.convite||"—"}</b>
+        <button class="btn btn-gold btn-sm" onclick="convidarConfraria('${escJS(c.id)}')">👥 Convidar</button>
         <button class="btn btn-ghost btn-sm" onclick="copiarConvite('${escJS(c.id)}')">📋 Copiar link</button>
         <button class="btn btn-ghost btn-sm" onclick="mostrarQR('${escJS(c.id)}')">📱 QR code</button>
         ${sou?`<button class="btn btn-ghost btn-sm" onclick="novoConvite('${escJS(c.id)}')" title="Invalida o código atual">♻️ Gerar novo</button>`:""}
@@ -2403,6 +2415,27 @@ async function novoConvite(id){
     c.convite=tok;persist();abrirGestaoConfraria(id);
     toast("♻️ Novo convite gerado — o código antigo não vale mais.");
   }catch(e){toast("Sem conexão para gerar o convite. 📡")}
+}
+/* v1.07 — CONVIDAR DE VERDADE.
+   O código sozinho não convida ninguém: alguém precisa mandar o link. No
+   iPhone e no Android modernos existe a folha de compartilhamento nativa, que
+   já abre o WhatsApp com a mensagem pronta. Quando ela não existe (navegador
+   de computador), cai no antigo copiar-e-colar. */
+async function convidarConfraria(id){
+  const c=CONFRARIAS.find(x=>x.id===id);
+  if(!c)return;
+  if(!c.convite){try{c.convite=await rpc("convite_da_confraria",{cid:id})}catch(e){}}
+  if(!c.convite){toast("Só a diretoria da confraria pode convidar. 🔒");return}
+  const link=SITE_URL+"?convite="+encodeURIComponent(c.convite);
+  const msg=`🍷 Você está convidado para a confraria "${c.nome}" no Apotheca!\n`
+    +`Toque no link e entre direto: ${link}\n`
+    +`É grátis. A gente marca os encontros por lá, cada um diz que garrafa leva `
+    +`e o aplicativo monta a ordem de servir.`;
+  if(navigator.share){
+    try{ await navigator.share({title:"Confraria "+c.nome,text:msg}); return }
+    catch(e){ if((e&&e.name)==="AbortError")return }   /* desistiu: não insiste */
+  }
+  copiarConvite(id);
 }
 async function copiarConvite(id){
   const c=CONFRARIAS.find(x=>x.id===id);if(!c)return;
@@ -3536,29 +3569,44 @@ async function boasVindasAdega(forcar){
     $("#modal-detail-body").innerHTML=`
       <button class="close" onclick="bvFechar()">✕</button>
       <h3 class="serif">🍷 Bem-vindo, @${esc(perfil.user)}</h3>
-      <div class="sub">Sua adega ainda está vazia neste aparelho. De onde ela vem?</div>
+      <div class="sub">Por onde você quer começar? Pelo grupo, ou pela sua adega.</div>
 
       ${nuvem?`<div class="explain-box" style="margin-top:14px">
         <b>Encontrei a sua adega guardada na sua conta:</b><br>
         ${(nuvem.dados.vinhos||[]).length} rótulo${(nuvem.dados.vinhos||[]).length===1?"":"s"} · ${nuvem.garrafas} garrafa${nuvem.garrafas===1?"":"s"}
         ${nuvem.aparelho?"<br>Gravada por: "+esc(nuvem.aparelho):""}
         ${nuvem.atualizado?"<br>Atualizada em "+esc(new Date(nuvem.atualizado).toLocaleString("pt-BR")):""}
-      </div>`:`<div class="explain-box" style="margin-top:14px" id="bv-semnuvem">
+      </div>`:""}
+
+      ${nuvem?porta("☁️","Trazer a minha adega da nuvem",
+        "vem inteira e os dois aparelhos ficam iguais daqui em diante",
+        "sincAceitarConvite()",true):""}
+      ${/* v1.07: a porta que faltava. Até aqui as quatro opções eram sobre
+            encher a adega sozinho — e a primeira pessoa de fora a testar o
+            aplicativo, no dia 30/08, quis justamente o contrário: trazer o
+            grupo de amigas. Quem chega por convite entrava numa tela que só
+            falava de importar arquivo. */""}
+      ${porta("🎟️","Entrar numa confraria",
+        "recebi o código ou o link de um amigo — quero entrar no grupo dele",
+        "bvConvite()",!nuvem&&!soc)}
+      ${porta("🔍","Encontrar apreciadores",
+        "ver quem já está no Apotheca e seguir quem bebe o que eu bebo",
+        "bvDescobrir()")}
+      ${soc?porta("🛟","Devolver a cópia de socorro",
+        soc.rotulos+" rótulos · "+soc.garrafas+" garrafas, guardada em "+new Date(soc.quando).toLocaleDateString("pt-BR"),
+        "bvSocorro()",!nuvem):""}
+      ${/* v1.07: o aviso sobre troca de aparelho desceu para junto das portas
+            de restauração, que é o assunto dele. No topo, ele respondia uma
+            pergunta que a pessoa ainda não tinha feito. */
+        nuvem?"":`<div class="explain-box" style="margin-top:16px" id="bv-semnuvem">
         <b>Trocou de aparelho ou instalou o app da loja?</b><br>
         Nada se perdeu: o aplicativo da loja tem memória própria, separada do
         navegador. A sua adega continua onde estava — traga-a por um dos
         caminhos abaixo.
       </div>`}
-
-      ${nuvem?porta("☁️","Trazer a minha adega da nuvem",
-        "vem inteira e os dois aparelhos ficam iguais daqui em diante",
-        "sincAceitarConvite()",true):""}
-      ${soc?porta("🛟","Devolver a cópia de socorro",
-        soc.rotulos+" rótulos · "+soc.garrafas+" garrafas, guardada em "+new Date(soc.quando).toLocaleDateString("pt-BR"),
-        "bvSocorro()",!nuvem):""}
       ${porta("📂","Restaurar de um arquivo",
         "o backup do Apotheca que você salvou — ou uma planilha de outro app",
-        "bvArquivo()",!nuvem&&!soc)}
+        "bvArquivo()",false)}
       ${porta("🎬","Ver a demonstração",
         "153 garrafas de exemplo para passear antes de começar a sua",
         "bvDemo()")}
@@ -3575,6 +3623,20 @@ async function boasVindasAdega(forcar){
   }catch(e){}
 }
 function bvFechar(){ closeModal("modal-detail") }   /* fechar no ✕ NÃO dispensa: volta na próxima abertura */
+/* v1.07: as duas portas sociais. Nenhuma das duas dispensa a pergunta — quem
+   entra numa confraria antes de ter garrafas continua sendo perguntado sobre a
+   adega na próxima abertura, que é o certo. */
+function bvConvite(){
+  closeModal("modal-detail");
+  go("encontros");
+  try{ abrirEntrarComCodigo() }
+  catch(e){ toast("Vá em 🥂 Encontros → 🎟️ Entrar com convite.") }
+}
+function bvDescobrir(){
+  closeModal("modal-detail");
+  go("comunidade");
+  try{ abaComunidade("rede"); setAbaRede("descobrir") }catch(e){}
+}
 function bvSocorro(){ socorroRestaurar() }
 function bvArquivo(){ closeModal("modal-detail"); try{bkEscolherArquivo()}catch(e){toast("Não consegui abrir o seletor de arquivos aqui. 😕")} }
 function bvDemo(){ closeModal("modal-detail"); carregarDemo() }
@@ -3929,9 +3991,14 @@ function consultarAntesDeSalvar(onde){
   const nome=($("#a-nome").value||"").trim();
   if(nome.length<3){toast("Escreva o nome do vinho primeiro. ✍️");return}
   const v={nome,vinicola:($("#a-vinicola").value||"").trim(),safra:+$("#a-safra").value||0};
+  /* v1.07: grava o rascunho ANTES de sair do aplicativo. Era exatamente aqui
+     que a ficha se perdia — a pessoa ia ver a nota lá fora e voltava para uma
+     tela em branco. */
+  guardarRascunho();
   if(abrirLinkFora(refURL(onde,v))){
     const sel=$("#a-ref-de");
     if(sel&&!sel.value)sel.value=onde==="ws"?"no Wine-Searcher":"no Vivino";
+    guardarRascunho();
   }
 }
 function refDoFormulario(){
@@ -8741,7 +8808,78 @@ function cancelarNovaAdega(){
   const d=ADEGAS.find(a=>a.id===volta);
   toast("Cancelado — o vinho vai para "+(d?d.icone+" "+d.nome:"a adega atual")+". 🍷");
 }
+/* ================= v1.07 — RASCUNHO DA FICHA =================
+   O caso que originou isto: o Jorge escaneou um Quinta do Crasto, saiu do
+   aplicativo para conferir a nota no Vivino e, ao voltar, o cadastro tinha
+   sumido — a ficha inteira, inclusive a foto do rótulo. No iPhone isso é
+   normal: o sistema descarta a página em segundo plano quando precisa de
+   memória, e o app recomeça do zero.
+   A ficha em andamento passa a ser gravada no próprio aparelho. Nada disso
+   sobe para a nuvem: é localStorage, o mesmo lugar onde a adega já mora.
+   O rascunho morre quando o vinho é salvo, quando a ficha é limpa, ou
+   sozinho depois de 48 horas. */
+const RASCUNHO_FICHA="apotheca_rascunho_ficha";
+const CAMPOS_FICHA=["a-nome","a-vinicola","a-pais","a-regiao","a-safra","a-tipo","a-uvas",
+  "a-adega","a-qtd","a-preco","a-corpo","a-acidez","a-tanino","a-jan1","a-jan2","a-notas",
+  "a-ref-de","a-ref-n"];
+function guardarRascunho(){
+  try{
+    if(typeof editandoId!=="undefined"&&editandoId)return; /* editar garrafa existente não vira rascunho */
+    const el=$("#a-nome");
+    if(!el||(el.value||"").trim().length<2)return;         /* sem nome não há o que guardar */
+    const d={};
+    CAMPOS_FICHA.forEach(i=>{const e=$("#"+i);if(e)d[i]=e.value});
+    d.__foto=lastFotoRotulo||"";
+    d.__titulo=($("#form-title")||{}).textContent||"";
+    d.__quando=Date.now();
+    localStorage.setItem(RASCUNHO_FICHA,JSON.stringify(d));
+  }catch(e){}
+}
+function apagarRascunho(){try{localStorage.removeItem(RASCUNHO_FICHA)}catch(e){}}
+function lerRascunho(){
+  try{
+    const d=JSON.parse(localStorage.getItem(RASCUNHO_FICHA)||"null");
+    if(!d||!d.__quando)return null;
+    if(Date.now()-d.__quando>48*3600*1000){apagarRascunho();return null}
+    return d;
+  }catch(e){return null}
+}
+function restaurarRascunho(){
+  const d=lerRascunho();
+  if(!d)return false;
+  const nomeAtual=(($("#a-nome")||{}).value||"").trim();
+  if(nomeAtual)return false;              /* já há ficha em edição: não atropela */
+  CAMPOS_FICHA.forEach(i=>{const e=$("#"+i);if(e&&typeof d[i]==="string")e.value=d[i]});
+  ["corpo","acidez","tanino"].forEach(k=>{
+    const v=$("#v-"+k),a=$("#a-"+k); if(v&&a)v.textContent=a.value;
+  });
+  if(d.__foto)lastFotoRotulo=d.__foto;
+  if(d.__titulo&&$("#form-title"))$("#form-title").textContent=d.__titulo;
+  toast("📝 Rascunho recuperado — a ficha voltou como você a deixou.");
+  return true;
+}
+/* grava enquanto a pessoa digita, sem pesar: no máximo uma gravação por segundo */
+(function(){
+  let t=null;
+  const marcar=()=>{clearTimeout(t);t=setTimeout(guardarRascunho,1000)};
+  const ligar=()=>{
+    const p=$("#form-panel");
+    if(!p)return;
+    p.addEventListener("input",marcar);
+    p.addEventListener("change",marcar);
+    /* ao sair do aplicativo (trocar de aba, ir ao Vivino, bloquear a tela),
+       grava na hora — é o instante em que o iPhone pode descartar a página */
+    document.addEventListener("visibilitychange",()=>{
+      if(document.hidden)guardarRascunho(); else setTimeout(restaurarRascunho,300);
+    });
+    window.addEventListener("pagehide",guardarRascunho);
+    setTimeout(restaurarRascunho,1500);   /* na abertura, depois do app montar */
+  };
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",ligar);
+  else setTimeout(ligar,0);
+})();
 function clearForm(){
+  apagarRascunho();
   ["a-nome","a-vinicola","a-regiao","a-safra","a-uvas","a-preco","a-jan1","a-jan2","a-notas","a-ref-n"].forEach(i=>$("#"+i).value="");
   $("#a-ref-de").value="";
   $("#a-qtd").value=1;["corpo","acidez","tanino"].forEach(k=>{$("#a-"+k).value=3;$("#v-"+k).textContent=3});
@@ -9152,8 +9290,11 @@ async function chamarLeitorServidor(corpo,segundos){
 async function analisarComServidor(b64){
   let j;
   /* v1.06: 30 s era curto. O tempo do envio da foto pelo 4G de um restaurante
-     cheio entra dentro deste limite, e era ele que estourava — não a leitura. */
-  try{ j=await chamarLeitorServidor({imagem:b64},45) }
+     cheio entra dentro deste limite, e era ele que estourava — não a leitura.
+     v1.07: o servidor passou a desistir aos 38 s, então 42 s aqui deixa ele
+     responder primeiro. Antes eram 45 s contra 22 s do servidor, e sobravam
+     23 segundos de espera sem ninguém do outro lado. */
+  try{ j=await chamarLeitorServidor({imagem:b64},42) }
   catch(e){ if(e.message==="LIMITE")scanRestantes=0; throw e }
   if(typeof j.restantes==="number")scanRestantes=j.restantes;
   return j.vinho||j;
@@ -9237,6 +9378,9 @@ function aplicarIA(o){
   $("#a-notas").value=(o.notas||"").trim();
   $("#form-title").textContent="🧠 Identificado pela IA: "+(o.nome||"vinho")+(o.vinicola?" ("+o.vinicola+")":"");
   $("#form-panel").scrollIntoView({behavior:"smooth"});
+  /* v1.07: a ficha recém-identificada já nasce como rascunho — se a pessoa
+     sair para conferir a nota lá fora, ela volta inteira. */
+  guardarRascunho();
   toast("🧠 Rótulo reconhecido pela IA de visão — confira e salve!");
 }
 /* ============== v1.06: O QUE VOCÊ VÊ É O QUE É ANALISADO ==============
@@ -9316,19 +9460,22 @@ async function capturarRotulo(){
   /* rajada de três quadros: o toque vira uma foto só, mas a melhor das três */
   let melhor=null;
   for(let i=0;i<3;i++){
-    const c=recorteDaMoldura(v,1600);
+    const c=recorteDaMoldura(v,1400);
     const nit=nitidezDe(c);
     if(!melhor||nit>melhor.nit)melhor={c,nit};
     if(i<2)await new Promise(r=>setTimeout(r,110));
   }
-  const alta=melhor.c, mini=canvasDe(alta,300);
-  const dataAlta=alta.toDataURL("image/jpeg",0.85);
+  /* v1.07: fecha a foto em ~90 KB antes de qualquer outra coisa, para o que
+     aparece na tela ser exatamente o que sobe para a IA. */
+  const orc=fotoSobOrcamento(melhor.c,92*1024);
+  const alta=orc.canvas, dataAlta=orc.data, mini=canvasDe(alta,300);
 
   /* congela: daqui em diante o que está na tela é exatamente o que foi enviado
      — e é exatamente como a foto vai aparecer na ficha do vinho */
   mostrarPrevia(dataAlta);
   ultimaLeitura={data:dataAlta,nitidez:Math.round(melhor.nit),quando:Date.now(),
-                 lado:alta.width+"×"+alta.height};
+                 lado:alta.width+"×"+alta.height,
+                 peso:Math.round(bytesDeDataURL(dataAlta)/1024)+" KB"};
 
   await analisarRotuloDeCanvas(alta,mini,
     "Não reconheci um vinho nesta foto.<br>Ela está aí em cima, do jeito que a IA a viu — se estiver tremida ou escura, toque em <b>📷 Tirar outra</b>.<br>Ou use <b>⌨️ Prefiro digitar</b> com <b>🔎 Procurar com a IA</b>: pelo nome, ela acha até o que a foto não revelou.",
@@ -9416,6 +9563,38 @@ function travarBotoesScan(t){
   if(b)b.disabled=t;
   if(g)g.disabled=t;
 }
+/* v1.07 — ORÇAMENTO DE PESO DA FOTO DO SCANNER.
+   Medição de 29/08/2026: a 1.05 enviava 67 KB e a 1.06, depois que passei a
+   recortar o enquadramento da moldura, passou a enviar 139 KB — o dobro, sem
+   nenhum ganho de leitura. Em rede de restaurante cada quilobyte a mais vira
+   segundo de espera, e foi exatamente disso que o Jorge reclamou.
+   Aqui a foto é fechada em no máximo ~90 KB. Reduzo primeiro a qualidade e só
+   depois o lado, porque o rótulo perde menos com compressão do que com
+   redimensionamento. O recorte da moldura continua igual: o que muda é o peso,
+   não o enquadramento. */
+function bytesDeDataURL(d){
+  const b64=String(d||"").split(",")[1]||"";
+  return Math.floor(b64.length*3/4);
+}
+function fotoSobOrcamento(cv,maxBytes){
+  const tentativas=[[1400,.82],[1400,.72],[1200,.70],[1000,.66],[800,.60]];
+  let ultima=null;
+  for(const [lado,q] of tentativas){
+    const c=(Math.max(cv.width,cv.height)>lado)?canvasDe(cv,lado):cv;
+    const d=c.toDataURL("image/jpeg",q);
+    ultima={data:d,canvas:c};
+    if(bytesDeDataURL(d)<=maxBytes)return ultima;
+  }
+  /* Fotos muito "ruidosas" — cascalho, mato, tecido — comprimem mal e podem
+     não caber nem no último degrau. Aqui o app encolhe em passos de 20% até
+     caber, com piso de 420 px para nunca devolver uma imagem ilegível. */
+  let c=ultima?ultima.canvas:cv, d=ultima?ultima.data:cv.toDataURL("image/jpeg",.6), guarda=0;
+  while(bytesDeDataURL(d)>maxBytes && Math.max(c.width,c.height)>420 && guarda++<10){
+    c=canvasDe(c,Math.round(Math.max(c.width,c.height)*0.8));
+    d=c.toDataURL("image/jpeg",.5);
+  }
+  return {data:d,canvas:c};
+}
 function canvasDe(img,maxLado){
   const w=img.width,h=img.height;
   const e=Math.min(1,maxLado/Math.max(w,h));
@@ -9451,8 +9630,9 @@ async function rotuloDoArquivo(inp){
     setScan("Não consegui abrir esta imagem.<br>Tente uma foto em <b>JPG</b> ou <b>PNG</b> — ou fotografe o rótulo agora.");
     ocrBusy=false;travarBotoesScan(false);return;
   }
-  const alta=canvasDe(img,1024), mini=canvasDe(img,300);
-  const dataAlta=alta.toDataURL("image/jpeg",0.85);
+  /* v1.07: a foto da galeria também passa pelo orçamento de peso */
+  const orcArq=fotoSobOrcamento(canvasDe(img,1200),92*1024);
+  const alta=orcArq.canvas, dataAlta=orcArq.data, mini=canvasDe(img,300);
   /* a foto aparece ANTES da análise: se a IA demorar ou falhar, a pessoa já
      está vendo qual foto o app pegou */
   mostrarPrevia(dataAlta);
@@ -9480,7 +9660,7 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
     if(el&&etapaScan<etapasScan.length)el.textContent=etapasScan[etapaScan++];
   },9000);
   try{
-    const b64=(dataAlta||alta.toDataURL("image/jpeg",0.85)).split(",")[1];
+    const b64=(dataAlta||fotoSobOrcamento(alta,92*1024).data).split(",")[1];
     /* ---------- v1.06: REPETIR A MESMA FOTO, EM VEZ DE PEDIR OUTRA ----------
        Medição feita em 29/08/2026, oito chamadas com a MESMA imagem: sete
        responderam entre 10 e 19,5 segundos e uma estourou o tempo. A imagem
@@ -9491,13 +9671,18 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
        Agora o app reenvia a MESMA foto até duas vezes antes de desistir. Não
        gasta cota: o servidor devolve a leitura quando ela não acontece. */
     let o=null,ultimo=null;
+    /* v1.07: teto de tempo para a rodada inteira. Três tentativas de 42 s
+       davam mais de dois minutos de "analisando" no pior caso — tempo em que
+       ninguém segura o celular apontado para a garrafa. Passados 80 s, o app
+       para de insistir e devolve o controle à pessoa. */
+    const limiteRodada=Date.now()+80000;
     for(let tent=1;tent<=3;tent++){
       try{ o=await analisarComIA(b64); break }
       catch(e){
         ultimo=e;
         const recuperavel=/demor|conex|rede|indispon|limite deste m/i.test(e.message||"")
           && e.message!=="LIMITE" && e.message!=="SEM_LOGIN";
-        if(!recuperavel||tent===3)throw e;
+        if(!recuperavel||tent===3||Date.now()>limiteRodada)throw e;
         const el=$("#scan-etapa");
         if(el)el.textContent=`a rede está lenta — tentando de novo (${tent+1}ª de 3)…`;
         await new Promise(r=>setTimeout(r,1200*tent));
