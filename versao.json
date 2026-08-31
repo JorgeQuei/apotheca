@@ -1,6 +1,6 @@
 {
-  "versao": "1.08",
-  "codigo": 112,
-  "novidades": "Leitor de rótulos: 📷 Tirar outra passa a responder durante a análise, e Cancelar interrompe de verdade — a leitura antiga não volta mais preenchendo a ficha sozinha. A primeira tentativa ficou mais curta (24 s), então a segunda chance chega antes. Na ficha: um ✕ dentro do campo do nome e um 🧹 Limpar ficha ao lado do título, sem precisar rolar até o fim. O campo do nome deixou de atrair o preenchimento automático do iPhone.",
+  "versao": "1.09",
+  "codigo": 113,
+  "novidades": "Quando as leituras de foto do mês acabam, o Apotheca passa a ler o rótulo no próprio aparelho e a procurar nas 206 mil garrafas da base mundial — de graça e sem internet. O campo de notas de degustação não tem mais a alça de arrastar que desalinhava a ficha: agora ele cresce sozinho conforme você escreve.",
   "publicada_em": "2026-08-31"
 }

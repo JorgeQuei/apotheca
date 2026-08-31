@@ -179,6 +179,12 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .filters input[type=search]{flex:1;min-width:200px}
 input,select,textarea{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
 input:focus,select:focus,textarea:focus{outline:2px solid rgba(201,162,39,.5);border-color:var(--gold)}
+/* v1.09: o campo de notas vinha com a alça de arrastar do navegador, que no
+   iPhone o dedo pega sem querer — e como o padrão é `resize: both`, ele podia
+   ficar MAIS LARGO que o painel e quebrar o alinhamento da ficha. Relato do
+   Jorge em 31/08/2026. A alça sai; no lugar, o campo cresce sozinho conforme
+   a pessoa escreve, que é o que ela queria quando puxava a alça. */
+textarea{resize:none;max-width:100%}
 .wine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(295px,1fr));gap:14px}
 .wcard{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--c-tinto);border-radius:var(--radius);padding:15px 16px;box-shadow:var(--shadow);cursor:pointer;transition:transform .12s, box-shadow .12s;position:relative}
 .wcard:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(60,30,40,.14)}
@@ -864,7 +870,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.08"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.09"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -8901,6 +8907,8 @@ function restaurarRascunho(){
     });
     window.addEventListener("pagehide",guardarRascunho);
     setTimeout(restaurarRascunho,1500);   /* na abertura, depois do app montar */
+    const tn=document.getElementById("a-notas");
+    if(tn){tn.addEventListener("input",crescerNotas);setTimeout(crescerNotas,1600)}
   };
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",ligar);
   else setTimeout(ligar,0);
@@ -8916,7 +8924,7 @@ function clearForm(){
   $("#nova-adega-wrap").classList.add("hidden");$("#a-nova-adega").value="";
   adegaAnterior=($("#a-adega").value&&$("#a-adega").value!=="__nova")?$("#a-adega").value:null;
   $("#form-title").textContent="Ficha do vinho";lastEan=null;lastFotoRotulo=null;editandoId=null;
-  pintarXNome();
+  pintarXNome();crescerNotas();
 }
 /* ============ v1.08 — APAGAR SEM PROCURAR ============
    Duas queixas do dia 31/08/2026 vinham do mesmo lugar: apagar o nome do vinho
@@ -8927,6 +8935,13 @@ function clearForm(){
 function pintarXNome(){
   const i=$("#a-nome"),x=$("#a-nome-x");
   if(i&&x)x.classList.toggle("hidden",!(i.value||"").length);
+}
+/* v1.09: sem a alça de arrastar, o campo de notas precisa crescer sozinho —
+   senão escrever cinco linhas de degustação vira rolagem dentro de duas. */
+function crescerNotas(){
+  const t=$("#a-notas"); if(!t)return;
+  t.style.height="auto";
+  t.style.height=Math.min(360,Math.max(t.scrollHeight,52))+"px";
 }
 function limparNome(){
   const i=$("#a-nome");
@@ -9154,8 +9169,11 @@ async function garantirOcr(){
 }
 /* Recorte central + tons de cinza + contraste: menos fundo, letras mais nítidas para o OCR */
 function prepararQuadro(v){
-  const mx=v.videoWidth*0.08,my=v.videoHeight*0.08;
-  const w=v.videoWidth-2*mx,h=v.videoHeight-2*my;
+  /* v1.09: aceita o vídeo ao vivo OU um canvas já capturado (foto da galeria,
+     ou a foto que a IA recusou por falta de cota) — os pixels é que importam. */
+  const VW=v.videoWidth||v.width, VH=v.videoHeight||v.height;
+  const mx=VW*0.08,my=VH*0.08;
+  const w=VW-2*mx,h=VH-2*my;
   const esc=Math.min(1.6,1300/w);
   const c=document.createElement("canvas");
   c.width=Math.round(w*esc);c.height=Math.round(h*esc);
@@ -9240,6 +9258,39 @@ function achadosTxt(){
   const p=[];if(ocrAcc.nome)p.push("<b>"+tituloCase(ocrAcc.nome)+"</b>");
   if(ocrAcc.safra)p.push(ocrAcc.safra);if(ocrAcc.regiao)p.push(ocrAcc.regiao);if(ocrAcc.tipo)p.push(ocrAcc.tipo);
   return p.join(" · ");
+}
+/* ============ v1.09 — QUANDO A COTA ACABA, O APARELHO ASSUME ============
+   Relato do Jorge, 31/08/2026: "acabou meus créditos com o scanner e mesmo
+   colocando para escanear o rótulo por uma foto já existente, para procurar em
+   nosso banco de dados o aplicativo não aceitou".
+   Ele estava certo em estranhar. O app JÁ SABE ler rótulo sozinho — tem o
+   leitor óptico no aparelho e as 206 mil garrafas da base mundial aqui dentro,
+   sem pedir nada a servidor nenhum. Só que esse caminho estava amarrado ao
+   modo de câmera contínua: quando a cota da IA acabava, os dois caminhos da
+   foto (câmera e galeria) davam a mesma resposta seca de "acabou" e mandavam
+   a pessoa digitar. Um beco sem saída construído em cima de um recurso que
+   estava pronto e desligado.
+   Agora, cota estourada ou leitor fora do ar, a MESMA foto passa pelo leitor
+   do aparelho e pela base mundial antes de qualquer mensagem de desistência.
+   É menos preciso que a IA — e é de graça, ilimitado e funciona sem internet. */
+async function lerNoAparelho(canvas,ger){
+  if(!canvas)return false;
+  try{
+    setScan('<span class="scan-spinner"></span>🔎 <b>Lendo o rótulo aqui no aparelho…</b>'
+      +'<br><span style="font-size:12.5px">sem gastar cota — menos preciso que a IA, mas resolve</span>');
+    await garantirOcr();
+    if(ger!==scanGeracao)return false;
+    resetOcrAcc();
+    const {data}=await ocrWorker.recognize(prepararQuadro(canvas));
+    if(ger!==scanGeracao)return false;
+    parseFrame(data.text||"");
+    if(ocrAcc.nome){
+      finalizarRotulo();            /* preenche a ficha e oferece a base mundial */
+      setTimeout(()=>toast("Leitura feita no próprio aparelho — confira os dados. 🔎"),900);
+      return true;
+    }
+    return false;
+  }catch(e){ return false }
 }
 async function tentarLerRotulo(manual){
   if(!scanAtivo||ocrBusy)return;
@@ -9458,7 +9509,7 @@ function aplicarIA(o){
   $("#form-panel").scrollIntoView({behavior:"smooth"});
   /* v1.07: a ficha recém-identificada já nasce como rascunho — se a pessoa
      sair para conferir a nota lá fora, ela volta inteira. */
-  guardarRascunho();pintarXNome();
+  guardarRascunho();pintarXNome();crescerNotas();
   toast("🧠 Rótulo reconhecido pela IA de visão — confira e salve!");
 }
 /* ============== v1.06: O QUE VOCÊ VÊ É O QUE É ANALISADO ==============
@@ -9786,6 +9837,15 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta,ger){
        um Château Talbot precisou de quatro tentativas.
        Agora o app reenvia a MESMA foto até duas vezes antes de desistir. Não
        gasta cota: o servidor devolve a leitura quando ela não acontece. */
+    /* v1.09: se a cota JÁ estava zerada na última resposta do servidor, não
+       há por que gastar meio minuto para ouvir "acabou". Vai direto para o
+       leitor do aparelho. */
+    if(scanRestantes===0&&!getIaKey()){
+      if(await lerNoAparelho(alta,ger))return true;
+      if(!viva())return false;
+      setScan("📸 <b>As suas leituras de foto deste mês acabaram.</b><br>Tentei ler o rótulo aqui no aparelho e não consegui desta vez.<br>Elas voltam no dia 1º — e a busca digitada tem cota própria: toque em <b>⌨️ Prefiro digitar</b>.");
+      return false;
+    }
     let o=null,ultimo=null;
     /* v1.07: teto de tempo para a rodada inteira. Três tentativas de 42 s
        davam mais de dois minutos de "analisando" no pior caso — tempo em que
@@ -9825,8 +9885,11 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta,ger){
       setScan("🔑 <b>A sua sessão expirou</b> — entre de novo para usar o leitor de rótulos.<br>É o que garante as leituras gratuitas de cada pessoa."
         +'<br><button class="btn btn-gold btn-sm" style="margin-top:10px" onclick="entrarGoogleReal()">Entrar com o Google</button>'
         +"<br><span style=\"font-size:12px\">Ou toque em <b>⌨️ Prefiro digitar</b> para buscar na base de 206 mil vinhos.</span>");
-    }else if(m==="LIMITE"){
-      setScan("📸 <b>Você usou as suas leituras de foto deste mês.</b><br>Elas voltam no dia 1º — mas a busca digitada tem cota própria: toque em <b>⌨️ Prefiro digitar</b> e use <b>🔎 Procurar com a IA</b>. Para leituras ilimitadas, configure a sua própria chave em ☰ → 🔑 IA de visão.");
+    }else if(m==="LIMITE"||/limite deste m/i.test(m)){
+      /* v1.09: antes de dizer "acabou", tenta ler a MESMA foto aqui dentro. */
+      if(await lerNoAparelho(alta,ger))return true;
+      if(!viva())return false;
+      setScan("📸 <b>Você usou as suas leituras de foto deste mês.</b><br>Tentei ler o rótulo aqui no aparelho e não consegui — a foto pode estar tremida, escura ou o rótulo é muito artístico.<br>As leituras de foto voltam no dia 1º. Enquanto isso, a busca digitada tem cota própria: toque em <b>⌨️ Prefiro digitar</b> e use <b>🔎 Procurar com a IA</b>. Para leituras ilimitadas, configure a sua própria chave em ☰ → 🔑 IA de visão.");
     }else{
       setScan("❌ <b>Não consegui ler agora:</b> "+m+"<br>Tente de novo em instantes — ou toque em <b>⌨️ Prefiro digitar</b>: a busca na base de 206 mil vinhos funciona até sem internet, e <b>🔎 Procurar com a IA</b> tenta pelo outro caminho.");
     }
@@ -9867,7 +9930,7 @@ function fillForm(w){
   ["corpo","acidez","tanino"].forEach(k=>{$("#a-"+k).value=w[k];$("#v-"+k).textContent=w[k]});
   $("#a-adega").value=adegaAtiva!=="todas"?adegaAtiva:ADEGAS[0].id;
   $("#form-title").textContent="✓ Ficha preenchida pelo scanner — confira e salve";
-  pintarXNome();
+  pintarXNome();crescerNotas();
   $("#form-panel").scrollIntoView({behavior:"smooth"});
   toast("Ficha preenchida automaticamente — revise e salve. ✨");
 }
