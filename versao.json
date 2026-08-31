@@ -1,1 +1,6 @@
-{"versao": "1.07", "codigo": 111, "novidades": "Foto do scanner mais leve e tempos de espera alinhados. A ficha do vinho vira rascunho: sair para conferir a nota nao apaga mais o cadastro. Boas-vindas com entrada por convite de confraria. Botao de convidar o grupo.", "publicada_em": "2026-08-30", "apk": "https://apotheca.app.br/Apotheca-v1.04.apk"}
+{
+  "versao": "1.08",
+  "codigo": 112,
+  "novidades": "Leitor de rótulos: 📷 Tirar outra passa a responder durante a análise, e Cancelar interrompe de verdade — a leitura antiga não volta mais preenchendo a ficha sozinha. A primeira tentativa ficou mais curta (24 s), então a segunda chance chega antes. Na ficha: um ✕ dentro do campo do nome e um 🧹 Limpar ficha ao lado do título, sem precisar rolar até o fim. O campo do nome deixou de atrair o preenchimento automático do iPhone.",
+  "publicada_em": "2026-08-31"
+}

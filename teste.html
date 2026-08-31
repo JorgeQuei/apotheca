@@ -212,6 +212,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(201,162,39,.5);bo
 .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
 .field input,.field select{width:100%}
 .field.wide{grid-column:1/-1}
+/* v1.08: o ✕ que apaga o campo do nome sem depender do teclado do aparelho.
+   Ele fica dentro do próprio campo, que por isso reserva espaço à direita. */
+#a-nome{padding-right:42px;-webkit-appearance:none;appearance:none}
+#a-nome::-webkit-search-decoration,#a-nome::-webkit-search-cancel-button{-webkit-appearance:none}
+.campo-x{position:absolute;right:5px;bottom:4px;width:34px;height:34px;border:0;padding:0;
+  background:transparent;color:var(--ink-3);font-size:17px;line-height:1;cursor:pointer;
+  border-radius:9px;z-index:2}
+.campo-x:hover{background:var(--cream);color:var(--wine)}
 .slider-val{font-weight:700;color:var(--wine);margin-left:6px}
 input[type=range]{width:100%;accent-color:var(--wine-3);padding:0}
 
@@ -568,9 +576,27 @@ button.foto-vinho.vazia span{font-size:26px}
         </div>
       </div>
       <div class="panel" id="form-panel">
-        <h3 id="form-title">Ficha do vinho</h3>
+        <!-- v1.08: "o botão limpar só existe no final da ficha" (Jorge, 31/08).
+             Quem acabou de receber uma ficha preenchida pela IA e quer começar
+             de novo estava no TOPO da tela e tinha de percorrer a ficha inteira
+             para achar como zerá-la. O botão passa a existir também aqui, ao
+             lado do título — o mesmo `clearForm()`, ao alcance da mão. -->
+        <div style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
+          <h3 id="form-title" style="flex:1;min-width:180px">Ficha do vinho</h3>
+          <button class="btn btn-ghost btn-sm" onclick="limparFichaComAviso()" title="Apagar tudo e começar uma ficha nova">🧹 Limpar ficha</button>
+        </div>
         <div class="formgrid">
-          <div class="field wide sug-wrap"><label>Nome do vinho * <span style="font-weight:400;text-transform:none;letter-spacing:0">· digite: busca na base de 206 mil vinhos — e na IA, se você pedir</span></label><input id="a-nome" placeholder="Ex.: Catena, Esporão, Miolo…" autocomplete="off"><div class="sug-box hidden" id="nome-sug"></div></div>
+          <div class="field wide sug-wrap"><label>Nome do vinho * <span style="font-weight:400;text-transform:none;letter-spacing:0">· digite: busca na base de 206 mil vinhos — e na IA, se você pedir</span></label><!--
+            v1.08: este campo atraía o preenchimento automático do iPhone. O
+            aparelho olha o rótulo do campo, o `id` e o `name`; vendo "nome",
+            concluía que era o nome de uma PESSOA e oferecia os contatos do
+            Jorge por cima da nossa própria lista de sugestões — os asteriscos
+            do print de 31/08/2026. `autocomplete="off"` sozinho não basta no
+            WebKit; é preciso dizer três coisas ao mesmo tempo: que o campo é
+            uma caixa de BUSCA (`type=search`), que ele tem lista própria
+            (`role=combobox` + `aria-autocomplete`), e que o `name` não é de
+            pessoa. Os `data-*` calam os gerenciadores de senha.
+          --><input id="a-nome" type="search" name="rotulo-do-vinho" placeholder="Ex.: Catena, Esporão, Miolo…" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" enterkeyhint="search" role="combobox" aria-autocomplete="list" aria-expanded="false" data-1p-ignore data-lpignore="true" data-form-type="other" oninput="pintarXNome()"><button type="button" id="a-nome-x" class="campo-x hidden" onclick="limparNome()" aria-label="Apagar o nome do vinho">✕</button><div class="sug-box hidden" id="nome-sug"></div></div>
           <div class="field"><label>Vinícola / Produtor</label><input id="a-vinicola" placeholder="Ex.: Vinícola Miolo"></div>
           <div class="field"><label>País</label><select id="a-pais"></select></div>
           <div class="field"><label>Região</label><input id="a-regiao" placeholder="Ex.: Vale dos Vinhedos"></div>
@@ -838,7 +864,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.07"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.08"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -1273,7 +1299,7 @@ function nomeExibicao(w){
   return generico?w[5]+" "+w[0]:w[0];
 }
 function preencherDaBase(w){
-  $("#a-nome").value=nomeExibicao(w);
+  $("#a-nome").value=nomeExibicao(w);pintarXNome();
   $("#a-vinicola").value=w[5]||"";
   $("#a-uvas").value=w[2]||"";
   if(PAISES.includes(w[3]))$("#a-pais").value=w[3];
@@ -1414,7 +1440,7 @@ function mostrarResultadoIA(q,r){
 
 function preencherDaIA(){
   const o=window.__iaVinho;if(!o)return;
-  $("#a-nome").value=o.nome||"";
+  $("#a-nome").value=o.nome||"";pintarXNome();
   $("#a-vinicola").value=o.vinicola||"";
   if(o.uvas&&o.uvas.length)$("#a-uvas").value=o.uvas.join(", ");
   if(PAISES.includes(o.pais))$("#a-pais").value=o.pais;
@@ -8639,7 +8665,7 @@ function editarVinho(id){
   go("add");
   clearForm();
   editandoId=id;
-  $("#a-nome").value=v.nome;$("#a-vinicola").value=v.vinicola==="—"?"":v.vinicola;
+  $("#a-nome").value=v.nome;pintarXNome();$("#a-vinicola").value=v.vinicola==="—"?"":v.vinicola;
   if(PAISES.includes(v.pais))$("#a-pais").value=v.pais;
   $("#a-regiao").value=v.regiao==="—"?"":v.regiao;
   $("#a-safra").value=v.safra||"";$("#a-tipo").value=v.tipo;
@@ -8855,6 +8881,7 @@ function restaurarRascunho(){
   });
   if(d.__foto)lastFotoRotulo=d.__foto;
   if(d.__titulo&&$("#form-title"))$("#form-title").textContent=d.__titulo;
+  pintarXNome();
   toast("📝 Rascunho recuperado — a ficha voltou como você a deixou.");
   return true;
 }
@@ -8889,6 +8916,36 @@ function clearForm(){
   $("#nova-adega-wrap").classList.add("hidden");$("#a-nova-adega").value="";
   adegaAnterior=($("#a-adega").value&&$("#a-adega").value!=="__nova")?$("#a-adega").value:null;
   $("#form-title").textContent="Ficha do vinho";lastEan=null;lastFotoRotulo=null;editandoId=null;
+  pintarXNome();
+}
+/* ============ v1.08 — APAGAR SEM PROCURAR ============
+   Duas queixas do dia 31/08/2026 vinham do mesmo lugar: apagar o nome do vinho
+   era trabalhoso (o teclado do iPhone apagava letra a letra e, campo vazio,
+   o aparelho oferecia os contatos do dono) e o botão Limpar só existia depois
+   de rolar a ficha inteira. Agora há um ✕ dentro do próprio campo e um
+   "🧹 Limpar ficha" junto do título. */
+function pintarXNome(){
+  const i=$("#a-nome"),x=$("#a-nome-x");
+  if(i&&x)x.classList.toggle("hidden",!(i.value||"").length);
+}
+function limparNome(){
+  const i=$("#a-nome");
+  if(!i)return;
+  i.value="";
+  const b=$("#nome-sug");if(b)b.classList.add("hidden");
+  pintarXNome();
+  /* devolve o cursor ao campo: quem apagou quer digitar em seguida */
+  try{i.focus()}catch(e){}
+}
+/* Limpar apaga trabalho — e apagar trabalho sem perguntar é o tipo de coisa
+   que faz a pessoa desistir do aplicativo. Só pergunta quando há o que perder. */
+function limparFichaComAviso(){
+  const cheia=["a-nome","a-vinicola","a-regiao","a-safra","a-uvas","a-notas"]
+    .some(id=>((($("#"+id)||{}).value)||"").trim().length>0);
+  if(cheia&&!confirm("Apagar tudo o que está nesta ficha e começar do zero?"))return;
+  clearForm();
+  toast("Ficha limpa — pode começar de novo. 🧹");
+  try{$("#a-nome").focus()}catch(e){}
 }
 /* ---------- v0.96: o guarda do rótulo repetido ----------
    Compara pelo NOME e pela SAFRA dentro da MESMA adega, ignorando a vinícola —
@@ -9035,6 +9092,20 @@ function saveWine(){
 
 /* ===== SCANNER REAL: câmera → EAN → base local → Open Food Facts → cadastro assistido ===== */
 let scanStream=null,scanTimer=null,scanAtivo=false,lastEan=null,lastFotoRotulo=null;
+/* v1.08 — CANCELAR TEM QUE CANCELAR.
+   Relato do Jorge, 31/08/2026, dois iPhones: "quando pedimos para cancelar a
+   operação do scanner, ele não obedece e continua ativo" e "o botão Nova foto
+   não funciona".
+   As duas queixas eram o mesmo defeito. A leitura no servidor pode levar até
+   80 s, e nesse intervalo nada no código olhava para trás: `closeScanner()`
+   escondia a tela, mas a chamada seguia viva e, ao voltar, preenchia a ficha
+   sozinha — o app "ressuscitava". Pior: `ocrBusy` continuava `true`, de modo
+   que ao reabrir o leitor o botão de fotografar já nascia travado.
+   A partir daqui cada leitura carrega um número de geração. Fechar o leitor,
+   ou pedir outra foto, avança esse número — e todo resultado que chegar com
+   número velho é descartado em silêncio, sem tocar na tela nem na ficha. */
+let scanGeracao=0;
+function abortarLeitura(){scanGeracao++;ocrBusy=false;travarBotoesScan(false)}
 const setScan=h=>{$("#scan-status").innerHTML=h};
 let temCamera=false;
 function loadAnyScript(urls){
@@ -9287,14 +9358,21 @@ async function chamarLeitorServidor(corpo,segundos){
   return res.j;
 }
 
-async function analisarComServidor(b64){
+async function analisarComServidor(b64,tentativa){
   let j;
   /* v1.06: 30 s era curto. O tempo do envio da foto pelo 4G de um restaurante
      cheio entra dentro deste limite, e era ele que estourava — não a leitura.
      v1.07: o servidor passou a desistir aos 38 s, então 42 s aqui deixa ele
-     responder primeiro. Antes eram 45 s contra 22 s do servidor, e sobravam
-     23 segundos de espera sem ninguém do outro lado. */
-  try{ j=await chamarLeitorServidor({imagem:b64},42) }
+     responder primeiro.
+     v1.08 — A PRIMEIRA TENTATIVA PASSA A SER CURTA. A medição de 29/08 mostrou
+     que a leitura que dá certo responde entre 10 e 19,5 segundos; a que passa
+     disso quase sempre é uma chamada travada, e esperar 42 s por ela não a faz
+     voltar — só consome a paciência de quem está com a garrafa na mão. Então a
+     1ª tentativa desiste aos 24 s e reenvia na hora; só a 2ª e a 3ª esperam os
+     42 s. No caso comum nada muda; no caso ruim, o tempo até a segunda chance
+     caiu de 42 s para 24 s. */
+  const espera=(tentativa||1)===1?24:42;
+  try{ j=await chamarLeitorServidor({imagem:b64},espera) }
   catch(e){ if(e.message==="LIMITE")scanRestantes=0; throw e }
   if(typeof j.restantes==="number")scanRestantes=j.restantes;
   return j.vinho||j;
@@ -9308,9 +9386,9 @@ async function buscarVinhoNoServidor(q){
   return j;
 }
 
-async function analisarComIA(b64){
+async function analisarComIA(b64,tentativa){
   /* sem chave própria: usa o leitor do Apotheca (nada para configurar) */
-  if(!getIaKey())return analisarComServidor(b64);
+  if(!getIaKey())return analisarComServidor(b64,tentativa);
   /* com chave própria: tenta a dela primeiro; se falhar (chave vencida,
      cota estourada, formato antigo AIza que o Google desliga em setembro),
      cai no leitor do Apotheca em vez de deixar o usuário na mão. */
@@ -9318,7 +9396,7 @@ async function analisarComIA(b64){
     return await analisarComChavePropria(b64);
   }catch(e){
     try{
-      const r=await analisarComServidor(b64);
+      const r=await analisarComServidor(b64,tentativa);
       toast("A sua chave falhou — usei o leitor do Apotheca. 📸");
       return r;
     }catch(e2){
@@ -9380,7 +9458,7 @@ function aplicarIA(o){
   $("#form-panel").scrollIntoView({behavior:"smooth"});
   /* v1.07: a ficha recém-identificada já nasce como rascunho — se a pessoa
      sair para conferir a nota lá fora, ela volta inteira. */
-  guardarRascunho();
+  guardarRascunho();pintarXNome();
   toast("🧠 Rótulo reconhecido pela IA de visão — confira e salve!");
 }
 /* ============== v1.06: O QUE VOCÊ VÊ É O QUE É ANALISADO ==============
@@ -9454,6 +9532,7 @@ async function capturarRotulo(){
   if(ocrBusy)return;
   const v=$("#scan-video");
   if(!v.videoWidth){toast("Câmera ainda carregando…");return}
+  const ger=++scanGeracao;                      /* v1.08: esta é a minha leitura */
   ocrBusy=true;travarBotoesScan(true);
   setScan("📸 Escolhendo o quadro mais nítido…");
 
@@ -9465,6 +9544,7 @@ async function capturarRotulo(){
     if(!melhor||nit>melhor.nit)melhor={c,nit};
     if(i<2)await new Promise(r=>setTimeout(r,110));
   }
+  if(ger!==scanGeracao)return;   /* cancelou durante a rajada: nada acontece */
   /* v1.07: fecha a foto em ~90 KB antes de qualquer outra coisa, para o que
      aparece na tela ser exatamente o que sobe para a IA. */
   const orc=fotoSobOrcamento(melhor.c,92*1024);
@@ -9477,10 +9557,15 @@ async function capturarRotulo(){
                  lado:alta.width+"×"+alta.height,
                  peso:Math.round(bytesDeDataURL(dataAlta)/1024)+" KB"};
 
-  await analisarRotuloDeCanvas(alta,mini,
-    "Não reconheci um vinho nesta foto.<br>Ela está aí em cima, do jeito que a IA a viu — se estiver tremida ou escura, toque em <b>📷 Tirar outra</b>.<br>Ou use <b>⌨️ Prefiro digitar</b> com <b>🔎 Procurar com a IA</b>: pelo nome, ela acha até o que a foto não revelou.",
-    dataAlta);
-  ocrBusy=false;travarBotoesScan(false);
+  try{
+    await analisarRotuloDeCanvas(alta,mini,
+      "Não reconheci um vinho nesta foto.<br>Ela está aí em cima, do jeito que a IA a viu — se estiver tremida ou escura, toque em <b>📷 Tirar outra</b>.<br>Ou use <b>⌨️ Prefiro digitar</b> com <b>🔎 Procurar com a IA</b>: pelo nome, ela acha até o que a foto não revelou.",
+      dataAlta,ger);
+  }finally{
+    /* v1.08: só devolve os botões se esta ainda for a leitura corrente. Se a
+       pessoa já cancelou ou já pediu outra foto, quem manda é a leitura nova. */
+    if(ger===scanGeracao){ocrBusy=false;travarBotoesScan(false)}
+  }
 }
 
 /* ============== v1.06: LANTERNA ==============
@@ -9536,7 +9621,18 @@ function mostrarPrevia(url){
   if(b){
     b.classList.remove("hidden");
     b.textContent="📷 Tirar outra";
-    b.setAttribute("onclick","voltarACamera()");
+    /* v1.08: dois consertos num só lugar.
+       1) O rótulo do botão virava "📷 Tirar outra" no instante em que a foto
+          aparecia, mas o botão continuava DESABILITADO pelos 40 a 80 s da
+          análise — foi isso que o Jorge viu como "o botão não funciona". Um
+          botão que anuncia uma ação e a recusa é pior do que um botão ausente.
+          Agora ele é reabilitado aqui: durante a espera, pedir outra foto é
+          justamente o que a pessoa mais quer poder fazer.
+       2) A ação passa a ser atribuída pela propriedade `onclick`, e não por
+          `setAttribute`, que depende de a WebView aceitar código escrito em
+          atributo — dentro do aplicativo iOS isso é frágil. */
+    b.disabled=false;
+    b.onclick=voltarACamera;
   }
   const l=$("#btn-lanterna");if(l)l.classList.add("hidden");
 }
@@ -9550,12 +9646,17 @@ function resetarPrevia(){
   if(im){im.classList.add("hidden");im.removeAttribute("src")}
   const v=$("#scan-video");if(v)v.classList.remove("hidden");
   const b=$("#btn-capturar");
-  if(b){b.textContent="📸 Fotografar rótulo";b.setAttribute("onclick","capturarRotulo()")}
+  if(b){b.textContent="📸 Fotografar rótulo";b.disabled=false;b.onclick=capturarRotulo}
   linhaEscaneando(true);
   previaAtiva=false;
 }
 async function voltarACamera(){
+  /* v1.08: pedir outra foto abandona a leitura em curso. Antes, a leitura
+     antiga continuava viva e voltava depois preenchendo a ficha com o rótulo
+     que a pessoa já tinha descartado. */
+  abortarLeitura();
   resetarPrevia();
+  setScan("Encha a moldura com o <b>rótulo</b> e toque em <b>📸 Fotografar</b>");
   await openScanner();
 }
 function travarBotoesScan(t){
@@ -9622,33 +9723,48 @@ async function rotuloDoArquivo(inp){
   if(inp)inp.value="";          /* zera para aceitar a MESMA foto de novo */
   if(!f||ocrBusy)return;
   if(f.type&&!/^image\//.test(f.type)){toast("Escolha uma imagem do rótulo. 🖼️");return}
+  const ger=++scanGeracao;                      /* v1.08 */
   ocrBusy=true;travarBotoesScan(true);
   setScan("🖼️ Abrindo a foto…");
   let img;
   try{img=await imagemDoArquivo(f)}
   catch(e){
-    setScan("Não consegui abrir esta imagem.<br>Tente uma foto em <b>JPG</b> ou <b>PNG</b> — ou fotografe o rótulo agora.");
-    ocrBusy=false;travarBotoesScan(false);return;
+    if(ger===scanGeracao){
+      setScan("Não consegui abrir esta imagem.<br>Tente uma foto em <b>JPG</b> ou <b>PNG</b> — ou fotografe o rótulo agora.");
+      ocrBusy=false;travarBotoesScan(false);
+    }
+    return;
   }
+  if(ger!==scanGeracao){if(img.close)img.close();return}
   /* v1.07: a foto da galeria também passa pelo orçamento de peso */
   const orcArq=fotoSobOrcamento(canvasDe(img,1200),92*1024);
   const alta=orcArq.canvas, dataAlta=orcArq.data, mini=canvasDe(img,300);
   /* a foto aparece ANTES da análise: se a IA demorar ou falhar, a pessoa já
      está vendo qual foto o app pegou */
   mostrarPrevia(dataAlta);
-  await analisarRotuloDeCanvas(alta,mini,
-    "Não reconheci o vinho nesta foto.<br>Toque em <b>🖼️ Usar uma foto do aparelho</b> para tentar outra — ou em <b>⌨️ Prefiro digitar</b> e use <b>🔎 Procurar com a IA</b>: pelo nome, ela acha até o que a foto não revelou.",
-    dataAlta);
-  if(img.close)img.close();
-  ocrBusy=false;travarBotoesScan(false);
+  try{
+    await analisarRotuloDeCanvas(alta,mini,
+      "Não reconheci o vinho nesta foto.<br>Toque em <b>🖼️ Usar uma foto do aparelho</b> para tentar outra — ou em <b>⌨️ Prefiro digitar</b> e use <b>🔎 Procurar com a IA</b>: pelo nome, ela acha até o que a foto não revelou.",
+      dataAlta,ger);
+  }finally{
+    if(img.close)img.close();
+    if(ger===scanGeracao){ocrBusy=false;travarBotoesScan(false)}
+  }
 }
 /* O coração do reconhecimento, comum aos dois caminhos */
-async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
+async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta,ger){
+  /* v1.08: `ger` é o número desta leitura. Se ele não for mais o corrente,
+     a pessoa cancelou ou pediu outra foto — e o resultado que chegar depois
+     disso não pode escrever nem na tela do leitor nem na ficha do vinho. */
+  if(ger===undefined)ger=scanGeracao;
+  const viva=()=>ger===scanGeracao;
   lastFotoRotulo=mini.toDataURL("image/jpeg",0.72);
   /* v1.02: a mesma espera VIVA da busca por nome, agora no leitor de rótulo —
      círculo girando e mensagem que avança, para a leitura longa não parecer
      leitura morta. */
-  setScan(`<span class="scan-spinner"></span>${getIaKey()?"🧠 IA de visão analisando o rótulo…":"🧠 Lendo o rótulo…"}<br><span id="scan-etapa" style="font-size:12.5px">a leitura está em andamento…</span>`);
+  /* v1.08: a espera passa a dizer que ela pode ser interrompida. Enquanto o
+     Cancelar não obedecia de verdade, anunciá-lo seria mentir; agora obedece. */
+  setScan(`<span class="scan-spinner"></span>${getIaKey()?"🧠 IA de visão analisando o rótulo…":"🧠 Lendo o rótulo…"}<br><span id="scan-etapa" style="font-size:12.5px">a leitura está em andamento…</span><br><span style="font-size:11.5px;opacity:.8">📷 Tirar outra troca a foto · Cancelar interrompe</span>`);
   const etapasScan=[
     "ainda lendo — rótulos artísticos levam mais tempo…",
     "quase lá — redes lentas levam até meio minuto. Segura firme. 🍷"
@@ -9675,10 +9791,12 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
        davam mais de dois minutos de "analisando" no pior caso — tempo em que
        ninguém segura o celular apontado para a garrafa. Passados 80 s, o app
        para de insistir e devolve o controle à pessoa. */
-    const limiteRodada=Date.now()+80000;
+    const limiteRodada=Date.now()+72000;
     for(let tent=1;tent<=3;tent++){
-      try{ o=await analisarComIA(b64); break }
+      if(!viva())return false;                 /* v1.08: cancelada */
+      try{ o=await analisarComIA(b64,tent); break }
       catch(e){
+        if(!viva())return false;               /* v1.08: cancelada */
         ultimo=e;
         const recuperavel=/demor|conex|rede|indispon|limite deste m/i.test(e.message||"")
           && e.message!=="LIMITE" && e.message!=="SEM_LOGIN";
@@ -9688,6 +9806,7 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
         await new Promise(r=>setTimeout(r,1200*tent));
       }
     }
+    if(!viva())return false;                   /* v1.08: cancelada */
     if(!o)throw (ultimo||new Error("leitura vazia"));
     if(o&&o.nome&&(+o.confianca||0)>=25){
       aplicarIA(o);
@@ -9700,6 +9819,7 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta){
     setScan(recado);
     return false;
   }catch(e){
+    if(!viva())return false;                   /* v1.08: cancelada */
     const m=e.message||"";
     if(m==="SEM_LOGIN"){
       setScan("🔑 <b>A sua sessão expirou</b> — entre de novo para usar o leitor de rótulos.<br>É o que garante as leituras gratuitas de cada pessoa."
@@ -9731,7 +9851,14 @@ function pararCamera(){
   if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}
   const v=$("#scan-video");if(v){v.pause();v.srcObject=null}
 }
-function closeScanner(){scanAtivo=false;pararCamera();resetarPrevia();$("#scanner").classList.remove("open")}
+/* v1.08: fechar o leitor agora encerra também a leitura que estava no ar —
+   e destrava os botões, para que o leitor reabra pronto para uso. */
+function closeScanner(){
+  scanAtivo=false;
+  abortarLeitura();
+  pararCamera();resetarPrevia();
+  $("#scanner").classList.remove("open");
+}
 function fillForm(w){
   $("#a-nome").value=w.nome;$("#a-vinicola").value=w.vinicola;$("#a-pais").value=w.pais;
   $("#a-regiao").value=w.regiao;$("#a-safra").value=w.safra;$("#a-tipo").value=w.tipo;
@@ -9740,6 +9867,7 @@ function fillForm(w){
   ["corpo","acidez","tanino"].forEach(k=>{$("#a-"+k).value=w[k];$("#v-"+k).textContent=w[k]});
   $("#a-adega").value=adegaAtiva!=="todas"?adegaAtiva:ADEGAS[0].id;
   $("#form-title").textContent="✓ Ficha preenchida pelo scanner — confira e salve";
+  pintarXNome();
   $("#form-panel").scrollIntoView({behavior:"smooth"});
   toast("Ficha preenchida automaticamente — revise e salve. ✨");
 }
