@@ -870,7 +870,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.11"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.12"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -8928,6 +8928,7 @@ function clearForm(){
   $("#nova-adega-wrap").classList.add("hidden");$("#a-nova-adega").value="";
   adegaAnterior=($("#a-adega").value&&$("#a-adega").value!=="__nova")?$("#a-adega").value:null;
   $("#form-title").textContent="Ficha do vinho";lastEan=null;lastFotoRotulo=null;editandoId=null;
+  const cxv=$("#caixa-verso");if(cxv)cxv.remove();   /* v1.12 */
   pintarXNome();crescerNotas();
 }
 /* ============ v1.08 — APAGAR SEM PROCURAR ============
@@ -8946,6 +8947,48 @@ function crescerNotas(){
   const t=$("#a-notas"); if(!t)return;
   t.style.height="auto";
   t.style.height=Math.min(360,Math.max(t.scrollHeight,52))+"px";
+}
+/* ============ v1.12 — A OFERTA DO CONTRARRÓTULO ============
+   Aparece só quando a leitura da frente deixou buracos que o verso costuma
+   preencher. Nada de pedir duas fotos a todo mundo: quem fotografou um rótulo
+   que diz tudo não é incomodado. */
+function ofertarVerso(o){
+  const caixa=$("#caixa-verso"); if(caixa)caixa.remove();
+  if(veioDoVerso){veioDoVerso=false;return}          /* acabamos de usar o verso */
+  if(!ultimaLeitura||!ultimaLeitura.data)return;      /* não guardei a frente */
+  const falta=[];
+  if(!($("#a-vinicola").value||"").trim())falta.push("o produtor");
+  if(!($("#a-uvas").value||"").trim())falta.push("as castas");
+  if(!($("#a-regiao").value||"").trim())falta.push("a região");
+  const confBaixa=(+((o||{}).confianca)||0)<60;
+  if(!falta.length&&!confBaixa)return;
+  const motivo=falta.length
+    ? "Faltou "+(falta.length>1?falta.slice(0,-1).join(", ")+" e "+falta[falta.length-1]:falta[0])+"."
+    : "A leitura ficou pouco segura.";
+  const el=document.createElement("div");
+  el.id="caixa-verso";
+  el.style.cssText="background:#fbf3ea;border:1px solid var(--gold);border-radius:14px;padding:13px 15px;margin:0 0 14px";
+  el.innerHTML=`<div style="font-size:13.5px;line-height:1.5;color:var(--ink-2)">
+      <b style="color:var(--wine)">${esc(motivo)}</b> Esses dados quase sempre estão no
+      <b>contrarrótulo</b> — a etiqueta de trás da garrafa, com produtor, castas e denominação.
+      Quer fotografar? As duas fotos vão juntas e contam como <b>uma única leitura</b>.
+    </div>
+    <button class="btn btn-gold btn-sm" style="margin-top:10px" onclick="fotografarVerso()">📄 Fotografar o contrarrótulo</button>
+    <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="document.getElementById('caixa-verso').remove()">Assim está bom</button>`;
+  const titulo=$("#form-title");
+  if(titulo&&titulo.parentElement&&titulo.parentElement.parentElement)
+    titulo.parentElement.parentElement.insertBefore(el,titulo.parentElement.nextSibling);
+}
+async function fotografarVerso(){
+  const cx=$("#caixa-verso"); if(cx)cx.remove();
+  if(!ultimaLeitura||!ultimaLeitura.data){
+    toast("Preciso da foto da frente — refaça o leitor de rótulo. 📷");return;
+  }
+  modoVerso={frente:ultimaLeitura.data};
+  veioDoVerso=true;
+  await openScanner();
+  setScan("📄 <b>Agora o contrarrótulo</b> — a etiqueta de trás da garrafa."
+    +"<br><span style=\"font-size:12.5px\">É lá que ficam o produtor, as castas e a denominação. Enquadre o bloco de texto do alto, bem de perto.</span>");
 }
 function limparNome(){
   const i=$("#a-nome");
@@ -9133,6 +9176,18 @@ let scanStream=null,scanTimer=null,scanAtivo=false,lastEan=null,lastFotoRotulo=n
    número velho é descartado em silêncio, sem tocar na tela nem na ficha. */
 let scanGeracao=0;
 function abortarLeitura(){scanGeracao++;ocrBusy=false;travarBotoesScan(false)}
+/* v1.12 — O CONTRARRÓTULO, SÓ QUANDO ELE FAZ FALTA.
+   O rótulo da frente traz o nome e pouco mais. Produtor, castas, denominação e
+   teor alcoólico moram no verso — foi o que o M.I. do Douro mostrou: a mesma
+   garrafa, lida pela frente, devolvia produtor vazio; lida pelo verso, devolvia
+   "Quinta Maria Izabel, Lda." e as castas com as palavras do próprio rótulo.
+   A tentação seria pedir sempre as duas fotos. Seria errado: na maioria das
+   garrafas a frente basta, e cobrar dois enquadramentos de todo mundo para
+   resolver a minoria é fazer o usuário pagar pelo caso raro.
+   Então o app só pede o verso QUANDO FALTOU alguma coisa — e as duas fotos vão
+   juntas na MESMA chamada, gastando uma cota só. */
+let modoVerso=null;      /* {frente:dataURL} enquanto se fotografa o verso */
+let veioDoVerso=false;   /* evita oferecer o verso logo depois de usá-lo */
 const setScan=h=>{$("#scan-status").innerHTML=h};
 let temCamera=false;
 function loadAnyScript(urls){
@@ -9526,7 +9581,7 @@ async function chamarLeitorServidor(corpo,segundos){
   return res.j;
 }
 
-async function analisarComServidor(b64,tentativa){
+async function analisarComServidor(b64,tentativa,versoB64){
   let j;
   /* v1.06: 30 s era curto. O tempo do envio da foto pelo 4G de um restaurante
      cheio entra dentro deste limite, e era ele que estourava — não a leitura.
@@ -9540,7 +9595,9 @@ async function analisarComServidor(b64,tentativa){
      42 s. No caso comum nada muda; no caso ruim, o tempo até a segunda chance
      caiu de 42 s para 24 s. */
   const espera=(tentativa||1)===1?24:42;
-  try{ j=await chamarLeitorServidor({imagem:b64},espera) }
+  /* v1.12: as duas fotos numa chamada só — o verso é opcional e não custa cota
+     extra, porque para o servidor continua sendo UMA leitura. */
+  try{ j=await chamarLeitorServidor(versoB64?{imagem:b64,verso:versoB64}:{imagem:b64},espera) }
   catch(e){ if(e.message==="LIMITE")scanRestantes=0; throw e }
   if(typeof j.restantes==="number")scanRestantes=j.restantes;
   return j.vinho||j;
@@ -9554,7 +9611,11 @@ async function buscarVinhoNoServidor(q){
   return j;
 }
 
-async function analisarComIA(b64,tentativa){
+async function analisarComIA(b64,tentativa,versoB64){
+  /* v1.12: a leitura de duas fotos é feita no servidor, onde mora o prompt que
+     sabe combinar frente e verso. Quem tem chave própria também passa por aqui
+     nesse caso — é uma ação explícita da pessoa, e rara. */
+  if(versoB64)return analisarComServidor(b64,tentativa,versoB64);
   /* sem chave própria: usa o leitor do Apotheca (nada para configurar) */
   if(!getIaKey())return analisarComServidor(b64,tentativa);
   /* com chave própria: tenta a dela primeiro; se falhar (chave vencida,
@@ -9627,6 +9688,7 @@ function aplicarIA(o){
   /* v1.07: a ficha recém-identificada já nasce como rascunho — se a pessoa
      sair para conferir a nota lá fora, ela volta inteira. */
   guardarRascunho();pintarXNome();crescerNotas();
+  ofertarVerso(o);
   toast("🧠 Rótulo reconhecido pela IA de visão — confira e salve!");
 }
 /* ============== v1.06: O QUE VOCÊ VÊ É O QUE É ANALISADO ==============
@@ -9726,9 +9788,18 @@ async function capturarRotulo(){
                  peso:Math.round(bytesDeDataURL(dataAlta)/1024)+" KB"};
 
   try{
-    await analisarRotuloDeCanvas(alta,mini,
-      "Não reconheci um vinho nesta foto.<br>Ela está aí em cima, do jeito que a IA a viu — se estiver tremida ou escura, toque em <b>📷 Tirar outra</b>.<br>Ou use <b>⌨️ Prefiro digitar</b> com <b>🔎 Procurar com a IA</b>: pelo nome, ela acha até o que a foto não revelou.",
-      dataAlta,ger);
+    if(modoVerso){
+      /* v1.12: esta foto é o VERSO. A frente guardada é que vai como imagem
+         principal, e a foto do vinho continua sendo a da frente. */
+      const frente=modoVerso.frente; modoVerso=null;
+      await analisarRotuloDeCanvas(alta,mini,
+        "Não consegui juntar as duas fotos.<br>Tente o contrarrótulo mais de perto, com o bloco de texto do alto preenchendo a moldura.",
+        frente,ger,dataAlta.split(",")[1],true);
+    }else{
+      await analisarRotuloDeCanvas(alta,mini,
+        "Não reconheci um vinho nesta foto.<br>Ela está aí em cima, do jeito que a IA a viu — se estiver tremida ou escura, toque em <b>📷 Tirar outra</b>.<br>Ou use <b>⌨️ Prefiro digitar</b> com <b>🔎 Procurar com a IA</b>: pelo nome, ela acha até o que a foto não revelou.",
+        dataAlta,ger);
+    }
   }finally{
     /* v1.08: só devolve os botões se esta ainda for a leitura corrente. Se a
        pessoa já cancelou ou já pediu outra foto, quem manda é a leitura nova. */
@@ -9920,13 +9991,13 @@ async function rotuloDoArquivo(inp){
   }
 }
 /* O coração do reconhecimento, comum aos dois caminhos */
-async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta,ger){
+async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta,ger,versoB64,manterFoto){
   /* v1.08: `ger` é o número desta leitura. Se ele não for mais o corrente,
      a pessoa cancelou ou pediu outra foto — e o resultado que chegar depois
      disso não pode escrever nem na tela do leitor nem na ficha do vinho. */
   if(ger===undefined)ger=scanGeracao;
   const viva=()=>ger===scanGeracao;
-  lastFotoRotulo=mini.toDataURL("image/jpeg",0.72);
+  if(!manterFoto)lastFotoRotulo=mini.toDataURL("image/jpeg",0.72);  /* v1.12: no verso, a foto do vinho continua sendo a da frente */
   /* v1.02: a mesma espera VIVA da busca por nome, agora no leitor de rótulo —
      círculo girando e mensagem que avança, para a leitura longa não parecer
      leitura morta. */
@@ -9957,7 +10028,7 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta,ger){
     /* v1.09: se a cota JÁ estava zerada na última resposta do servidor, não
        há por que gastar meio minuto para ouvir "acabou". Vai direto para o
        leitor do aparelho. */
-    if(scanRestantes===0&&!getIaKey()){
+    if(scanRestantes===0&&!getIaKey()&&!versoB64){
       if(await lerNoAparelho(alta,ger))return true;
       if(!viva())return false;
       setScan("📸 <b>As suas leituras de foto deste mês acabaram.</b><br>Tentei ler aqui no aparelho e este rótulo venceu o leitor — ele lê bem letra de imprensa, e tropeça em letra desenhada, relevo e pouca luz.<br><b>Aproxime até o rótulo encher a moldura</b> e tente de novo, ou toque em <b>⌨️ Prefiro digitar</b>: a busca por nome tem cota própria e alcança as 206 mil garrafas.");
@@ -9971,7 +10042,7 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta,ger){
     const limiteRodada=Date.now()+72000;
     for(let tent=1;tent<=3;tent++){
       if(!viva())return false;                 /* v1.08: cancelada */
-      try{ o=await analisarComIA(b64,tent); break }
+      try{ o=await analisarComIA(b64,tent,versoB64); break }
       catch(e){
         if(!viva())return false;               /* v1.08: cancelada */
         ultimo=e;
@@ -10035,6 +10106,8 @@ function pararCamera(){
    e destrava os botões, para que o leitor reabra pronto para uso. */
 function closeScanner(){
   scanAtivo=false;
+  /* v1.12: desistiu do verso? volta ao estado normal, sem meia leitura pendente */
+  if(modoVerso){modoVerso=null;veioDoVerso=false;toast("Tudo bem — a ficha continua com o que já foi lido. ✏️")}
   abortarLeitura();
   pararCamera();resetarPrevia();
   $("#scanner").classList.remove("open");

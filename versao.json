@@ -1,6 +1,6 @@
 {
-  "versao": "1.11",
-  "codigo": 115,
-  "novidades": "Leitura parcial agora é leitura. Quando o leitor do aparelho entende a safra, a região, o país ou o tipo mas não consegue o nome, ele preenche o que leu e põe o cursor no campo do nome, em vez de dizer que não conseguiu nada. E o país impresso no rótulo passou a ir para o campo País — antes ele disputava o nome do vinho, e chegava a ganhar.",
+  "versao": "1.12",
+  "codigo": 116,
+  "novidades": "O contrarrótulo entrou na leitura — só quando faz falta. Se a foto da frente deixar sem produtor, castas ou região, o Apotheca avisa e oferece fotografar a etiqueta de trás; as duas fotos vão juntas e contam como uma única leitura. Quem fotografou um rótulo que diz tudo não é incomodado.",
   "publicada_em": "2026-08-31"
 }
