@@ -1,6 +1,6 @@
 {
-  "versao": "1.09",
-  "codigo": 113,
-  "novidades": "Quando as leituras de foto do mês acabam, o Apotheca passa a ler o rótulo no próprio aparelho e a procurar nas 206 mil garrafas da base mundial — de graça e sem internet. O campo de notas de degustação não tem mais a alça de arrastar que desalinhava a ficha: agora ele cresce sozinho conforme você escreve.",
+  "versao": "1.10",
+  "codigo": 114,
+  "novidades": "O leitor do aparelho parou de afirmar o que não leu. Ele passa a fazer três leituras da mesma foto e só escreve na ficha o que se repetiu; quando encontra o vinho na base mundial, pergunta qual é em vez de preencher por conta própria. O país deixou de sair como Brasil quando o rótulo não diz o país, e as suas notas de degustação não recebem mais o texto cru da leitura.",
   "publicada_em": "2026-08-31"
 }

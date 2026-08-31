@@ -870,7 +870,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.09"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.10"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -8804,8 +8804,12 @@ function refreshAdegaSelect(){
 function initSelects(){
   refreshAdegaSelect();
   $("#a-nova-adega-ico").innerHTML=ICONES.map(ic=>`<option>${ic}</option>`).join("");
-  $("#a-pais").innerHTML=PAISES.map(p=>`<option>${p}</option>`).join("");
-  $("#a-tipo").innerHTML=TIPOS.map(t=>`<option>${t}</option>`).join("");
+  /* v1.09b: a opção que faltava. Sem ela, uma leitura que não identificou o
+     país deixava "Brasil" na tela — e, sob um título dizendo "Rótulo lido", o
+     padrão do formulário passava por afirmação do scanner. Foi a queixa do
+     Jorge sobre o Marques de Casa Concha, chileno, aparecer como brasileiro. */
+  $("#a-pais").innerHTML='<option value="">— não identificado —</option>'+PAISES.map(p=>`<option>${p}</option>`).join("");
+  $("#a-tipo").innerHTML='<option value="">— não identificado —</option>'+TIPOS.map(t=>`<option>${t}</option>`).join("");
   $("#f-tipo").innerHTML+=TIPOS.map(t=>`<option>${t}</option>`).join("");
   $("#f-pais").innerHTML+=[...new Set(vinhos.map(v=>v.pais))].sort().map(p=>`<option>${p}</option>`).join("");
 }
@@ -9028,6 +9032,14 @@ function dupSomar(){
 function saveWine(){
   const nome=$("#a-nome").value.trim();
   if(!nome){toast("Informe ao menos o nome do vinho. 🍷");return}
+  /* v1.09b: o tipo move a harmonização inteira — deixar o app escolher por
+     você seria repetir, na hora de salvar, a mentira que acabei de tirar da
+     tela. O país, esse pode ficar sem resposta. */
+  if(!$("#a-tipo").value){
+    toast("Escolha o tipo do vinho — é ele que guia a harmonização. 🍷");
+    try{$("#a-tipo").focus();$("#a-tipo").scrollIntoView({behavior:"smooth",block:"center"})}catch(e){}
+    return;
+  }
   let adegaSel=$("#a-adega").value;
   if(adegaSel==="__nova"){
     const nomeAdega=($("#a-nova-adega").value||"").trim();
@@ -9045,7 +9057,7 @@ function saveWine(){
       /* diminuiu a quantidade → libera as casas excedentes */
       const novaQtd=Math.max(1,+$("#a-qtd").value||1);
       if(Array.isArray(v.pos)&&v.pos.length>novaQtd)v.pos=v.pos.slice(0,novaQtd);
-      Object.assign(v,{nome,vinicola:$("#a-vinicola").value||"—",pais:$("#a-pais").value,regiao:$("#a-regiao").value||"—",
+      Object.assign(v,{nome,vinicola:$("#a-vinicola").value||"—",pais:$("#a-pais").value||"—",regiao:$("#a-regiao").value||"—",
         safra:+$("#a-safra").value||0,tipo:$("#a-tipo").value,uvas:($("#a-uvas").value||"").split(",").map(s=>s.trim()).filter(Boolean),
         corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,adega:adegaSel,
         qtd:Math.max(1,+$("#a-qtd").value||1),preco:+$("#a-preco").value||0,
@@ -9087,7 +9099,7 @@ function saveWine(){
   assumirAdegaReal(); /* a partir do primeiro vinho cadastrado, a adega é de verdade */
   const _novoId=NEXT_ID++;
   if(lastFotoRotulo){const _f=lastFotoRotulo;setTimeout(()=>{const nv=vinhos.find(x=>x.id===_novoId);if(nv)definirFotoVinho(nv,_f).then(()=>{try{renderColecao()}catch(e){}}).catch(()=>{})},0)}
-  vinhos.push({ean:lastEan||undefined,adega:adegaSel,id:_novoId,nome,vinicola:$("#a-vinicola").value||"—",pais:$("#a-pais").value,regiao:$("#a-regiao").value||"—",
+  vinhos.push({ean:lastEan||undefined,adega:adegaSel,id:_novoId,nome,vinicola:$("#a-vinicola").value||"—",pais:$("#a-pais").value||"—",regiao:$("#a-regiao").value||"—",
     safra:+$("#a-safra").value||0,tipo:$("#a-tipo").value,uvas:($("#a-uvas").value||"").split(",").map(s=>s.trim()).filter(Boolean),
     corpo:+$("#a-corpo").value,acidez:+$("#a-acidez").value,tanino:+$("#a-tanino").value,doc:1,
     qtd:Math.max(1,+$("#a-qtd").value||1),preco:+$("#a-preco").value||0,
@@ -9168,11 +9180,15 @@ async function garantirOcr(){
   }
 }
 /* Recorte central + tons de cinza + contraste: menos fundo, letras mais nítidas para o OCR */
-function prepararQuadro(v){
+function prepararQuadro(v,contraste,margem){
   /* v1.09: aceita o vídeo ao vivo OU um canvas já capturado (foto da galeria,
-     ou a foto que a IA recusou por falta de cota) — os pixels é que importam. */
+     ou a foto que a IA recusou por falta de cota) — os pixels é que importam.
+     v1.09b: contraste e margem viraram parâmetros. Uma foto só não dá ao
+     acumulador em quem votar; passando a MESMA foto com preparos diferentes,
+     o que é texto de verdade se repete e o que é ruído não. */
   const VW=v.videoWidth||v.width, VH=v.videoHeight||v.height;
-  const mx=VW*0.08,my=VH*0.08;
+  const m=(margem===undefined)?0.08:margem;
+  const mx=VW*m,my=VH*m;
   const w=VW-2*mx,h=VH-2*my;
   const esc=Math.min(1.6,1300/w);
   const c=document.createElement("canvas");
@@ -9182,7 +9198,7 @@ function prepararQuadro(v){
   const im=ctx.getImageData(0,0,c.width,c.height),d=im.data;
   for(let i=0;i<d.length;i+=4){
     let g=0.3*d[i]+0.59*d[i+1]+0.11*d[i+2];
-    g=(g-128)*1.5+128;g=g<0?0:g>255?255:g;
+    g=(g-128)*(contraste||1.5)+128;g=g<0?0:g>255?255:g;
     d[i]=d[i+1]=d[i+2]=g;
   }
   ctx.putImageData(im,0,0);
@@ -9281,12 +9297,17 @@ async function lerNoAparelho(canvas,ger){
     await garantirOcr();
     if(ger!==scanGeracao)return false;
     resetOcrAcc();
-    const {data}=await ocrWorker.recognize(prepararQuadro(canvas));
-    if(ger!==scanGeracao)return false;
-    parseFrame(data.text||"");
-    if(ocrAcc.nome){
-      finalizarRotulo();            /* preenche a ficha e oferece a base mundial */
-      setTimeout(()=>toast("Leitura feita no próprio aparelho — confira os dados. 🔎"),900);
+    /* v1.09b: TRÊS passadas sobre a mesma foto, com contraste e recorte
+       diferentes. É o que devolve ao acumulador a votação que ele espera —
+       na câmera contínua são oito quadros; aqui, três preparos. */
+    const preparos=[[1.5,0.02],[2.3,0.02],[1.2,0.14]];
+    for(const [c,m] of preparos){
+      const {data}=await ocrWorker.recognize(prepararQuadro(canvas,c,m));
+      if(ger!==scanGeracao)return false;
+      parseFrame(data.text||"");
+    }
+    if(finalizarRotulo("foto")){
+      setTimeout(()=>toast("Leitura feita no próprio aparelho, sem a IA — confira os dados. 🔎"),900);
       return true;
     }
     return false;
@@ -9317,29 +9338,64 @@ async function tentarLerRotulo(manual){
   }
   ocrBusy=false;
 }
-function finalizarRotulo(){
+/* ============ v1.09b — O QUE O LEITOR LOCAL PODE E NÃO PODE AFIRMAR ============
+   Relato do Jorge, 31/08/2026, com fotos: no Marques de Casa Concha o leitor
+   pôs "Casa Concha" no nome e "Jairo Ande 7" na vinícola; no M.I. do Douro
+   escreveu "V HY B R A N C 0 L" e "RE W A"; e os dois vieram como brasileiros.
+   O diagnóstico: este acumulador foi feito para a câmera contínua, onde OITO
+   quadros votam entre si e `ocrPronto()` só aceita com sinal forte. Ao ligá-lo
+   à foto única eu deixei de fora justamente a votação — sobrou "aceite a linha
+   mais comprida", e a linha mais comprida de um rótulo preto é ruído.
+   Três mudanças:
+   1. A foto passa por TRÊS preparos diferentes, então há em quem votar.
+   2. Vindo de foto, o leitor só escreve no nome e na vinícola se a mesma linha
+      apareceu em 2+ passadas. Não achou nada firme, não inventa: devolve
+      `false` e quem chamou avisa que não conseguiu ler.
+   3. Quando a base mundial tem candidatos, ELES são a resposta — a ficha fica
+      limpa atrás do modal, e o texto cru do OCR aparece no próprio modal, para
+      a pessoa julgar. Antes esse texto era despejado nas Notas de degustação,
+      que são o campo DELA, não o meu rascunho. */
+function finalizarRotulo(fonte){
   stopOcrLoop();
   const acc=ocrAcc;
+  const daFoto=(fonte==="foto");
   const cs=melhoresCandidatos();
+  /* "firme" = a mesma linha saiu em duas passadas e tem corpo de nome */
+  const firme=cs.length>0&&(!daFoto||(cs[0].n>=2&&cs[0].score>=6));
   if(cs.length){acc.nome=cs[0].l;acc.nomeScore=cs[0].score;if(cs[1]){acc.vinic=cs[1].l;acc.vinScore=cs[1].score}}
+  const cands=matchBaseMundialTop((acc.nome||"")+" "+(acc.vinic||"")+" "+acc.linhas.join(" "),3);
+
+  /* Nem candidato na base, nem linha firme: não há leitura para mostrar. */
+  if(daFoto&&!cands.length&&!firme)return false;
+
   const fotoCapturada=lastFotoRotulo;
   pararCamera();closeScanner();clearForm();
   lastFotoRotulo=fotoCapturada; /* a foto do rótulo sobrevive à limpeza e vai para a ficha */
-  /* preenche com o que o OCR leu (o usuário sempre confere) */
-  $("#a-nome").value=tituloCase(acc.nome);
-  if(acc.vinic&&acc.vinScore>=4)$("#a-vinicola").value=tituloCase(acc.vinic);
-  if(acc.safra)$("#a-safra").value=acc.safra;
+
+  /* Com candidatos da base, a ficha fica limpa: quem responde é o modal. */
+  const escreverOcr=(!daFoto||!cands.length);
+  if(escreverOcr){
+    $("#a-nome").value=tituloCase(acc.nome||"");
+    if(acc.vinic&&acc.vinScore>=4)$("#a-vinicola").value=tituloCase(acc.vinic);
+  }
+  if(acc.safra)$("#a-safra").value=acc.safra;   /* um ano de 4 dígitos é confiável */
   if(acc.regiao)$("#a-regiao").value=acc.regiao;
   if(acc.pais&&PAISES.includes(acc.pais))$("#a-pais").value=acc.pais;
+  else if(daFoto)$("#a-pais").value="";         /* não afirmo país que não li */
   if(acc.tipo)$("#a-tipo").value=acc.tipo;
-  $("#a-notas").value="Rótulo lido por OCR no aparelho. Texto identificado: "+acc.linhas.join(" · ");
-  $("#form-title").textContent="✓ Rótulo lido — confira, complete e salve";
+  else if(daFoto)$("#a-tipo").value="";
+  /* As Notas de degustação são do usuário. O texto cru do OCR vai para o modal. */
+  if(!daFoto)$("#a-notas").value="Rótulo lido por OCR no aparelho. Texto identificado: "+acc.linhas.join(" · ");
+  $("#form-title").textContent = daFoto
+    ? (cands.length?"🔎 Li o rótulo aqui — confirme qual é":"🔎 Leitura no aparelho — confira tudo antes de salvar")
+    : "✓ Rótulo lido — confira, complete e salve";
   $("#form-panel").scrollIntoView({behavior:"smooth"});
   /* candidatos na base mundial: o app PERGUNTA em vez de decidir sozinho */
-  const cands=matchBaseMundialTop(acc.nome+" "+(acc.vinic||"")+" "+acc.linhas.join(" "),3);
   if(cands.length){
     window.__cands=cands.map(c=>c.w);
+    window.__ocrPalpite={nome:tituloCase(acc.nome||""),vinic:(acc.vinic&&acc.vinScore>=4)?tituloCase(acc.vinic):""};
     const safraLida=acc.safra;
+    const lido=acc.linhas.slice(0,4).join(" · ");
     $("#modal-detail-body").innerHTML=`
       <button class="close" onclick="closeModal('modal-detail')">✕</button>
       <h3 class="serif">🌍 Encontrei na base mundial</h3>
@@ -9349,11 +9405,26 @@ function finalizarRotulo(){
         <div class="inf"><b>${nomeExibicao(c.w)}</b><small>${c.w[5]||"—"} · ${c.w[4]||"—"} · ${c.w[3]||"—"}${c.w[2]?" · "+c.w[2]:""}</small></div>
         <span style="font-size:11px;color:var(--ink-3)">${Math.min(99,Math.round(c.score*66))}%</span>
       </div>`).join("")}
-      <button class="btn btn-ghost" style="width:100%" onclick="closeModal('modal-detail')">Nenhum destes — manter o que o scanner leu</button>`;
+      <button class="btn btn-ghost" style="width:100%" onclick="${daFoto?"manterPalpiteOcr()":"closeModal('modal-detail')"}">Nenhum destes — preencho eu mesmo</button>
+      ${lido?`<div class="sug-nota" style="margin-top:10px;border-top:1px solid var(--cream);padding-top:9px">O que consegui ler no rótulo: <b>${esc(lido)}</b>${daFoto?"<br>Leitura feita aqui no aparelho, sem a IA — por isso pergunto em vez de preencher.":""}</div>`:""}`;
     $("#modal-detail").classList.add("open");
   }else{
-    toast("Rótulo lido! Sem candidatos claros na base — confira e complete a ficha. 🧱");
+    toast(daFoto
+      ?"Li o rótulo no aparelho, mas sem candidatos na base — confira cada campo. 🔎"
+      :"Rótulo lido! Sem candidatos claros na base — confira e complete a ficha. 🧱");
   }
+  return true;
+}
+/* "Nenhum destes": só AGORA o palpite do OCR entra na ficha, e o usuário sabe
+   de onde ele veio. */
+function manterPalpiteOcr(){
+  const p=window.__ocrPalpite||{};
+  if(p.nome)$("#a-nome").value=p.nome;
+  if(p.vinic)$("#a-vinicola").value=p.vinic;
+  pintarXNome();
+  closeModal("modal-detail");
+  $("#form-title").textContent="🔎 Leitura no aparelho — confira tudo antes de salvar";
+  toast(p.nome?"Deixei o que o leitor achou ter lido — corrija o que estiver errado. ✏️":"Ficha em branco — pode digitar o nome do vinho. ✏️");
 }
 /* ===== IA de visão (v0.57): FUNCIONA DE FÁBRICA =====
    Até a v0.56 o usuário precisava criar uma conta de desenvolvedor no Google,
