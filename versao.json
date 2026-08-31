@@ -1,6 +1,6 @@
 {
-  "versao": "1.10",
-  "codigo": 114,
-  "novidades": "O leitor do aparelho parou de afirmar o que não leu. Ele passa a fazer três leituras da mesma foto e só escreve na ficha o que se repetiu; quando encontra o vinho na base mundial, pergunta qual é em vez de preencher por conta própria. O país deixou de sair como Brasil quando o rótulo não diz o país, e as suas notas de degustação não recebem mais o texto cru da leitura.",
+  "versao": "1.11",
+  "codigo": 115,
+  "novidades": "Leitura parcial agora é leitura. Quando o leitor do aparelho entende a safra, a região, o país ou o tipo mas não consegue o nome, ele preenche o que leu e põe o cursor no campo do nome, em vez de dizer que não conseguiu nada. E o país impresso no rótulo passou a ir para o campo País — antes ele disputava o nome do vinho, e chegava a ganhar.",
   "publicada_em": "2026-08-31"
 }

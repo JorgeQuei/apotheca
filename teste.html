@@ -870,7 +870,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.10"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.11"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -9233,6 +9233,21 @@ const TIPOS_ROTULO=[
  [/\b(vinho tinto|tinto|rouge|rosso|red wine|rotwein)\b/,"Tinto"]
 ];
 const LIXO_LINHA=/\b(est|estd|ml|cl|vol|alc|alcool|alcohol|product of|produce of|vinho|wine|vin|vino|garrafa|bottled|engarrafado|produzido|elaborado|contem|sulfitos|750|375|1716|reserva)\b/;
+/* v1.11: o rótulo do M.I. do Douro ensinou que faltava uma peneira. "PORTUGAL"
+   aparecia nas três passadas, com oito letras, e vencia a disputa de "qual
+   linha parece um nome" — o app ia batizar o vinho de Portugal. País impresso
+   no rótulo é PAÍS, e agora é lido como tal: entra no campo certo e sai da
+   disputa pelo nome. O mesmo vale para as siglas de denominação de origem. */
+const PAIS_NO_ROTULO=new Map([
+  ["portugal","Portugal"],["espanha","Espanha"],["espana","Espanha"],["spain","Espanha"],
+  ["franca","França"],["france","França"],["italia","Itália"],["italy","Itália"],
+  ["chile","Chile"],["argentina","Argentina"],["brasil","Brasil"],["brazil","Brasil"],
+  ["uruguai","Uruguai"],["uruguay","Uruguai"],["alemanha","Alemanha"],["germany","Alemanha"],
+  ["deutschland","Alemanha"],["africa do sul","África do Sul"],["south africa","África do Sul"],
+  ["estados unidos","Estados Unidos"],["united states","Estados Unidos"],
+  ["nova zelandia","Nova Zelândia"],["new zealand","Nova Zelândia"]
+]);
+const SELO_ORIGEM=/^(d\.?o\.?c?\.?g?\.?|d\.?o\.?p\.?|i\.?g\.?p\.?|a\.?o\.?c\.?|denominacao de origem.*|denominacion de origen.*|appellation.*|vinho regional|vin de pays|estate bottled|grand vin|mis en bouteille.*|importado por.*|imported by.*)$/;
 let ocrAcc=null;
 function resetOcrAcc(){ocrAcc={frames:0,nome:"",nomeScore:0,vinic:"",vinScore:0,safra:"",regiao:"",pais:"",tipo:"",linhas:[],cand:{},match:null}}
 /* Entre candidatos a nome quase iguais (ex.: "MVALLADO" × "VALLADO"), descarta o que é o outro com 1–2
@@ -9252,6 +9267,10 @@ function parseFrame(texto){
   if(!ocrAcc.tipo){const t=TIPOS_ROTULO.find(([re])=>re.test(norm));if(t)ocrAcc.tipo=t[1]}
   for(const l of linhas){
     const nl=deacc(l.toLowerCase());
+    /* v1.11: país impresso no rótulo preenche o campo País e sai da corrida
+       pelo nome — antes ele ganhava a corrida. */
+    if(PAIS_NO_ROTULO.has(nl)){ if(!ocrAcc.pais)ocrAcc.pais=PAIS_NO_ROTULO.get(nl); continue }
+    if(SELO_ORIGEM.test(nl))continue;
     if(/^\d+$/.test(l)||LIXO_LINHA.test(nl)||REGIOES_ROTULO.some(([re])=>re.test(nl))||TIPOS_ROTULO.some(([re])=>re.test(nl)))continue;
     const score=l.replace(/[^\p{L}]/gu,"").length;
     const k=l.toUpperCase();
@@ -9365,15 +9384,26 @@ function finalizarRotulo(fonte){
   if(cs.length){acc.nome=cs[0].l;acc.nomeScore=cs[0].score;if(cs[1]){acc.vinic=cs[1].l;acc.vinScore=cs[1].score}}
   const cands=matchBaseMundialTop((acc.nome||"")+" "+(acc.vinic||"")+" "+acc.linhas.join(" "),3);
 
-  /* Nem candidato na base, nem linha firme: não há leitura para mostrar. */
-  if(daFoto&&!cands.length&&!firme)return false;
+  /* v1.10a — LEITURA PARCIAL É LEITURA.
+     Relato do Jorge com o M.I. do Douro: o app disse "não consegui ler" numa
+     garrafa cujo rótulo tem BRANCO, 2022, DOURO e PORTUGAL escritos com todas
+     as letras. O leitor lia tudo isso — e eu jogava fora, porque exigia um
+     NOME e o nome deste vinho são duas letras com pontos ("M.I."), que nunca
+     chegam ao mínimo de seis letras que eu tinha imposto.
+     Safra, região, país e tipo são achados de valor próprio: eles vêm de
+     expressões fixas, não do palpite de "qual linha parece um nome". Agora,
+     havendo qualquer um deles, a ficha abre com o que foi lido e o cursor no
+     campo do nome — que é justamente o que a pessoa sabe e o app não. */
+  const pistas=[acc.safra,acc.regiao,acc.pais,acc.tipo].filter(Boolean);
+  if(daFoto&&!cands.length&&!firme&&!pistas.length)return false;
 
   const fotoCapturada=lastFotoRotulo;
   pararCamera();closeScanner();clearForm();
   lastFotoRotulo=fotoCapturada; /* a foto do rótulo sobrevive à limpeza e vai para a ficha */
 
-  /* Com candidatos da base, a ficha fica limpa: quem responde é o modal. */
-  const escreverOcr=(!daFoto||!cands.length);
+  /* Com candidatos da base, a ficha fica limpa: quem responde é o modal.
+     E vindo de foto, o nome só entra se a leitura foi firme. */
+  const escreverOcr=(!daFoto)||(!cands.length&&firme);
   if(escreverOcr){
     $("#a-nome").value=tituloCase(acc.nome||"");
     if(acc.vinic&&acc.vinScore>=4)$("#a-vinicola").value=tituloCase(acc.vinic);
@@ -9386,10 +9416,26 @@ function finalizarRotulo(fonte){
   else if(daFoto)$("#a-tipo").value="";
   /* As Notas de degustação são do usuário. O texto cru do OCR vai para o modal. */
   if(!daFoto)$("#a-notas").value="Rótulo lido por OCR no aparelho. Texto identificado: "+acc.linhas.join(" · ");
+  const soPistas=daFoto&&!cands.length&&!firme;
   $("#form-title").textContent = daFoto
-    ? (cands.length?"🔎 Li o rótulo aqui — confirme qual é":"🔎 Leitura no aparelho — confira tudo antes de salvar")
+    ? (cands.length?"🔎 Li o rótulo aqui — confirme qual é"
+      :(soPistas?"🔎 Li parte do rótulo — falta o nome do vinho"
+               :"🔎 Leitura no aparelho — confira tudo antes de salvar"))
     : "✓ Rótulo lido — confira, complete e salve";
   $("#form-panel").scrollIntoView({behavior:"smooth"});
+  if(soPistas){
+    /* O que o app sabe, ele mostra. O que não sabe, ele pede — com o cursor
+       já no campo certo, porque digitar 3 letras aciona a base de 206 mil. */
+    const ditos=[];
+    if(acc.tipo)ditos.push(acc.tipo.toLowerCase());
+    if(acc.safra)ditos.push("safra "+acc.safra);
+    if(acc.regiao)ditos.push(acc.regiao);
+    if(acc.pais&&!acc.regiao)ditos.push(acc.pais);
+    setTimeout(()=>{
+      try{$("#a-nome").focus()}catch(e){}
+      toast("Li "+ditos.join(", ")+". O nome eu não consegui — digite 3 letras e a base completa. ✏️");
+    },700);
+  }
   /* candidatos na base mundial: o app PERGUNTA em vez de decidir sozinho */
   if(cands.length){
     window.__cands=cands.map(c=>c.w);
@@ -9914,7 +9960,7 @@ async function analisarRotuloDeCanvas(alta,mini,recado,dataAlta,ger){
     if(scanRestantes===0&&!getIaKey()){
       if(await lerNoAparelho(alta,ger))return true;
       if(!viva())return false;
-      setScan("📸 <b>As suas leituras de foto deste mês acabaram.</b><br>Tentei ler o rótulo aqui no aparelho e não consegui desta vez.<br>Elas voltam no dia 1º — e a busca digitada tem cota própria: toque em <b>⌨️ Prefiro digitar</b>.");
+      setScan("📸 <b>As suas leituras de foto deste mês acabaram.</b><br>Tentei ler aqui no aparelho e este rótulo venceu o leitor — ele lê bem letra de imprensa, e tropeça em letra desenhada, relevo e pouca luz.<br><b>Aproxime até o rótulo encher a moldura</b> e tente de novo, ou toque em <b>⌨️ Prefiro digitar</b>: a busca por nome tem cota própria e alcança as 206 mil garrafas.");
       return false;
     }
     let o=null,ultimo=null;
