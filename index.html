@@ -870,7 +870,7 @@ button.foto-vinho.vazia span{font-size:26px}
 
 <script>
 /* ================== DADOS ================== */
-const APP_VERSION = "1.12"; /* fonte única da versão — Sobre e rodapé leem daqui */
+const APP_VERSION = "1.13"; /* fonte única da versão — Sobre e rodapé leem daqui */
 const SITE_URL = "https://apotheca.app.br/"; /* endereço público do app — troca quando o domínio próprio entrar no ar */
 const IA_KEY_STORE="apotheca_ia_key";
 function getIaKey(){try{return localStorage.getItem(IA_KEY_STORE)||""}catch(e){return ""}}
@@ -9023,9 +9023,55 @@ function dupProcurar(nome,safra,adega){
   return vinhos.find(v=>v.adega===adega&&(v.safra||0)===(safra||0)&&buscaNorm(v.nome)===n)||null;
 }
 let dupPend=null;
+/* ---------- v1.13: SOMAR NÃO PODE SIGNIFICAR JOGAR FORA ----------
+   Relato do Jorge, 02/09/2026: "Fui salvar a ficha do novo M.I e o aplicativo
+   me falou que já tinha uma garrafa... Escolhi acrescentar e ele ficou com a
+   ficha antiga. Que pena."
+
+   Ele tinha razão de se decepcionar, e o defeito era pior do que parecia: a
+   tela MOSTRAVA a divergência lado a lado e, logo depois, descartava o lado
+   novo. A ficha antiga podia ser a que veio errada do primeiro escaneamento —
+   sem produtor, sem castas — e a nova, a boa, lida com o contrarrótulo.
+
+   O conserto tem duas metades. A primeira é oferecer a escolha: um terceiro
+   botão que soma a garrafa E atualiza a ficha. A segunda é o limite dessa
+   escolha, que é o que me impede de trocar um defeito por outro: atualizar
+   mexe só no que é FATO SOBRE O VINHO (vinícola, país, região, castas, tipo).
+   O que é DO DONO — a nota que ele deu, as notas de degustação que escreveu,
+   as posições no mapa da adega, a adega em que guardou — não se toca nunca.
+   Campo vazio é o único caso em que o novo entra sem pedir licença: preencher
+   o que está em branco não tira nada de ninguém. */
+const DUP_FATOS=[["vinicola","Vinícola","#a-vinicola"],["pais","País","#a-pais"],
+                 ["regiao","Região","#a-regiao"],["uvas","Castas","#a-uvas"],
+                 ["tipo","Tipo","#a-tipo"]];
+function dupValorAtual(v,campo){
+  if(campo==="uvas")return (v.uvas||[]).join(", ");
+  const s=String(v[campo]==null?"":v[campo]).trim();
+  return s==="—"?"":s;
+}
+function dupValorForm(sel,campo){
+  const e=$(sel); let s=e?String(e.value||"").trim():"";
+  if(s==="—")s="";
+  if(campo==="uvas")s=s.split(",").map(x=>x.trim()).filter(Boolean).join(", ");
+  return s;
+}
+/* A ficha na tela contra a ficha guardada. Só conta como diferença quando o
+   campo novo tem conteúdo: apagar por omissão seria outra forma de perder dado. */
+function dupDiferencas(v){
+  const out=[];
+  for(const [campo,rot,sel] of DUP_FATOS){
+    const para=dupValorForm(sel,campo);
+    if(!para)continue;
+    const de=dupValorAtual(v,campo);
+    if(buscaNorm(de)===buscaNorm(para))continue;
+    out.push({campo,rot,de,para});
+  }
+  return out;
+}
 function dupPerguntar(v,dados){
   dupPend={id:v.id,...dados};
-  const difere=buscaNorm(v.vinicola||"")!==buscaNorm(dados.vinicola||"");
+  const difs=dupDiferencas(v);
+  const difere=difs.length>0;
   $("#nota-pop-corpo").innerHTML=`
     <button class="close" style="position:absolute;top:10px;right:12px" onclick="dupCancelar()"
       aria-label="Fechar">✕</button>
@@ -9036,16 +9082,26 @@ function dupPerguntar(v,dados){
       ${adegaDe(dados.adega).icone} ${esc(adegaDe(dados.adega).nome)},
       com ${v.qtd} garrafa${v.qtd>1?"s":""}.
       <b>Quer acrescentar mais ${dados.qtd>1?dados.qtd:"uma"}?</b></p>
-    ${difere?`<div style="text-align:left;font-size:12.5px;background:var(--paper-2);
+    ${difere?`<div id="dup-difs" style="text-align:left;font-size:12.5px;background:var(--paper-2);
       border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px">
-      <div style="color:var(--ink-3);margin-bottom:4px">A vinícola está diferente:</div>
-      <div>já cadastrada: <b>${esc(v.vinicola||"—")}</b></div>
-      <div>a que você digitou: <b>${esc(dados.vinicola||"—")}</b></div>
+      <div style="color:var(--ink-3);margin-bottom:6px">Esta ficha traz ${difs.length===1?"um dado diferente":"dados diferentes"} do que você já tem:</div>
+      ${difs.map(d=>`<div style="margin-bottom:6px">
+        <div style="color:var(--ink-3)">${d.rot}</div>
+        <div>já cadastrado: ${esc(d.de||"—")}</div>
+        <div>nesta ficha: <b>${esc(d.para)}</b></div>
+      </div>`).join("")}
     </div>`:""}
-    <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="dupSomar()">
-      ➕ Sim, acrescentar ${dados.qtd} garrafa${dados.qtd>1?"s":""}</button>
+    ${difere?`<button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="dupSomar(true)">
+      ➕ Sim, e ATUALIZAR a ficha com estes dados</button>
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="dupSomar(false)">
+      ➕ Sim, mas MANTER a ficha como está</button>`
+    :`<button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="dupSomar(false)">
+      ➕ Sim, acrescentar ${dados.qtd} garrafa${dados.qtd>1?"s":""}</button>`}
     <button class="btn btn-ghost" style="width:100%;margin-bottom:10px" onclick="dupSeparado()">
       Não, é outro vinho — cadastrar separado</button>
+    ${difere?`<div style="font-size:11px;color:var(--ink-3);margin-bottom:8px">Atualizar troca só os
+      dados do vinho listados acima. A sua nota, as suas notas de degustação e as posições
+      no mapa da adega continuam como estão.</div>`:""}
     <div style="font-size:11px;color:var(--ink-3)">Rótulo separado é o certo quando são
       produtores ou cuvées diferentes com o mesmo nome — acontece em Bordeaux e em
       Montalcino. Na dúvida, some: dá para separar depois.</div>`;
@@ -9059,15 +9115,39 @@ function dupSeparado(){
   $("#nota-pop").classList.remove("open");
   saveWine();
 }
-function dupSomar(){
+/* Devolve a lista de campos que mudaram, ou null se nada mudou. Escreve na
+   fila de sincronia com op:"campo", que é a mesma porta usada pela nota
+   pessoal — assim a atualização chega aos outros aparelhos do dono. */
+function dupAtualizarFicha(v){
+  const c={};
+  for(const d of dupDiferencas(v))
+    c[d.campo] = d.campo==="uvas" ? d.para.split(",").map(s=>s.trim()).filter(Boolean) : d.para;
+  /* preencher vazio nunca é perda */
+  const preco=+$("#a-preco").value||0;
+  if(preco&&!(+v.preco))c.preco=preco;
+  if(!Array.isArray(v.jan)||v.jan.length<2)
+    c.jan=[+$("#a-jan1").value||ANO,+$("#a-jan2").value||ANO+5];
+  const notasNovas=String($("#a-notas").value||"").trim();
+  const notasVelhas=String(v.notas||"").trim();
+  if(notasNovas&&(!notasVelhas||notasVelhas==="Sem notas registradas."))c.notas=notasNovas;
+  const campos=Object.keys(c);
+  if(!campos.length)return null;
+  Object.assign(v,c);
+  filaAnotar({op:"campo",id:v.id,c});
+  return campos;
+}
+function dupSomar(atualizar){
   const p=dupPend; if(!p)return;
   const v=vinhos.find(x=>x.id===p.id);
   dupPend=null; $("#nota-pop").classList.remove("open");
   if(!v)return;
+  const mud=atualizar?dupAtualizarFicha(v):null;
   v.qtd=(v.qtd||0)+p.qtd;
   filaAnotar({op:"qtd",id:v.id,d:p.qtd});
   if(lastFotoRotulo&&!v.fotoId)definirFotoVinho(v,lastFotoRotulo).then(()=>{try{renderColecao()}catch(e){}}).catch(()=>{});
-  toast(`${v.nome} agora tem ${v.qtd} garrafa${v.qtd>1?"s":""}. 🍾`);
+  toast(mud&&mud.length
+    ? `${v.nome}: ${v.qtd} garrafa${v.qtd>1?"s":""} e ficha atualizada. 🍾`
+    : `${v.nome} agora tem ${v.qtd} garrafa${v.qtd>1?"s":""}. 🍾`);
   clearForm();persist();renderAdegaBar();
   go("colecao");
 }
