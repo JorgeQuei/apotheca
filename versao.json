@@ -1,6 +1,7 @@
 {
-  "versao": "1.12",
-  "codigo": 116,
-  "novidades": "O contrarrótulo entrou na leitura — só quando faz falta. Se a foto da frente deixar sem produtor, castas ou região, o Apotheca avisa e oferece fotografar a etiqueta de trás; as duas fotos vão juntas e contam como uma única leitura. Quem fotografou um rótulo que diz tudo não é incomodado.",
-  "publicada_em": "2026-08-31"
+  "versao": "1.14",
+  "codigo": 118,
+  "novidades": "Cinco idiomas — o app segue o idioma do aparelho. O botão + pergunta o que você está fazendo: ler um rótulo, dizer o prato ou preencher à mão. Ao salvar um vinho, escolha entre abrir agora ou guardar na adega.",
+  "publicada_em": "2026-09-15",
+  "apk": "https://play.google.com/store/apps/details?id=br.com.apotheca"
 }
